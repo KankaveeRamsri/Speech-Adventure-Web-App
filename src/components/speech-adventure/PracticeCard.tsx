@@ -1,7 +1,13 @@
 "use client";
 
-import { useState } from "react";
-import type { PracticeItem, PracticeState, EvaluationResult } from "@/types/speechAdventure";
+import { useState, useCallback } from "react";
+import type {
+  PracticeItem,
+  EvaluationResult,
+  MockEvaluationResult,
+} from "@/types/speechAdventure";
+import { useAudioRecorder } from "@/hooks/useAudioRecorder";
+import AudioRecorder from "./AudioRecorder";
 import EvaluationResultCard from "./EvaluationResultCard";
 import RewardBadge from "./RewardBadge";
 
@@ -12,41 +18,131 @@ interface Props {
   onNext?: () => void;
 }
 
-export default function PracticeCard({ item, accentColor, stageName, onNext }: Props) {
-  const [state, setState] = useState<PracticeState>("idle");
+function generateMockEvaluation(): {
+  mock: MockEvaluationResult;
+  result: EvaluationResult;
+} {
+  const pool: Array<{
+    mock: MockEvaluationResult;
+    result: EvaluationResult;
+  }> = [
+    {
+      mock: {
+        score: 95,
+        confidence: 0.97,
+        status: "passed",
+        feedback: "ยอดเยี่ยม! เสียงออกมาชัดเจนมาก! เก่งจัง!",
+        recommendation: "ลองฝึกระดับถัดไปได้เลยนะ",
+        isMock: true,
+      },
+      result: {
+        score: 95,
+        maxScore: 100,
+        stars: 5,
+        message: "ยอดเยี่ยม! เก่งมาก!",
+        isPassed: true,
+      },
+    },
+    {
+      mock: {
+        score: 82,
+        confidence: 0.85,
+        status: "passed",
+        feedback: "ดีมาก! ออกเสียงได้ดีขึ้นแล้ว ใกล้เก่งแล้ว!",
+        recommendation: "ลองฟังเสียงตัวอย่างแล้วฝึกตามอีกสักหน่อยนะ",
+        isMock: true,
+      },
+      result: {
+        score: 82,
+        maxScore: 100,
+        stars: 4,
+        message: "ดีมาก! ใกล้เก่งแล้ว!",
+        isPassed: true,
+      },
+    },
+    {
+      mock: {
+        score: 68,
+        confidence: 0.72,
+        status: "almost",
+        feedback: "ดีใจด้วย! เกือบจะผ่านแล้ว! ลองอีกสักครั้งนะ!",
+        recommendation: "พยายามออกเสียงให้ช้าลงและชัดขึ้นอีกนิด",
+        isMock: true,
+      },
+      result: {
+        score: 68,
+        maxScore: 100,
+        stars: 3,
+        message: "ดีขึ้นแล้ว! ลองอีกครั้งนะ!",
+        isPassed: true,
+      },
+    },
+    {
+      mock: {
+        score: 50,
+        confidence: 0.55,
+        status: "retry",
+        feedback: "สู้ต่อนะ! ลองฟังเสียงตัวอย่างแล้วฝึกอีกครั้ง!",
+        recommendation: "เริ่มจากการฟังเสียงตัวอย่างก่อน แล้วค่อยๆ ออกเสียงตาม",
+        isMock: true,
+      },
+      result: {
+        score: 50,
+        maxScore: 100,
+        stars: 2,
+        message: "พยายามอีกนิดนะ! เกือบแล้ว!",
+        isPassed: false,
+      },
+    },
+  ];
+
+  return pool[Math.floor(Math.random() * pool.length)];
+}
+
+export default function PracticeCard({
+  item,
+  accentColor,
+  stageName,
+  onNext,
+}: Props) {
+  const recorder = useAudioRecorder();
+  const [phase, setPhase] = useState<
+    "idle" | "listening" | "recording" | "evaluated" | "reward"
+  >("idle");
   const [result, setResult] = useState<EvaluationResult | null>(null);
-  const [showReward, setShowReward] = useState(false);
+  const [mockEval, setMockEval] = useState<MockEvaluationResult | null>(null);
 
   const handleListen = () => {
-    setState("listening");
-    setTimeout(() => setState("idle"), 2000);
+    setPhase("listening");
+    setTimeout(() => setPhase("idle"), 2000);
   };
 
-  const handleRecord = () => {
-    setState("recording");
-    setTimeout(() => {
-      setState("processing");
-      setTimeout(() => {
-        const results: EvaluationResult[] = [
-          { score: 95, maxScore: 100, stars: 5, message: "ยอดเยี่ยม! เก่งมาก!", isPassed: true },
-          { score: 80, maxScore: 100, stars: 4, message: "ดีมาก! ใกล้เก่งแล้ว!", isPassed: true },
-          { score: 65, maxScore: 100, stars: 3, message: "พอใช้ได้! ลองอีกครั้งนะ!", isPassed: true },
-        ];
-        const randomResult = results[Math.floor(Math.random() * results.length)];
-        setResult(randomResult);
-        setState("result");
-      }, 1500);
-    }, 3000);
-  };
+  const handleStartRecording = useCallback(() => {
+    setPhase("recording");
+    recorder.startRecording();
+  }, [recorder]);
 
-  const handleRetry = () => {
-    setState("idle");
+  const handleStopRecording = useCallback(() => {
+    recorder.stopRecording();
+    setPhase("idle");
+  }, [recorder]);
+
+  const handleEvaluate = useCallback(() => {
+    const { mock, result: evalResult } = generateMockEvaluation();
+    setResult(evalResult);
+    setMockEval(mock);
+    setPhase("evaluated");
+  }, []);
+
+  const handleRetry = useCallback(() => {
+    recorder.clearRecording();
     setResult(null);
-    setShowReward(false);
-  };
+    setMockEval(null);
+    setPhase("idle");
+  }, [recorder]);
 
   const handleAccept = () => {
-    setShowReward(true);
+    setPhase("reward");
   };
 
   const sizeClass =
@@ -76,86 +172,27 @@ export default function PracticeCard({ item, accentColor, stageName, onNext }: P
         </p>
       </div>
 
-      {/* Action Buttons */}
-      {state !== "result" && (
-        <div className="flex justify-center gap-4 mb-6">
-          {/* Listen Button */}
-          <button
-            onClick={handleListen}
-            disabled={state === "listening" || state === "recording" || state === "processing"}
-            className={`flex flex-col items-center gap-2 px-6 py-4 rounded-2xl transition-all ${
-              state === "listening"
-                ? "bg-info/20 text-info animate-pulse-gentle"
-                : "bg-bg text-text hover:bg-gray-100"
-            } disabled:opacity-50 disabled:cursor-not-allowed`}
-            aria-label="ฟังเสียงตัวอย่าง"
-          >
-            <span className="text-3xl">{state === "listening" ? "🔊" : "🔈"}</span>
-            <span className="text-sm font-medium">ฟังเสียง</span>
-          </button>
-
-          {/* Record Button */}
-          <button
-            onClick={handleRecord}
-            disabled={state === "recording" || state === "processing" || state === "listening"}
-            className={`flex flex-col items-center gap-2 px-6 py-4 rounded-2xl transition-all ${
-              state === "recording"
-                ? "bg-error/20 text-error animate-glow-pulse"
-                : state === "processing"
-                ? "bg-secondary/20 text-secondary animate-pulse-gentle"
-                : "bg-primary text-white hover:bg-primary/90"
-            } disabled:opacity-50 disabled:cursor-not-allowed`}
-            aria-label={state === "recording" ? "กำลังบันทึกเสียง" : "บันทึกเสียงของฉัน"}
-          >
-            <span className="text-3xl">
-              {state === "recording" ? "⏺️" : state === "processing" ? "⏳" : "🎙️"}
-            </span>
-            <span className="text-sm font-medium">
-              {state === "recording"
-                ? "กำลังบันทึก..."
-                : state === "processing"
-                ? "กำลังวิเคราะห์..."
-                : "บันทึกเสียง"}
-            </span>
-          </button>
-
-          {/* Replay (mock) */}
-          <button
-            disabled={state !== "idle"}
-            className="flex flex-col items-center gap-2 px-6 py-4 rounded-2xl bg-bg text-text hover:bg-gray-100 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-            aria-label="ฟังเสียงที่บันทึก"
-          >
-            <span className="text-3xl">🔄</span>
-            <span className="text-sm font-medium">ฟังซ้ำ</span>
-          </button>
-        </div>
-      )}
-
-      {/* Recording Indicator */}
-      {state === "recording" && (
-        <div className="text-center mb-4">
-          <div className="inline-flex items-center gap-2 bg-error/10 text-error px-4 py-2 rounded-full text-sm font-medium">
-            <span className="w-2 h-2 bg-error rounded-full animate-pulse" />
-            กำลังบันทึกเสียง... พูดตอนนี้!
-          </div>
-        </div>
-      )}
-
-      {/* Processing Indicator */}
-      {state === "processing" && (
-        <div className="text-center mb-4">
-          <div className="inline-flex items-center gap-2 bg-secondary/10 text-secondary px-4 py-2 rounded-full text-sm font-medium">
-            <span className="w-2 h-2 bg-secondary rounded-full animate-pulse" />
-            AI กำลังวิเคราะห์เสียงของคุณ...
-          </div>
-        </div>
-      )}
-
-      {/* Result */}
-      {state === "result" && result && !showReward && (
-        <div className="animate-slide-up">
+      {/* Evaluation result phase — show result card */}
+      {phase === "evaluated" && result && mockEval && (
+        <div className="animate-slide-up space-y-4">
           <EvaluationResultCard result={result} accentColor={accentColor} />
-          <div className="flex gap-3 mt-4">
+
+          {/* Mock evaluation details */}
+          <div
+            className="rounded-2xl p-4 text-sm space-y-2"
+            style={{ backgroundColor: `${accentColor}08` }}
+          >
+            <p className="font-semibold text-text">{mockEval.feedback}</p>
+            {mockEval.recommendation && (
+              <p className="text-text-muted">{mockEval.recommendation}</p>
+            )}
+            <p className="text-xs text-text-muted mt-2">
+              💡 ผลประเมินนี้เป็นตัวอย่าง (Mock) ระบบ AI จริงยังไม่พร้อมใช้งาน
+            </p>
+          </div>
+
+          {/* Actions */}
+          <div className="flex gap-3">
             <button
               onClick={handleRetry}
               className="flex-1 py-3 rounded-2xl border-2 border-primary text-primary font-semibold hover:bg-primary/5 transition-all active:scale-[0.98]"
@@ -172,19 +209,60 @@ export default function PracticeCard({ item, accentColor, stageName, onNext }: P
         </div>
       )}
 
-      {/* Reward */}
-      {showReward && result && (
-        <div className="animate-bounce-in text-center">
+      {/* Reward phase */}
+      {phase === "reward" && result && (
+        <div className="animate-bounce-in text-center space-y-4">
           <RewardBadge stars={result.stars} message={result.message} />
           {onNext && (
             <button
               onClick={onNext}
-              className="mt-4 w-full py-3 rounded-2xl bg-secondary text-white font-semibold text-lg hover:bg-secondary/90 transition-all active:scale-[0.98] shadow-md"
+              className="w-full py-3 rounded-2xl bg-secondary text-white font-semibold text-lg hover:bg-secondary/90 transition-all active:scale-[0.98] shadow-md"
             >
               🚀 ภารกิจต่อไป
             </button>
           )}
         </div>
+      )}
+
+      {/* Practice phase — show listen + recorder */}
+      {phase !== "evaluated" && phase !== "reward" && (
+        <>
+          {/* Listen Button */}
+          <div className="flex justify-center mb-6">
+            <button
+              onClick={handleListen}
+              disabled={
+                phase === "listening" ||
+                recorder.state === "recording" ||
+                recorder.state === "requesting_permission"
+              }
+              className={`flex flex-col items-center gap-2 px-6 py-4 rounded-2xl transition-all ${
+                phase === "listening"
+                  ? "bg-info/20 text-info animate-pulse-gentle"
+                  : "bg-bg text-text hover:bg-gray-100"
+              } disabled:opacity-50 disabled:cursor-not-allowed`}
+              aria-label="ฟังเสียงตัวอย่าง"
+            >
+              <span className="text-3xl">
+                {phase === "listening" ? "🔊" : "🔈"}
+              </span>
+              <span className="text-sm font-medium">ฟังเสียง</span>
+            </button>
+          </div>
+
+          {/* Audio Recorder */}
+          <AudioRecorder
+            state={recorder.state}
+            durationMs={recorder.durationMs}
+            errorMessage={recorder.errorMessage}
+            onStartRecording={handleStartRecording}
+            onStopRecording={handleStopRecording}
+            onPlayRecording={recorder.playRecording}
+            onClearRecording={handleRetry}
+            onEvaluate={handleEvaluate}
+            accentColor={accentColor}
+          />
+        </>
       )}
     </div>
   );

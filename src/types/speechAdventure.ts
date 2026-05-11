@@ -2,6 +2,19 @@ export type StageStatus = "completed" | "current" | "locked" | "review";
 
 export type PracticeState = "idle" | "listening" | "recording" | "processing" | "result";
 
+export type RecordingState =
+  | "idle"
+  | "requesting_permission"
+  | "recording"
+  | "recorded"
+  | "processing"
+  | "result"
+  | "permission_denied"
+  | "unsupported"
+  | "error";
+
+export type EvaluationStatus = "passed" | "almost" | "retry";
+
 export interface ChildProfile {
   id: string;
   name: string;
@@ -48,6 +61,25 @@ export interface EvaluationResult {
   stars: number;
   message: string;
   isPassed: boolean;
+}
+
+export interface MockEvaluationResult {
+  score: number;
+  confidence: number;
+  status: EvaluationStatus;
+  feedback: string;
+  recommendation?: string;
+  isMock: true;
+}
+
+export interface AudioAttempt {
+  id: string;
+  stageId: string;
+  practiceItemId: string;
+  audioUrl: string;
+  durationMs: number;
+  createdAt: string;
+  evaluation?: MockEvaluationResult;
 }
 
 export interface ProgressSummary {
