@@ -1,5 +1,7 @@
 "use client";
 
+import Link from "next/link";
+
 export default function HeroSection() {
   return (
     <section className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-primary via-primary/90 to-purple-400 px-6 py-12 md:px-12 md:py-16 text-white">
@@ -23,18 +25,18 @@ export default function HeroSection() {
         </p>
 
         <div className="flex flex-wrap gap-3">
-          <a
+          <Link
             href="/training"
             className="inline-flex items-center gap-2 bg-white text-primary font-semibold px-6 py-3 rounded-2xl text-base md:text-lg hover:bg-opacity-90 transition-all hover:scale-[1.02] active:scale-[0.98] shadow-lg"
           >
             🚀 เริ่มฝึกเลย
-          </a>
-          <a
+          </Link>
+          <Link
             href="/progress"
             className="inline-flex items-center gap-2 bg-white/20 backdrop-blur-sm text-white font-semibold px-6 py-3 rounded-2xl text-base md:text-lg hover:bg-white/30 transition-all hover:scale-[1.02] active:scale-[0.98]"
           >
             📊 ดูความก้าวหน้า
-          </a>
+          </Link>
         </div>
       </div>
     </section>

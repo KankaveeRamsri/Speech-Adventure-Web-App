@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback } from "react";
 import type {
   SpeechProgress,
   PracticeAttempt,
@@ -17,15 +17,11 @@ import {
 } from "@/lib/speechProgressStorage";
 
 export function useSpeechProgress() {
-  const [progress, setProgress] = useState<SpeechProgress>({
-    childId: "child-001",
-    targetSound: "ช",
-    attempts: [],
-    updatedAt: new Date().toISOString(),
-  });
-
-  const [summary, setSummary] = useState<ProgressSummary>(
-    calculateProgressSummary(progress)
+  // Lazy initializers read from localStorage on each component mount,
+  // so navigating back to the training map always picks up the latest progress.
+  const [progress, setProgress] = useState<SpeechProgress>(() => getProgress());
+  const [summary, setSummary] = useState<ProgressSummary>(() =>
+    calculateProgressSummary(getProgress())
   );
 
   const refreshProgress = useCallback(() => {
@@ -33,10 +29,6 @@ export function useSpeechProgress() {
     setProgress(p);
     setSummary(calculateProgressSummary(p));
   }, []);
-
-  useEffect(() => {
-    refreshProgress();
-  }, [refreshProgress]);
 
   const addAttempt = useCallback(
     (attempt: PracticeAttempt) => {

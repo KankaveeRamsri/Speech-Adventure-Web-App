@@ -1,13 +1,15 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useCallback } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
 import PracticeCard from "@/components/speech-adventure/PracticeCard";
+import { useSpeechProgress } from "@/hooks/useSpeechProgress";
 import {
   mockPracticeItems,
   mockTrainingStages,
 } from "@/data/speechAdventureMockData";
+import type { PracticeAttempt } from "@/types/speechAdventure";
 
 export default function PracticePage() {
   const params = useParams();
@@ -17,6 +19,14 @@ export default function PracticePage() {
   const items = mockPracticeItems[stageSlug] ?? [];
 
   const [currentIndex, setCurrentIndex] = useState(0);
+  const { addAttempt } = useSpeechProgress();
+
+  const handleSaveAttempt = useCallback(
+    (attempt: PracticeAttempt) => {
+      addAttempt(attempt);
+    },
+    [addAttempt]
+  );
 
   if (!stage) {
     return (
@@ -129,6 +139,7 @@ export default function PracticePage() {
             item={currentItem}
             accentColor={stage.accentColor}
             stageName={stage.name}
+            onSaveAttempt={handleSaveAttempt}
             onNext={handleNext}
           />
         )}

@@ -9,6 +9,16 @@ const STORAGE_KEY = "speech-adventure-progress-v1";
 const DEFAULT_CHILD_ID = "child-001";
 const DEFAULT_TARGET_SOUND = "ช";
 
+const STAGE_ORDER = [
+  "pretest",
+  "level-1",
+  "level-2",
+  "level-3",
+  "level-4",
+  "level-5",
+  "review",
+];
+
 function isBrowser(): boolean {
   return typeof window !== "undefined";
 }
@@ -68,76 +78,47 @@ export function clearProgress(): void {
   }
 }
 
-const STAGE_ORDER = [
-  "pretest",
-  "level-1",
-  "level-2",
-  "level-3",
-  "level-4",
-  "level-5",
-  "review",
-];
+function isStageCompleted(attempts: PracticeAttempt[], stageId: string): boolean {
+  const stageAttempts = attempts.filter((a) => a.stageId === stageId);
+  if (stageAttempts.length === 0) return false;
+
+  // Pretest and review: any attempt counts as completed
+  if (stageId === "pretest" || stageId === "review") {
+    return true;
+  }
+
+  // Levels 1–5: at least one attempt with score >= 70
+  return stageAttempts.some((a) => a.score >= 70);
+}
+
+function findCurrentStageId(attempts: PracticeAttempt[]): string {
+  for (const stageId of STAGE_ORDER) {
+    if (!isStageCompleted(attempts, stageId)) {
+      return stageId;
+    }
+  }
+  // All stages completed
+  return STAGE_ORDER[STAGE_ORDER.length - 1];
+}
 
 export function getStageStatus(
   attempts: PracticeAttempt[],
   stageId: string
 ): "locked" | "current" | "completed" | "review" {
-  if (attempts.length === 0) {
-    return stageId === "pretest" ? "current" : "locked";
-  }
-
   const stageIndex = STAGE_ORDER.indexOf(stageId);
   if (stageIndex === -1) return "locked";
 
-  const stageAttempts = attempts.filter((a) => a.stageId === stageId);
-  const hasAttempt = stageAttempts.length > 0;
-  const hasPassing = stageAttempts.some((a) => a.score >= 70);
-
-  // Review stage: completed after at least one attempt
-  if (stageId === "review") {
-    if (hasAttempt) return "completed";
-    // Check if level-5 is completed
-    const level5Attempts = attempts.filter((a) => a.stageId === "level-5");
-    if (level5Attempts.some((a) => a.score >= 70)) return "current";
-    return "locked";
+  if (isStageCompleted(attempts, stageId)) {
+    return "completed";
   }
 
-  // Pretest: completed once attempted
-  if (stageId === "pretest") {
-    return hasAttempt ? "completed" : "current";
+  const currentStageId = findCurrentStageId(attempts);
+
+  if (stageId === currentStageId) {
+    return stageId === "review" ? "review" : "current";
   }
 
-  // Regular levels
-  if (hasPassing) return "completed";
-
-  // Find the first stage that should be "current"
-  for (let i = 0; i < STAGE_ORDER.length; i++) {
-    const sid = STAGE_ORDER[i];
-    const sAttempts = attempts.filter((a) => a.stageId === sid);
-
-    if (sid === "pretest") {
-      if (sAttempts.length === 0) {
-        return stageId === "pretest" ? "current" : "locked";
-      }
-      continue;
-    }
-
-    if (sid === "review") {
-      // Check if level-5 is done
-      const l5 = attempts.filter((a) => a.stageId === "level-5");
-      if (l5.some((a) => a.score >= 70)) {
-        return stageId === "review" ? "current" : stageIndex < STAGE_ORDER.indexOf("review") ? "completed" : "locked";
-      }
-      // If we reach here, level-5 not done yet
-      if (stageIndex >= STAGE_ORDER.indexOf("review")) return "locked";
-    }
-
-    if (!sAttempts.some((a) => a.score >= 70)) {
-      return stageId === sid ? "current" : stageIndex < i ? "completed" : "locked";
-    }
-  }
-
-  return "completed";
+  return "locked";
 }
 
 export function getStageAttempts(
@@ -165,24 +146,14 @@ export function calculateProgressSummary(
   // Completed stages
   const completedStageIds = new Set<string>();
   for (const stageId of STAGE_ORDER) {
-    const stageAttempts = attempts.filter((a) => a.stageId === stageId);
-    if (stageId === "pretest" && stageAttempts.length > 0) {
-      completedStageIds.add(stageId);
-    } else if (stageAttempts.some((a) => a.score >= 70)) {
+    if (isStageCompleted(attempts, stageId)) {
       completedStageIds.add(stageId);
     }
   }
   const completedStages = completedStageIds.size;
 
   // Current stage
-  let currentStageId = "pretest";
-  for (const stageId of STAGE_ORDER) {
-    const status = getStageStatus(attempts, stageId);
-    if (status === "current") {
-      currentStageId = stageId;
-      break;
-    }
-  }
+  const currentStageId = findCurrentStageId(attempts) as string;
 
   const stageNames: Record<string, string> = {
     pretest: "Pre-test",
