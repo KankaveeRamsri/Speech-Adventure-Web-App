@@ -47,14 +47,24 @@ export interface TrainingStage {
   starsTotal: number;
 }
 
+export type PracticeItemType =
+  | "test"
+  | "oral_motor"
+  | "sound_choice"
+  | "sound_production"
+  | "word"
+  | "sentence";
+
 export interface PracticeItem {
   id: string;
   stageSlug: string;
   target: string;
   instruction: string;
-  type: "sound" | "word" | "sentence";
+  type: PracticeItemType;
   emoji?: string;
   hint?: string;
+  /** Choices shown for sound_choice type. target is the correct answer. */
+  soundChoices?: string[];
 }
 
 export interface EvaluationResult {

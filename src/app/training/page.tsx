@@ -1,6 +1,5 @@
 "use client";
 
-import { useState } from "react";
 import Link from "next/link";
 import ChildProfileCard from "@/components/speech-adventure/ChildProfileCard";
 import TargetSoundSelector from "@/components/speech-adventure/TargetSoundSelector";
@@ -14,10 +13,14 @@ import {
 import type { TrainingStage } from "@/types/speechAdventure";
 
 export default function TrainingMapPage() {
-  const [selectedSound, setSelectedSound] = useState<string | null>(
-    mockTargetSounds.find((s) => s.isSelected)?.id ?? null
-  );
-  const { getStageStatus, getStageAttempts, summary, isHydrated } = useSpeechProgress();
+  const {
+    getStageStatus,
+    getStageAttempts,
+    summary,
+    isHydrated,
+    selectedSoundId,
+    setSelectedSound,
+  } = useSpeechProgress();
 
   const liveStages: TrainingStage[] = mockTrainingStages.map((stage) => {
     const status = getStageStatus(stage.id);
@@ -26,12 +29,7 @@ export default function TrainingMapPage() {
       (sum, a) => sum + a.starsEarned,
       0
     );
-
-    return {
-      ...stage,
-      status,
-      starsEarned,
-    };
+    return { ...stage, status, starsEarned };
   });
 
   const liveProfile = {
@@ -40,6 +38,8 @@ export default function TrainingMapPage() {
     totalStars: summary.starsEarned,
     totalAttempts: summary.totalAttempts,
   };
+
+  const selectedSound = mockTargetSounds.find((s) => s.id === selectedSoundId);
 
   return (
     <main className="min-h-screen bg-bg">
@@ -66,14 +66,35 @@ export default function TrainingMapPage() {
 
       <div className="max-w-3xl mx-auto px-6 py-6 space-y-6">
         {/* Child Profile */}
-        <ChildProfileCard profile={liveProfile} compact isHydrated={isHydrated} />
+        <ChildProfileCard
+          profile={liveProfile}
+          compact
+          isHydrated={isHydrated}
+        />
 
         {/* Target Sound Selector */}
         <TargetSoundSelector
           sounds={mockTargetSounds}
-          selectedId={selectedSound}
+          selectedId={isHydrated ? selectedSoundId : null}
           onSelect={setSelectedSound}
         />
+
+        {/* Selected sound indicator */}
+        {isHydrated && selectedSound && (
+          <div className="flex items-center gap-3 bg-primary/8 rounded-2xl px-4 py-3">
+            <span className="text-2xl font-bold text-primary">
+              {selectedSound.label}
+            </span>
+            <div>
+              <p className="text-sm font-semibold text-primary">
+                กำลังฝึกเสียง: {selectedSound.description}
+              </p>
+              <p className="text-xs text-text-muted">
+                เปลี่ยนเสียงได้จากด้านบน
+              </p>
+            </div>
+          </div>
+        )}
 
         {/* Training Journey Map */}
         <div>

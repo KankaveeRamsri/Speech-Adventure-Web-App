@@ -5,9 +5,11 @@ import type {
 } from "@/types/speechAdventure";
 
 const STORAGE_KEY = "speech-adventure-progress-v1";
+const SOUND_STORAGE_KEY = "speech-adventure-selected-sound-v1";
 
 const DEFAULT_CHILD_ID = "child-001";
 const DEFAULT_TARGET_SOUND = "ช";
+const DEFAULT_SOUND_ID = "ก";
 
 const STAGE_ORDER = [
   "pretest",
@@ -153,6 +155,45 @@ export function clearProgress(): void {
   } catch {
     // Silently fail
   }
+}
+
+// ── Selected sound store ──────────────────────────────────────────────────────
+// Separate from progress — just a string persisted in its own localStorage key.
+// Follows the same stable-reference pattern as the progress store.
+
+let currentSoundId: string = DEFAULT_SOUND_ID;
+let isSoundInitialized = false;
+const soundListeners = new Set<() => void>();
+
+function initializeSoundIfNeeded(): void {
+  if (!isBrowser() || isSoundInitialized) return;
+  isSoundInitialized = true;
+  try {
+    const stored = localStorage.getItem(SOUND_STORAGE_KEY);
+    if (stored) currentSoundId = stored;
+  } catch { /* ignore */ }
+}
+
+export function subscribeToSelectedSound(callback: () => void): () => void {
+  soundListeners.add(callback);
+  return () => { soundListeners.delete(callback); };
+}
+
+export function getSelectedSoundId(): string {
+  initializeSoundIfNeeded();
+  return currentSoundId;
+}
+
+export function getServerSoundId(): string {
+  return DEFAULT_SOUND_ID;
+}
+
+export function setSelectedSoundId(id: string): void {
+  currentSoundId = id;
+  if (isBrowser()) {
+    try { localStorage.setItem(SOUND_STORAGE_KEY, id); } catch { /* ignore */ }
+  }
+  soundListeners.forEach((fn) => fn());
 }
 
 // ── Stage logic ───────────────────────────────────────────────────────────────

@@ -7,7 +7,7 @@ import PracticeCard from "@/components/speech-adventure/PracticeCard";
 import LevelCompletionSummary from "@/components/speech-adventure/LevelCompletionSummary";
 import { useSpeechProgress } from "@/hooks/useSpeechProgress";
 import {
-  mockPracticeItems,
+  mockPracticeItemsBySound,
   mockTrainingStages,
 } from "@/data/speechAdventureMockData";
 import type { PracticeAttempt } from "@/types/speechAdventure";
@@ -17,12 +17,18 @@ export default function PracticePage() {
   const stageSlug = params.stage as string;
 
   const stage = mockTrainingStages.find((s) => s.slug === stageSlug);
-  const items = mockPracticeItems[stageSlug] ?? [];
+  const { addAttempt, selectedSoundId, isHydrated } = useSpeechProgress();
+
+  // Resolve items: fall back to "ก" if selected sound has no content for this stage
+  const soundContent =
+    mockPracticeItemsBySound[selectedSoundId] ??
+    mockPracticeItemsBySound["ก"] ??
+    {};
+  const items = soundContent[stageSlug] ?? [];
 
   const [currentIndex, setCurrentIndex] = useState(0);
   const [showCompletion, setShowCompletion] = useState(false);
   const [sessionAttempts, setSessionAttempts] = useState<PracticeAttempt[]>([]);
-  const { addAttempt } = useSpeechProgress();
 
   const handleSaveAttempt = useCallback(
     (attempt: PracticeAttempt) => {
@@ -58,9 +64,7 @@ export default function PracticePage() {
         <div className="text-center px-6">
           <p className="text-6xl mb-4">🤔</p>
           <h1 className="text-2xl font-bold text-text mb-2">ไม่พบระดับนี้</h1>
-          <p className="text-text-muted mb-6">
-            ระดับที่น้องกำลังมองหาไม่มีอยู่
-          </p>
+          <p className="text-text-muted mb-6">ระดับที่น้องกำลังมองหาไม่มีอยู่</p>
           <Link
             href="/training"
             className="inline-flex items-center gap-2 bg-primary text-white px-6 py-3 rounded-2xl font-semibold hover:bg-primary/90 transition-all"
@@ -72,22 +76,37 @@ export default function PracticePage() {
     );
   }
 
-  if (items.length === 0) {
+  if (isHydrated && items.length === 0) {
     return (
-      <main className="min-h-screen bg-bg flex items-center justify-center">
-        <div className="text-center px-6">
+      <main className="min-h-screen bg-bg">
+        <nav className="sticky top-0 z-20 bg-surface/90 backdrop-blur-sm border-b border-gray-100">
+          <div className="flex items-center justify-between px-6 py-3 max-w-3xl mx-auto">
+            <Link href="/training" className="flex items-center gap-2 text-text-muted hover:text-text transition-colors">
+              <span className="text-lg">←</span>
+              <span className="text-sm font-medium hidden sm:inline">แผนที่การฝึก</span>
+            </Link>
+            <h1 className="font-bold text-text text-sm sm:text-base">
+              {stage.icon} {stage.name}
+            </h1>
+            <span />
+          </div>
+        </nav>
+        <div className="max-w-3xl mx-auto px-6 py-16 text-center">
           <p className="text-6xl mb-4">🔧</p>
-          <h1 className="text-2xl font-bold text-text mb-2">
-            ยังไม่มีภารกิจ
-          </h1>
-          <p className="text-text-muted mb-6">
-            ระดับนี้ยังอยู่ระหว่างการเตรียมภารกิจ
+          <h2 className="text-xl font-bold text-text mb-2">
+            ยังไม่มีภารกิจสำหรับเสียงนี้
+          </h2>
+          <p className="text-text-muted mb-2">
+            เสียง <strong className="text-primary">{selectedSoundId}</strong> ใน {stage.name} ยังอยู่ระหว่างการเตรียม
+          </p>
+          <p className="text-sm text-text-muted mb-6">
+            ลองเปลี่ยนเสียงที่ต้องการฝึกที่หน้าแผนที่
           </p>
           <Link
             href="/training"
             className="inline-flex items-center gap-2 bg-primary text-white px-6 py-3 rounded-2xl font-semibold hover:bg-primary/90 transition-all"
           >
-            ← กลับแผนที่การฝึก
+            🗺️ เปลี่ยนเสียงที่แผนที่
           </Link>
         </div>
       </main>
@@ -98,7 +117,9 @@ export default function PracticePage() {
   const isLastMission = currentIndex === items.length - 1;
   const progressPercent = showCompletion
     ? 100
-    : ((currentIndex + 1) / items.length) * 100;
+    : items.length > 0
+      ? ((currentIndex + 1) / items.length) * 100
+      : 0;
 
   return (
     <main className="min-h-screen bg-bg">
@@ -111,9 +132,7 @@ export default function PracticePage() {
             aria-label="กลับแผนที่การฝึก"
           >
             <span className="text-lg">←</span>
-            <span className="text-sm font-medium hidden sm:inline">
-              แผนที่การฝึก
-            </span>
+            <span className="text-sm font-medium hidden sm:inline">แผนที่การฝึก</span>
           </Link>
           <h1 className="font-bold text-text text-sm sm:text-base">
             {stage.icon} {stage.name}
@@ -121,7 +140,7 @@ export default function PracticePage() {
           <span className="text-sm font-medium text-text-muted">
             {showCompletion
               ? `✓ ${items.length}/${items.length}`
-              : `${currentIndex + 1}/${items.length}`}
+              : items.length > 0 ? `${currentIndex + 1}/${items.length}` : ""}
           </span>
         </div>
 
@@ -129,17 +148,13 @@ export default function PracticePage() {
         <div className="h-1.5 bg-gray-100">
           <div
             className="h-full rounded-r-full transition-all duration-500"
-            style={{
-              width: `${progressPercent}%`,
-              backgroundColor: stage.accentColor,
-            }}
+            style={{ width: `${progressPercent}%`, backgroundColor: stage.accentColor }}
           />
         </div>
       </nav>
 
       <div className="max-w-3xl mx-auto px-6 py-6 space-y-5">
         {showCompletion ? (
-          /* ── Level completion summary ── */
           <LevelCompletionSummary
             attempts={sessionAttempts}
             stage={stage}
@@ -148,7 +163,7 @@ export default function PracticePage() {
           />
         ) : (
           <>
-            {/* ── Level info + step dots ── */}
+            {/* Level info + step dots */}
             <div className="bg-surface rounded-3xl p-5 shadow-sm">
               <div className="flex items-center gap-3">
                 <span
@@ -159,66 +174,57 @@ export default function PracticePage() {
                   {stage.icon}
                 </span>
                 <div className="min-w-0">
-                  <h2 className="font-bold text-text leading-tight">
-                    {stage.name}
-                  </h2>
-                  <p className="text-sm text-text-muted truncate">
-                    {stage.shortGoal}
-                  </p>
+                  <h2 className="font-bold text-text leading-tight">{stage.name}</h2>
+                  <p className="text-sm text-text-muted truncate">{stage.shortGoal}</p>
                 </div>
-                {/* Mission counter badge */}
-                <div
-                  className="ml-auto shrink-0 rounded-2xl px-4 py-2 text-center"
-                  style={{ backgroundColor: `${stage.accentColor}15` }}
-                >
-                  <p
-                    className="text-xs font-semibold"
-                    style={{ color: stage.accentColor }}
-                  >
-                    ภารกิจที่
-                  </p>
-                  <p
-                    className="text-xl font-bold leading-tight"
-                    style={{ color: stage.accentColor }}
-                  >
-                    {currentIndex + 1}
-                    <span className="text-sm font-normal text-text-muted">
-                      {" "}
-                      / {items.length}
+
+                {/* Mission counter + sound badge */}
+                <div className="ml-auto shrink-0 text-right space-y-0.5">
+                  {isHydrated && (
+                    <span
+                      className="inline-block text-xs font-bold px-2 py-0.5 rounded-full"
+                      style={{ backgroundColor: `${stage.accentColor}20`, color: stage.accentColor }}
+                    >
+                      เสียง {selectedSoundId}
                     </span>
-                  </p>
+                  )}
+                  {items.length > 0 && (
+                    <p className="text-xs text-text-muted">
+                      ภารกิจที่{" "}
+                      <span className="font-bold" style={{ color: stage.accentColor }}>
+                        {currentIndex + 1}
+                      </span>
+                      {" / "}{items.length}
+                    </p>
+                  )}
                 </div>
               </div>
 
               {/* Step dots */}
-              <div className="flex items-center justify-center gap-2 mt-4">
-                {items.map((_, i) => (
-                  <div
-                    key={i}
-                    className={`h-2 rounded-full transition-all duration-300 ${
-                      i < currentIndex
-                        ? "w-4"
-                        : i === currentIndex
-                          ? "w-7"
-                          : "w-2"
-                    }`}
-                    style={{
-                      backgroundColor:
-                        i <= currentIndex ? stage.accentColor : "#E5E7EB",
-                    }}
-                    aria-hidden="true"
-                  />
-                ))}
-              </div>
+              {items.length > 0 && (
+                <div className="flex items-center justify-center gap-2 mt-4">
+                  {items.map((_, i) => (
+                    <div
+                      key={i}
+                      className={`h-2 rounded-full transition-all duration-300 ${
+                        i < currentIndex ? "w-4" : i === currentIndex ? "w-7" : "w-2"
+                      }`}
+                      style={{ backgroundColor: i <= currentIndex ? stage.accentColor : "#E5E7EB" }}
+                      aria-hidden="true"
+                    />
+                  ))}
+                </div>
+              )}
             </div>
 
-            {/* ── Practice card ── */}
+            {/* Practice card */}
             {currentItem && (
               <PracticeCard
                 key={currentItem.id}
                 item={currentItem}
                 accentColor={stage.accentColor}
                 stageName={stage.name}
+                targetSound={selectedSoundId}
                 missionIndex={currentIndex}
                 totalMissions={items.length}
                 isLastMission={isLastMission}
@@ -227,7 +233,7 @@ export default function PracticePage() {
               />
             )}
 
-            {/* ── Previous mission button ── */}
+            {/* Previous mission button */}
             {currentIndex > 0 && (
               <div className="flex justify-start">
                 <button

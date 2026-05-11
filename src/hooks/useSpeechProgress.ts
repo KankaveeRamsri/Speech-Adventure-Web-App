@@ -16,6 +16,10 @@ import {
   calculateProgressSummary,
   getStageStatus as computeStageStatus,
   getStageAttempts as computeStageAttempts,
+  subscribeToSelectedSound,
+  getSelectedSoundId,
+  getServerSoundId,
+  setSelectedSoundId,
 } from "@/lib/speechProgressStorage";
 
 // ── isHydrated detection ──────────────────────────────────────────────────────
@@ -47,6 +51,12 @@ export function useSpeechProgress() {
     serverSnapshot,
   );
 
+  const selectedSoundId = useSyncExternalStore(
+    subscribeToSelectedSound,
+    getSelectedSoundId,
+    getServerSoundId,
+  );
+
   const summary: ProgressSummary = calculateProgressSummary(progress);
 
   const addAttempt = useCallback((attempt: PracticeAttempt) => {
@@ -62,6 +72,10 @@ export function useSpeechProgress() {
   const refreshProgress = useCallback(() => {
     // With useSyncExternalStore the snapshot is re-read automatically
     // whenever notifyListeners fires. This is kept for API compatibility.
+  }, []);
+
+  const setSelectedSound = useCallback((id: string) => {
+    setSelectedSoundId(id);
   }, []);
 
   const getStageStatus = useCallback(
@@ -83,6 +97,8 @@ export function useSpeechProgress() {
     summary,
     attempts: progress.attempts,
     isHydrated,
+    selectedSoundId,
+    setSelectedSound,
     addAttempt,
     clearProgress: clearAllProgress,
     refreshProgress,
