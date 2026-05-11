@@ -19,66 +19,148 @@ const STAGE_ORDER = [
   "review",
 ];
 
+// ── Stable snapshots ──────────────────────────────────────────────────────────
+//
+// useSyncExternalStore uses Object.is() to compare snapshots on every render.
+// If getSnapshot / getServerSnapshot return a new object reference each call,
+// React sees a perpetual "change" and loops infinitely.
+//
+// Rules:
+//  • SERVER_PROGRESS is a module-level constant — always the same reference.
+//  • currentProgress is mutated ONLY in write operations (addAttempt /
+//    clearProgress) by assigning a brand-new object. Between writes, getProgress()
+//    returns the same reference, so React stays stable.
+
+const SERVER_PROGRESS: SpeechProgress = {
+  childId: DEFAULT_CHILD_ID,
+  targetSound: DEFAULT_TARGET_SOUND,
+  attempts: [],
+  updatedAt: "",
+};
+
+// In-memory cache — the single source of truth for the client snapshot.
+// Starts as SERVER_PROGRESS until the client initializes from localStorage.
+let currentProgress: SpeechProgress = SERVER_PROGRESS;
+let isClientInitialized = false;
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+
 function isBrowser(): boolean {
   return typeof window !== "undefined";
 }
 
-function createEmptyProgress(): SpeechProgress {
-  return {
-    childId: DEFAULT_CHILD_ID,
-    targetSound: DEFAULT_TARGET_SOUND,
-    attempts: [],
-    updatedAt: new Date().toISOString(),
-  };
-}
-
-export function getProgress(): SpeechProgress {
-  if (!isBrowser()) return createEmptyProgress();
-
+function readFromLocalStorage(): SpeechProgress {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) return createEmptyProgress();
+    if (!raw) return SERVER_PROGRESS;
 
     const parsed = JSON.parse(raw) as SpeechProgress;
-    if (!parsed || !Array.isArray(parsed.attempts)) {
-      return createEmptyProgress();
-    }
+    if (!parsed || !Array.isArray(parsed.attempts)) return SERVER_PROGRESS;
 
     return parsed;
   } catch {
-    return createEmptyProgress();
+    return SERVER_PROGRESS;
   }
 }
 
-export function saveProgress(progress: SpeechProgress): void {
-  if (!isBrowser()) return;
+/** Populate currentProgress from localStorage exactly once per page load. */
+function initializeIfNeeded(): void {
+  if (!isBrowser() || isClientInitialized) return;
+  isClientInitialized = true;
+  currentProgress = readFromLocalStorage();
+}
 
+function writeToLocalStorage(progress: SpeechProgress): void {
+  if (!isBrowser()) return;
   try {
-    progress.updatedAt = new Date().toISOString();
     localStorage.setItem(STORAGE_KEY, JSON.stringify(progress));
   } catch {
     // Storage full or unavailable — silently fail for prototype
   }
 }
 
-export function addAttempt(attempt: PracticeAttempt): SpeechProgress {
-  const progress = getProgress();
-  progress.attempts.push(attempt);
-  saveProgress(progress);
-  return progress;
+// ── Pub-sub for useSyncExternalStore ─────────────────────────────────────────
+
+const listeners = new Set<() => void>();
+
+function notifyListeners(): void {
+  listeners.forEach((fn) => fn());
 }
 
+/** Register a callback that fires whenever the progress store changes.
+ *  Used by useSyncExternalStore in useSpeechProgress. */
+export function subscribeToProgress(callback: () => void): () => void {
+  listeners.add(callback);
+  return () => {
+    listeners.delete(callback);
+  };
+}
+
+// ── Snapshots (called by useSyncExternalStore during render) ──────────────────
+
+/** Client snapshot: returns the stable in-memory reference.
+ *  Never parses localStorage inside render — only changes after write ops. */
+export function getProgress(): SpeechProgress {
+  initializeIfNeeded();
+  return currentProgress;
+}
+
+/** Server snapshot: always returns the exact same constant reference.
+ *  React requires this to be cached (same object) to avoid infinite loops. */
+export function getServerProgress(): SpeechProgress {
+  return SERVER_PROGRESS;
+}
+
+// ── Write operations (update the cache, persist, then notify) ─────────────────
+// These are the ONLY places that change currentProgress or call notifyListeners.
+// Never call these inside a render path.
+
+/** Persist an existing progress object without touching the in-memory cache.
+ *  Useful for legacy call sites; prefer addAttempt() for new code. */
+export function saveProgress(progress: SpeechProgress): void {
+  writeToLocalStorage(progress);
+}
+
+/** Add a new attempt, update the in-memory cache, and notify subscribers. */
+export function addAttempt(attempt: PracticeAttempt): SpeechProgress {
+  initializeIfNeeded();
+
+  // Spread into a fresh object so Object.is() detects the change.
+  const next: SpeechProgress = {
+    childId: currentProgress.childId,
+    targetSound: currentProgress.targetSound,
+    attempts: [...currentProgress.attempts, attempt],
+    updatedAt: new Date().toISOString(),
+  };
+
+  currentProgress = next;
+  writeToLocalStorage(currentProgress);
+  notifyListeners();
+  return currentProgress;
+}
+
+/** Clear all progress from localStorage and reset the in-memory cache. */
 export function clearProgress(): void {
   if (!isBrowser()) return;
 
   try {
     localStorage.removeItem(STORAGE_KEY);
+    // Reassign to SERVER_PROGRESS — this IS a new reference vs real data,
+    // so Object.is detects the change and React re-renders once.
+    currentProgress = SERVER_PROGRESS;
+    // Keep isClientInitialized = true so we don't re-read a stale file.
+    notifyListeners();
   } catch {
     // Silently fail
   }
 }
 
-function isStageCompleted(attempts: PracticeAttempt[], stageId: string): boolean {
+// ── Stage logic ───────────────────────────────────────────────────────────────
+
+function isStageCompleted(
+  attempts: PracticeAttempt[],
+  stageId: string
+): boolean {
   const stageAttempts = attempts.filter((a) => a.stageId === stageId);
   if (stageAttempts.length === 0) return false;
 
@@ -97,7 +179,6 @@ function findCurrentStageId(attempts: PracticeAttempt[]): string {
       return stageId;
     }
   }
-  // All stages completed
   return STAGE_ORDER[STAGE_ORDER.length - 1];
 }
 
@@ -128,6 +209,8 @@ export function getStageAttempts(
   return attempts.filter((a) => a.stageId === stageId);
 }
 
+// ── Progress summary ──────────────────────────────────────────────────────────
+
 export function calculateProgressSummary(
   progress: SpeechProgress
 ): ProgressSummary {
@@ -143,7 +226,6 @@ export function calculateProgressSummary(
   const starsEarned = attempts.reduce((sum, a) => sum + a.starsEarned, 0);
   const accuracy = averageScore;
 
-  // Completed stages
   const completedStageIds = new Set<string>();
   for (const stageId of STAGE_ORDER) {
     if (isStageCompleted(attempts, stageId)) {
@@ -152,7 +234,6 @@ export function calculateProgressSummary(
   }
   const completedStages = completedStageIds.size;
 
-  // Current stage
   const currentStageId = findCurrentStageId(attempts) as string;
 
   const stageNames: Record<string, string> = {
@@ -165,7 +246,6 @@ export function calculateProgressSummary(
     review: "Review / Post-test",
   };
 
-  // Pretest / Review scores
   const pretestAttempts = attempts.filter((a) => a.stageId === "pretest");
   const reviewAttempts = attempts.filter((a) => a.stageId === "review");
 
@@ -188,7 +268,6 @@ export function calculateProgressSummary(
   const improvement =
     pretestScore > 0 && reviewScore > 0 ? reviewScore - pretestScore : 0;
 
-  // Difficult items (score < 60, at least 1 attempt)
   const itemMap = new Map<
     string,
     { promptText: string; totalScore: number; count: number }
@@ -218,10 +297,8 @@ export function calculateProgressSummary(
     .sort((a, b) => a.averageScore - b.averageScore)
     .slice(0, 5);
 
-  // Difficult sounds from difficult items
   const difficultSounds = difficultItems.map((d) => d.promptText).slice(0, 3);
 
-  // Recent attempts (last 10)
   const recentAttempts = [...attempts]
     .sort(
       (a, b) =>

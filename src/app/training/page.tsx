@@ -17,7 +17,7 @@ export default function TrainingMapPage() {
   const [selectedSound, setSelectedSound] = useState<string | null>(
     mockTargetSounds.find((s) => s.isSelected)?.id ?? null
   );
-  const { getStageStatus, getStageAttempts, summary } = useSpeechProgress();
+  const { getStageStatus, getStageAttempts, summary, isHydrated } = useSpeechProgress();
 
   const liveStages: TrainingStage[] = mockTrainingStages.map((stage) => {
     const status = getStageStatus(stage.id);
@@ -66,7 +66,7 @@ export default function TrainingMapPage() {
 
       <div className="max-w-3xl mx-auto px-6 py-6 space-y-6">
         {/* Child Profile */}
-        <ChildProfileCard profile={liveProfile} compact />
+        <ChildProfileCard profile={liveProfile} compact isHydrated={isHydrated} />
 
         {/* Target Sound Selector */}
         <TargetSoundSelector

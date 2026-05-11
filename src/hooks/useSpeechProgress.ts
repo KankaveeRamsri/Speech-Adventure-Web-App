@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useCallback, useSyncExternalStore } from "react";
 import type {
   SpeechProgress,
   PracticeAttempt,
@@ -9,6 +9,8 @@ import type {
 } from "@/types/speechAdventure";
 import {
   getProgress,
+  getServerProgress,
+  subscribeToProgress,
   addAttempt as storageAddAttempt,
   clearProgress as storageClearProgress,
   calculateProgressSummary,
@@ -16,54 +18,71 @@ import {
   getStageAttempts as computeStageAttempts,
 } from "@/lib/speechProgressStorage";
 
+// ── isHydrated detection ──────────────────────────────────────────────────────
+// useSyncExternalStore with different server/client snapshots:
+// • Server + client hydration → false  (matches → no hydration mismatch)
+// • After hydration            → true   (React re-renders once, synchronously)
+// This avoids calling setState inside an effect entirely.
+
+const noopSubscribe = () => () => {};
+const clientSnapshot = () => true as const;
+const serverSnapshot = () => false as const;
+
+// ─────────────────────────────────────────────────────────────────────────────
+
 export function useSpeechProgress() {
-  // Lazy initializers read from localStorage on each component mount,
-  // so navigating back to the training map always picks up the latest progress.
-  const [progress, setProgress] = useState<SpeechProgress>(() => getProgress());
-  const [summary, setSummary] = useState<ProgressSummary>(() =>
-    calculateProgressSummary(getProgress())
+  // progress is synchronized with localStorage.
+  // getServerProgress() is used on the server AND during client hydration so
+  // the initial HTML matches — no hydration mismatch.
+  const progress = useSyncExternalStore<SpeechProgress>(
+    subscribeToProgress,
+    getProgress,
+    getServerProgress,
   );
 
-  const refreshProgress = useCallback(() => {
-    const p = getProgress();
-    setProgress(p);
-    setSummary(calculateProgressSummary(p));
+  // isHydrated: false during SSR + hydration, true right after.
+  const isHydrated = useSyncExternalStore(
+    noopSubscribe,
+    clientSnapshot,
+    serverSnapshot,
+  );
+
+  const summary: ProgressSummary = calculateProgressSummary(progress);
+
+  const addAttempt = useCallback((attempt: PracticeAttempt) => {
+    // storageAddAttempt saves to localStorage and calls notifyListeners(),
+    // which triggers useSyncExternalStore to re-read getProgress().
+    storageAddAttempt(attempt);
   }, []);
-
-  const addAttempt = useCallback(
-    (attempt: PracticeAttempt) => {
-      const updated = storageAddAttempt(attempt);
-      setProgress(updated);
-      setSummary(calculateProgressSummary(updated));
-    },
-    []
-  );
 
   const clearAllProgress = useCallback(() => {
     storageClearProgress();
-    const empty = getProgress();
-    setProgress(empty);
-    setSummary(calculateProgressSummary(empty));
+  }, []);
+
+  const refreshProgress = useCallback(() => {
+    // With useSyncExternalStore the snapshot is re-read automatically
+    // whenever notifyListeners fires. This is kept for API compatibility.
   }, []);
 
   const getStageStatus = useCallback(
     (stageId: string): StageStatus => {
       return computeStageStatus(progress.attempts, stageId);
     },
-    [progress.attempts]
+    [progress.attempts],
   );
 
   const getStageAttempts = useCallback(
     (stageId: string): PracticeAttempt[] => {
       return computeStageAttempts(progress.attempts, stageId);
     },
-    [progress.attempts]
+    [progress.attempts],
   );
 
   return {
     progress,
     summary,
     attempts: progress.attempts,
+    isHydrated,
     addAttempt,
     clearProgress: clearAllProgress,
     refreshProgress,
