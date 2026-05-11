@@ -82,14 +82,51 @@ export interface AudioAttempt {
   evaluation?: MockEvaluationResult;
 }
 
+export interface PracticeAttempt {
+  id: string;
+  childId: string;
+  stageId: string;
+  practiceItemId: string;
+  targetSound: string;
+  promptText: string;
+  durationMs: number;
+  score: number;
+  confidence: number;
+  status: EvaluationStatus;
+  feedback: string;
+  recommendation?: string;
+  starsEarned: number;
+  createdAt: string;
+}
+
+export interface SpeechProgress {
+  childId: string;
+  targetSound: string;
+  attempts: PracticeAttempt[];
+  updatedAt: string;
+}
+
+export interface DifficultItem {
+  practiceItemId: string;
+  promptText: string;
+  averageScore: number;
+  attempts: number;
+}
+
 export interface ProgressSummary {
+  totalAttempts: number;
+  averageScore: number;
+  starsEarned: number;
+  completedStages: number;
+  currentStageId: string;
   pretestScore: number;
   reviewScore: number;
-  currentLevel: string;
-  totalStars: number;
-  totalAttempts: number;
-  difficultSounds: string[];
+  improvement: number;
   accuracy: number;
+  currentLevel: string;
+  difficultSounds: string[];
+  difficultItems: DifficultItem[];
+  recentAttempts: PracticeAttempt[];
 }
 
 export interface PracticeHistory {

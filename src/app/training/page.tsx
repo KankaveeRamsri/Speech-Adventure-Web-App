@@ -5,16 +5,41 @@ import Link from "next/link";
 import ChildProfileCard from "@/components/speech-adventure/ChildProfileCard";
 import TargetSoundSelector from "@/components/speech-adventure/TargetSoundSelector";
 import TrainingMap from "@/components/speech-adventure/TrainingMap";
+import { useSpeechProgress } from "@/hooks/useSpeechProgress";
 import {
   mockChildProfile,
   mockTargetSounds,
   mockTrainingStages,
 } from "@/data/speechAdventureMockData";
+import type { TrainingStage } from "@/types/speechAdventure";
 
 export default function TrainingMapPage() {
   const [selectedSound, setSelectedSound] = useState<string | null>(
     mockTargetSounds.find((s) => s.isSelected)?.id ?? null
   );
+  const { getStageStatus, getStageAttempts, summary } = useSpeechProgress();
+
+  const liveStages: TrainingStage[] = mockTrainingStages.map((stage) => {
+    const status = getStageStatus(stage.id);
+    const stageAttempts = getStageAttempts(stage.id);
+    const starsEarned = stageAttempts.reduce(
+      (sum, a) => sum + a.starsEarned,
+      0
+    );
+
+    return {
+      ...stage,
+      status,
+      starsEarned,
+    };
+  });
+
+  const liveProfile = {
+    ...mockChildProfile,
+    currentStage: summary.currentStageId,
+    totalStars: summary.starsEarned,
+    totalAttempts: summary.totalAttempts,
+  };
 
   return (
     <main className="min-h-screen bg-bg">
@@ -41,7 +66,7 @@ export default function TrainingMapPage() {
 
       <div className="max-w-3xl mx-auto px-6 py-6 space-y-6">
         {/* Child Profile */}
-        <ChildProfileCard profile={mockChildProfile} compact />
+        <ChildProfileCard profile={liveProfile} compact />
 
         {/* Target Sound Selector */}
         <TargetSoundSelector
@@ -55,7 +80,7 @@ export default function TrainingMapPage() {
           <h2 className="text-xl font-bold text-text mb-4">
             🗺️ เส้นทางการผจญภัย
           </h2>
-          <TrainingMap stages={mockTrainingStages} />
+          <TrainingMap stages={liveStages} />
         </div>
       </div>
     </main>

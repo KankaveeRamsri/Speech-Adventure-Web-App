@@ -1,14 +1,32 @@
+"use client";
+
+import { useState } from "react";
 import Link from "next/link";
 import ChildProfileCard from "@/components/speech-adventure/ChildProfileCard";
-import ProgressSummary from "@/components/speech-adventure/ProgressSummary";
+import RecentAttemptsList from "@/components/speech-adventure/RecentAttemptsList";
+import StageProgressCard from "@/components/speech-adventure/StageProgressCard";
+import { useSpeechProgress } from "@/hooks/useSpeechProgress";
 import {
   mockChildProfile,
-  mockProgressSummary,
-  mockPracticeHistory,
   mockTrainingStages,
 } from "@/data/speechAdventureMockData";
 
 export default function ProgressDashboardPage() {
+  const { summary, clearProgress, getStageStatus } = useSpeechProgress();
+  const [showResetConfirm, setShowResetConfirm] = useState(false);
+
+  const liveProfile = {
+    ...mockChildProfile,
+    currentStage: summary.currentStageId,
+    totalStars: summary.starsEarned,
+    totalAttempts: summary.totalAttempts,
+  };
+
+  const handleReset = () => {
+    clearProgress();
+    setShowResetConfirm(false);
+  };
+
   return (
     <main className="min-h-screen bg-bg">
       {/* Top Bar */}
@@ -40,99 +58,162 @@ export default function ProgressDashboardPage() {
         </div>
 
         {/* Child Profile */}
-        <ChildProfileCard profile={mockChildProfile} />
+        <ChildProfileCard profile={liveProfile} />
 
         {/* Progress Summary */}
-        <ProgressSummary summary={mockProgressSummary} />
+        <div className="bg-surface rounded-3xl p-6 shadow-sm">
+          <h3 className="text-lg font-bold text-text mb-4">
+            📊 สรุปความก้าวหน้า
+          </h3>
+
+          {/* Pretest vs Review Comparison */}
+          <div className="grid grid-cols-2 gap-4 mb-6">
+            <div className="bg-level-pretest/10 rounded-2xl p-4 text-center">
+              <p className="text-sm text-text-muted mb-1">คะแนน Pre-test</p>
+              <p className="text-3xl font-bold text-level-pretest">
+                {summary.pretestScore || "—"}
+              </p>
+            </div>
+            <div className="bg-success/10 rounded-2xl p-4 text-center">
+              <p className="text-sm text-text-muted mb-1">คะแนน Review</p>
+              <p className="text-3xl font-bold text-success">
+                {summary.reviewScore || "—"}
+              </p>
+            </div>
+          </div>
+
+          {/* Improvement indicator */}
+          {summary.improvement > 0 && (
+            <div className="bg-success/10 rounded-2xl p-4 mb-6 text-center">
+              <p className="text-sm text-text-muted">พัฒนาการ</p>
+              <p className="text-2xl font-bold text-success">
+                +{summary.improvement} คะแนน
+              </p>
+              <p className="text-sm text-text-muted mt-1">
+                {summary.improvement >= 30
+                  ? "พัฒนาการยอดเยี่ยม!"
+                  : summary.improvement >= 15
+                  ? "พัฒนาการดีมาก!"
+                  : "พัฒนาการดีขึ้นเรื่อยๆ!"}
+              </p>
+            </div>
+          )}
+
+          {/* Stats Grid */}
+          <div className="grid grid-cols-2 gap-3 mb-6">
+            <div className="bg-bg rounded-2xl p-3">
+              <p className="text-xs text-text-muted">ระดับปัจจุบัน</p>
+              <p className="text-sm font-semibold text-text">
+                {summary.currentLevel}
+              </p>
+            </div>
+            <div className="bg-bg rounded-2xl p-3">
+              <p className="text-xs text-text-muted">ดาวทั้งหมด</p>
+              <p className="text-sm font-semibold text-secondary">
+                ⭐ {summary.starsEarned}
+              </p>
+            </div>
+            <div className="bg-bg rounded-2xl p-3">
+              <p className="text-xs text-text-muted">จำนวนครั้งที่ฝึก</p>
+              <p className="text-sm font-semibold text-primary">
+                {summary.totalAttempts} ครั้ง
+              </p>
+            </div>
+            <div className="bg-bg rounded-2xl p-3">
+              <p className="text-xs text-text-muted">คะแนนเฉลี่ย</p>
+              <p className="text-sm font-semibold text-success">
+                {summary.averageScore}%
+              </p>
+            </div>
+          </div>
+
+          {/* Difficult Sounds */}
+          {summary.difficultSounds.length > 0 && (
+            <div>
+              <p className="text-sm font-semibold text-text mb-2">
+                เสียงที่ควรฝึกเพิ่มเติม
+              </p>
+              <div className="flex gap-2 flex-wrap">
+                {summary.difficultSounds.map((sound) => (
+                  <span
+                    key={sound}
+                    className="inline-flex items-center gap-1 bg-secondary/10 text-secondary px-3 py-1.5 rounded-full text-sm font-medium"
+                  >
+                    ⚠️ {sound}
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
 
         {/* Stage Progress */}
         <div className="bg-surface rounded-3xl p-6 shadow-sm">
-          <h3 className="text-lg font-bold text-text mb-4">📍 ความคืบหน้าในแต่ละระดับ</h3>
+          <h3 className="text-lg font-bold text-text mb-4">
+            📍 ความคืบหน้าในแต่ละระดับ
+          </h3>
           <div className="space-y-3">
             {mockTrainingStages.map((stage) => {
-              const percent = stage.starsTotal > 0
-                ? Math.round((stage.starsEarned / stage.starsTotal) * 100)
-                : 0;
-
+              const status = getStageStatus(stage.id);
               return (
-                <div key={stage.id} className="flex items-center gap-3">
-                  <span className="text-xl w-8 text-center" aria-hidden="true">
-                    {stage.status === "locked" ? "🔒" : stage.icon}
-                  </span>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center justify-between mb-1">
-                      <span className="text-sm font-medium text-text truncate">
-                        {stage.name}
-                      </span>
-                      <span className="text-xs text-text-muted ml-2 flex-shrink-0">
-                        {stage.starsEarned}/{stage.starsTotal} ⭐
-                      </span>
-                    </div>
-                    <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
-                      <div
-                        className="h-full rounded-full transition-all duration-500"
-                        style={{
-                          width: `${percent}%`,
-                          backgroundColor: stage.status === "locked" ? "#B2BEC3" : stage.accentColor,
-                        }}
-                      />
-                    </div>
-                  </div>
-                </div>
+                <StageProgressCard
+                  key={stage.id}
+                  stageName={stage.name}
+                  stageIcon={stage.icon}
+                  accentColor={stage.accentColor}
+                  status={status}
+                  starsEarned={
+                    stage.starsEarned
+                  }
+                  starsTotal={stage.starsTotal}
+                />
               );
             })}
           </div>
         </div>
 
         {/* Recent Practice History */}
-        <div className="bg-surface rounded-3xl p-6 shadow-sm">
-          <h3 className="text-lg font-bold text-text mb-4">📝 ประวัติการฝึกล่าสุด</h3>
-          <div className="space-y-3">
-            {mockPracticeHistory.map((record) => (
-              <div
-                key={record.id}
-                className="flex items-center gap-4 bg-bg rounded-2xl p-4"
-              >
-                {/* Status Icon */}
-                <div
-                  className={`w-10 h-10 rounded-xl flex items-center justify-center text-lg flex-shrink-0 ${
-                    record.isPassed ? "bg-success/15" : "bg-error/15"
-                  }`}
-                  aria-hidden="true"
-                >
-                  {record.isPassed ? "✅" : "🔄"}
-                </div>
+        <RecentAttemptsList attempts={summary.recentAttempts} />
 
-                {/* Details */}
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center justify-between">
-                    <p className="font-semibold text-text text-sm">
-                      {record.target}
-                    </p>
-                    <div className="flex items-center gap-0.5 text-secondary text-sm ml-2 flex-shrink-0">
-                      {"★".repeat(record.stars)}
-                      <span className="text-text-muted text-xs ml-1">
-                        ({record.score}%)
-                      </span>
-                    </div>
-                  </div>
-                  <p className="text-xs text-text-muted mt-0.5">
-                    {record.stageName} · {record.date}
-                  </p>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        {/* Back to Training CTA */}
+        {/* Reset Demo Progress */}
         <div className="text-center pt-4 pb-8">
-          <Link
-            href="/training"
-            className="inline-flex items-center gap-2 bg-primary text-white font-semibold px-6 py-3 rounded-2xl hover:bg-primary/90 transition-all hover:scale-[1.02] active:scale-[0.98]"
-          >
-            🗺️ กลับไปฝึกต่อ
-          </Link>
+          {showResetConfirm ? (
+            <div className="inline-block bg-surface rounded-3xl p-6 shadow-sm">
+              <p className="text-sm text-text mb-4">
+                ต้องการล้างข้อมูลความก้าวหน้าทั้งหมดหรือไม่?
+              </p>
+              <div className="flex gap-3 justify-center">
+                <button
+                  onClick={() => setShowResetConfirm(false)}
+                  className="px-5 py-2.5 rounded-2xl border-2 border-gray-200 text-text-muted font-semibold text-sm hover:bg-gray-50 transition-all"
+                >
+                  ยกเลิก
+                </button>
+                <button
+                  onClick={handleReset}
+                  className="px-5 py-2.5 rounded-2xl bg-error text-white font-semibold text-sm hover:bg-error/90 transition-all"
+                >
+                  🗑️ ล้างข้อมูล
+                </button>
+              </div>
+            </div>
+          ) : (
+            <button
+              onClick={() => setShowResetConfirm(true)}
+              className="text-sm text-text-muted hover:text-error transition-colors underline underline-offset-4"
+            >
+              🔄 ล้างข้อมูลสาธิต
+            </button>
+          )}
+
+          <div className="mt-6">
+            <Link
+              href="/training"
+              className="inline-flex items-center gap-2 bg-primary text-white font-semibold px-6 py-3 rounded-2xl hover:bg-primary/90 transition-all hover:scale-[1.02] active:scale-[0.98]"
+            >
+              🗺️ กลับไปฝึกต่อ
+            </Link>
+          </div>
         </div>
       </div>
     </main>

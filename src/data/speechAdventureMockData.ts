@@ -181,10 +181,16 @@ export const mockProgressSummary: ProgressSummary = {
   pretestScore: 45,
   reviewScore: 78,
   currentLevel: "Level 3: Sound Production",
-  totalStars: 18,
+  starsEarned: 18,
   totalAttempts: 42,
-  difficultSounds: ["ช", "ร", "ฌ"],
+  averageScore: 72,
+  completedStages: 3,
+  currentStageId: "level-3",
+  improvement: 33,
   accuracy: 72,
+  difficultSounds: ["ช", "ร", "ฌ"],
+  difficultItems: [],
+  recentAttempts: [],
 };
 
 export const mockPracticeHistory: PracticeHistory[] = [

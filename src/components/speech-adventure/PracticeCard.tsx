@@ -5,16 +5,19 @@ import type {
   PracticeItem,
   EvaluationResult,
   MockEvaluationResult,
+  PracticeAttempt,
 } from "@/types/speechAdventure";
 import { useAudioRecorder } from "@/hooks/useAudioRecorder";
 import AudioRecorder from "./AudioRecorder";
 import EvaluationResultCard from "./EvaluationResultCard";
 import RewardBadge from "./RewardBadge";
+import SessionSummaryCard from "./SessionSummaryCard";
 
 interface Props {
   item: PracticeItem;
   accentColor: string;
   stageName: string;
+  onSaveAttempt?: (attempt: PracticeAttempt) => void;
   onNext?: () => void;
 }
 
@@ -99,18 +102,28 @@ function generateMockEvaluation(): {
   return pool[Math.floor(Math.random() * pool.length)];
 }
 
+function computeStars(score: number): number {
+  if (score >= 85) return 3;
+  if (score >= 70) return 2;
+  return 1;
+}
+
 export default function PracticeCard({
   item,
   accentColor,
   stageName,
+  onSaveAttempt,
   onNext,
 }: Props) {
   const recorder = useAudioRecorder();
   const [phase, setPhase] = useState<
-    "idle" | "listening" | "recording" | "evaluated" | "reward"
+    "idle" | "listening" | "recording" | "evaluated" | "saved" | "reward"
   >("idle");
   const [result, setResult] = useState<EvaluationResult | null>(null);
   const [mockEval, setMockEval] = useState<MockEvaluationResult | null>(null);
+  const [savedAttempt, setSavedAttempt] = useState<PracticeAttempt | null>(
+    null
+  );
 
   const handleListen = () => {
     setPhase("listening");
@@ -138,10 +151,38 @@ export default function PracticeCard({
     recorder.clearRecording();
     setResult(null);
     setMockEval(null);
+    setSavedAttempt(null);
     setPhase("idle");
   }, [recorder]);
 
-  const handleAccept = () => {
+  const handleAccept = useCallback(() => {
+    if (!mockEval) return;
+
+    const stars = computeStars(mockEval.score);
+
+    const attempt: PracticeAttempt = {
+      id: `attempt-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+      childId: "child-001",
+      stageId: item.stageSlug,
+      practiceItemId: item.id,
+      targetSound: "ช",
+      promptText: item.target,
+      durationMs: recorder.durationMs,
+      score: mockEval.score,
+      confidence: mockEval.confidence,
+      status: mockEval.status,
+      feedback: mockEval.feedback,
+      recommendation: mockEval.recommendation,
+      starsEarned: stars,
+      createdAt: new Date().toISOString(),
+    };
+
+    setSavedAttempt(attempt);
+    onSaveAttempt?.(attempt);
+    setPhase("saved");
+  }, [mockEval, item, recorder.durationMs, onSaveAttempt]);
+
+  const handleContinue = () => {
     setPhase("reward");
   };
 
@@ -172,7 +213,7 @@ export default function PracticeCard({
         </p>
       </div>
 
-      {/* Evaluation result phase — show result card */}
+      {/* Evaluated — show result card + accept/try-again */}
       {phase === "evaluated" && result && mockEval && (
         <div className="animate-slide-up space-y-4">
           <EvaluationResultCard result={result} accentColor={accentColor} />
@@ -209,6 +250,28 @@ export default function PracticeCard({
         </div>
       )}
 
+      {/* Saved — show session summary + continue */}
+      {phase === "saved" && savedAttempt && result && (
+        <div className="animate-slide-up space-y-4">
+          <SessionSummaryCard attempt={savedAttempt} accentColor={accentColor} />
+
+          <div className="flex gap-3">
+            <button
+              onClick={handleRetry}
+              className="flex-1 py-3 rounded-2xl border-2 border-primary text-primary font-semibold hover:bg-primary/5 transition-all active:scale-[0.98]"
+            >
+              🔄 ลองอีกครั้ง
+            </button>
+            <button
+              onClick={handleContinue}
+              className="flex-1 py-3 rounded-2xl bg-secondary text-white font-semibold hover:bg-secondary/90 transition-all active:scale-[0.98] shadow-md"
+            >
+              🚀 ดูรางวัล
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Reward phase */}
       {phase === "reward" && result && (
         <div className="animate-bounce-in text-center space-y-4">
@@ -225,7 +288,7 @@ export default function PracticeCard({
       )}
 
       {/* Practice phase — show listen + recorder */}
-      {phase !== "evaluated" && phase !== "reward" && (
+      {phase !== "evaluated" && phase !== "saved" && phase !== "reward" && (
         <>
           {/* Listen Button */}
           <div className="flex justify-center mb-6">

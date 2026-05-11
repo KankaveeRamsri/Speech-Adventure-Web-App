@@ -42,7 +42,7 @@ export default function ProgressSummary({ summary }: Props) {
         </div>
         <div className="bg-bg rounded-2xl p-3">
           <p className="text-xs text-text-muted">ดาวทั้งหมด</p>
-          <p className="text-sm font-semibold text-secondary">⭐ {summary.totalStars}</p>
+          <p className="text-sm font-semibold text-secondary">⭐ {summary.starsEarned}</p>
         </div>
         <div className="bg-bg rounded-2xl p-3">
           <p className="text-xs text-text-muted">จำนวนครั้งที่ฝึก</p>
