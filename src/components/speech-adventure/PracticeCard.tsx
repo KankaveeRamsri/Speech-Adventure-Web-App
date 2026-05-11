@@ -17,6 +17,9 @@ interface Props {
   item: PracticeItem;
   accentColor: string;
   stageName: string;
+  missionIndex?: number;
+  totalMissions?: number;
+  isLastMission?: boolean;
   onSaveAttempt?: (attempt: PracticeAttempt) => void;
   onNext?: () => void;
 }
@@ -112,6 +115,9 @@ export default function PracticeCard({
   item,
   accentColor,
   stageName,
+  missionIndex,
+  totalMissions,
+  isLastMission = false,
   onSaveAttempt,
   onNext,
 }: Props) {
@@ -198,8 +204,13 @@ export default function PracticeCard({
       {/* Header */}
       <div className="flex items-center justify-between mb-4">
         <div>
+          {missionIndex !== undefined && totalMissions !== undefined && (
+            <p className="text-xs font-semibold text-text-muted uppercase tracking-widest mb-0.5">
+              ภารกิจที่ {missionIndex + 1} / {totalMissions}
+            </p>
+          )}
           <p className="text-sm text-text-muted">{stageName}</p>
-          <p className="text-lg font-bold text-text">{item.instruction}</p>
+          <p className="text-base font-bold text-text">{item.instruction}</p>
         </div>
       </div>
 
@@ -208,9 +219,17 @@ export default function PracticeCard({
         className="rounded-3xl p-8 text-center mb-6"
         style={{ backgroundColor: `${accentColor}12` }}
       >
+        {item.emoji && (
+          <p className="text-5xl mb-3" aria-hidden="true">{item.emoji}</p>
+        )}
         <p className={`font-bold ${sizeClass}`} style={{ color: accentColor }}>
           {item.target}
         </p>
+        {item.hint && phase !== "evaluated" && phase !== "saved" && phase !== "reward" && (
+          <p className="text-sm text-text-muted mt-3 italic leading-relaxed">
+            💡 {item.hint}
+          </p>
+        )}
       </div>
 
       {/* Evaluated — show result card + accept/try-again */}
@@ -281,7 +300,7 @@ export default function PracticeCard({
               onClick={onNext}
               className="w-full py-3 rounded-2xl bg-secondary text-white font-semibold text-lg hover:bg-secondary/90 transition-all active:scale-[0.98] shadow-md"
             >
-              🚀 ภารกิจต่อไป
+              {isLastMission ? "🏆 ดูผลสรุประดับ" : "🚀 ภารกิจต่อไป"}
             </button>
           )}
         </div>

@@ -53,6 +53,8 @@ export interface PracticeItem {
   target: string;
   instruction: string;
   type: "sound" | "word" | "sentence";
+  emoji?: string;
+  hint?: string;
 }
 
 export interface EvaluationResult {
