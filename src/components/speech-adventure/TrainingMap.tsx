@@ -8,24 +8,39 @@ interface Props {
 export default function TrainingMap({ stages }: Props) {
   return (
     <div className="relative">
-      {/* Vertical connector line */}
-      <div className="absolute left-8 top-0 bottom-0 w-0.5 bg-gray-200 hidden md:block" aria-hidden="true" />
+      {/* Vertical connector line (desktop) */}
+      <div
+        className="absolute left-5 top-5 bottom-5 w-px hidden md:block"
+        style={{ background: "linear-gradient(to bottom, #E2E8F0, #E2E8F0)" }}
+        aria-hidden="true"
+      />
 
-      <div className="space-y-4">
+      <div className="space-y-3">
         {stages.map((stage, index) => (
-          <div key={stage.id} className="relative">
-            {/* Connector dot */}
+          <div key={stage.id} className="relative flex items-start gap-4">
+            {/* Connector node (desktop) */}
             <div
-              className={`absolute left-6 top-7 w-4 h-4 rounded-full border-2 border-white z-10 hidden md:block ${
-                stage.status === "completed"
-                  ? "bg-success"
-                  : stage.status === "current"
-                  ? "bg-primary animate-pulse-gentle"
-                  : "bg-gray-300"
-              }`}
+              className={`hidden md:flex flex-shrink-0 mt-4 w-10 h-10 items-center justify-center z-10`}
               aria-hidden="true"
-            />
-            <div className="md:pl-14">
+            >
+              <div
+                className={`w-3 h-3 rounded-full border-2 border-surface ${
+                  stage.status === "completed"
+                    ? "bg-success"
+                    : stage.status === "current"
+                    ? "animate-pulse-gentle"
+                    : "bg-border"
+                }`}
+                style={
+                  stage.status === "current"
+                    ? { backgroundColor: stage.accentColor }
+                    : undefined
+                }
+              />
+            </div>
+
+            {/* Level card */}
+            <div className="flex-1 min-w-0 md:-ml-10 md:pl-14">
               <LevelCard stage={stage} index={index} />
             </div>
           </div>

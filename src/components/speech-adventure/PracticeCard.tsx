@@ -25,26 +25,23 @@ interface Props {
   onNext?: () => void;
 }
 
-function generateMockEvaluation(): {
-  mock: MockEvaluationResult;
-  result: EvaluationResult;
-} {
+function generateMockEvaluation(): { mock: MockEvaluationResult; result: EvaluationResult } {
   const pool: Array<{ mock: MockEvaluationResult; result: EvaluationResult }> = [
     {
-      mock: { score: 95, confidence: 0.97, status: "passed", feedback: "ยอดเยี่ยม! เสียงออกมาชัดเจนมาก! เก่งจัง!", recommendation: "ลองฝึกระดับถัดไปได้เลยนะ", isMock: true },
+      mock: { score: 95, confidence: 0.97, status: "passed", feedback: "ยอดเยี่ยม! เสียงออกมาชัดเจนมาก!", recommendation: "ลองฝึกระดับถัดไปได้เลยนะ", isMock: true },
       result: { score: 95, maxScore: 100, stars: 5, message: "ยอดเยี่ยม! เก่งมาก!", isPassed: true },
     },
     {
-      mock: { score: 82, confidence: 0.85, status: "passed", feedback: "ดีมาก! ออกเสียงได้ดีขึ้นแล้ว ใกล้เก่งแล้ว!", recommendation: "ลองฟังเสียงตัวอย่างแล้วฝึกตามอีกสักหน่อยนะ", isMock: true },
+      mock: { score: 82, confidence: 0.85, status: "passed", feedback: "ดีมาก! ออกเสียงได้ดีขึ้นแล้ว!", recommendation: "ลองฟังเสียงตัวอย่างแล้วฝึกตามอีกสักหน่อย", isMock: true },
       result: { score: 82, maxScore: 100, stars: 4, message: "ดีมาก! ใกล้เก่งแล้ว!", isPassed: true },
     },
     {
-      mock: { score: 68, confidence: 0.72, status: "almost", feedback: "ดีใจด้วย! เกือบจะผ่านแล้ว! ลองอีกสักครั้งนะ!", recommendation: "พยายามออกเสียงให้ช้าลงและชัดขึ้นอีกนิด", isMock: true },
+      mock: { score: 68, confidence: 0.72, status: "almost", feedback: "เกือบจะผ่านแล้ว! ลองอีกสักครั้ง!", recommendation: "ออกเสียงให้ช้าลงและชัดขึ้นอีกนิด", isMock: true },
       result: { score: 68, maxScore: 100, stars: 3, message: "ดีขึ้นแล้ว! ลองอีกครั้งนะ!", isPassed: true },
     },
     {
       mock: { score: 50, confidence: 0.55, status: "retry", feedback: "สู้ต่อนะ! ลองฟังเสียงตัวอย่างแล้วฝึกอีกครั้ง!", recommendation: "เริ่มจากการฟังเสียงตัวอย่างก่อน แล้วค่อยๆ ออกเสียงตาม", isMock: true },
-      result: { score: 50, maxScore: 100, stars: 2, message: "พยายามอีกนิดนะ! เกือบแล้ว!", isPassed: false },
+      result: { score: 50, maxScore: 100, stars: 2, message: "พยายามอีกนิดนะ!", isPassed: false },
     },
   ];
   return pool[Math.floor(Math.random() * pool.length)];
@@ -57,14 +54,9 @@ function computeStars(score: number): number {
 }
 
 function buildAttempt(
-  item: PracticeItem,
-  targetSound: string,
-  score: number,
-  confidence: number,
-  status: "passed" | "almost" | "retry",
-  feedback: string,
-  recommendation: string | undefined,
-  durationMs: number
+  item: PracticeItem, targetSound: string, score: number, confidence: number,
+  status: "passed" | "almost" | "retry", feedback: string,
+  recommendation: string | undefined, durationMs: number
 ): PracticeAttempt {
   return {
     id: `attempt-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
@@ -74,11 +66,7 @@ function buildAttempt(
     targetSound,
     promptText: item.target,
     durationMs,
-    score,
-    confidence,
-    status,
-    feedback,
-    recommendation,
+    score, confidence, status, feedback, recommendation,
     starsEarned: computeStars(score),
     createdAt: new Date().toISOString(),
   };
@@ -99,14 +87,10 @@ export default function PracticeCard({
   onNext,
 }: Props) {
   const recorder = useAudioRecorder();
-  const [phase, setPhase] = useState<
-    "idle" | "listening" | "recording" | "evaluated" | "saved" | "reward"
-  >("idle");
+  const [phase, setPhase] = useState<"idle" | "listening" | "recording" | "evaluated" | "saved" | "reward">("idle");
   const [result, setResult] = useState<EvaluationResult | null>(null);
   const [mockEval, setMockEval] = useState<MockEvaluationResult | null>(null);
   const [savedAttempt, setSavedAttempt] = useState<PracticeAttempt | null>(null);
-
-  // ── Recorder-based handlers ────────────────────────────────────────────────
 
   const handleListen = () => {
     setPhase("listening");
@@ -152,44 +136,32 @@ export default function PracticeCard({
 
   const handleContinue = () => setPhase("reward");
 
-  // ── Oral motor handler ─────────────────────────────────────────────────────
-
   const handleOralMotorComplete = useCallback(() => {
-    const score = 75 + Math.floor(Math.random() * 21); // 75–95
+    const score = 75 + Math.floor(Math.random() * 21);
     const evalResult: EvaluationResult = {
       score, maxScore: 100, stars: computeStars(score),
       message: "ยอดเยี่ยม! ทำภารกิจสำเร็จแล้ว!", isPassed: true,
     };
     setResult(evalResult);
-    const attempt = buildAttempt(
-      item, targetSound, score, 0.9, "passed",
-      "ทำภารกิจ Oral Motor สำเร็จ!", undefined, 0
-    );
+    const attempt = buildAttempt(item, targetSound, score, 0.9, "passed", "ทำภารกิจ Oral Motor สำเร็จ!", undefined, 0);
     setSavedAttempt(attempt);
     onSaveAttempt?.(attempt);
     setPhase("reward");
   }, [item, targetSound, onSaveAttempt]);
 
-  // ── Sound choice handler ───────────────────────────────────────────────────
-
   const handleSoundChoice = useCallback((choice: string) => {
     const isCorrect = choice === item.target;
-    const score = isCorrect
-      ? 80 + Math.floor(Math.random() * 16) // 80–95
-      : 30 + Math.floor(Math.random() * 26); // 30–55
+    const score = isCorrect ? 80 + Math.floor(Math.random() * 16) : 30 + Math.floor(Math.random() * 26);
     const mock: MockEvaluationResult = {
-      score,
-      confidence: isCorrect ? 0.9 : 0.5,
+      score, confidence: isCorrect ? 0.9 : 0.5,
       status: isCorrect ? "passed" : "retry",
-      feedback: isCorrect
-        ? `ถูกต้อง! "${choice}" ใช่เลย! น้องเก่งมาก!`
-        : `ยังไม่ถูกนะ คำตอบที่ถูกคือ "${item.target}" ลองอีกครั้งนะ!`,
-      recommendation: isCorrect ? undefined : "ฟังเสียงให้ดีแล้วลองเลือกใหม่นะ",
+      feedback: isCorrect ? `ถูกต้อง! "${choice}" ใช่เลย!` : `คำตอบที่ถูกคือ "${item.target}" ลองอีกครั้ง!`,
+      recommendation: isCorrect ? undefined : "ฟังเสียงให้ดีแล้วลองเลือกใหม่",
       isMock: true,
     };
     const evalResult: EvaluationResult = {
       score, maxScore: 100, stars: computeStars(score),
-      message: isCorrect ? "ถูกต้อง! เก่งมาก!" : "ยังไม่ถูกนะ ลองอีกครั้ง!",
+      message: isCorrect ? "ถูกต้อง! เก่งมาก!" : "ยังไม่ถูก ลองอีกครั้ง!",
       isPassed: isCorrect,
     };
     setResult(evalResult);
@@ -197,81 +169,83 @@ export default function PracticeCard({
     setPhase("evaluated");
   }, [item.target]);
 
-  // ── Target size by type ────────────────────────────────────────────────────
-
   const sizeClass =
-    item.type === "sentence"
-      ? "text-xl md:text-3xl"
-      : item.type === "word"
-      ? "text-3xl md:text-5xl"
-      : item.type === "oral_motor"
-      ? "text-2xl md:text-4xl"
-      : "text-5xl md:text-7xl";
+    item.type === "sentence" ? "text-xl md:text-2xl" :
+    item.type === "word" ? "text-3xl md:text-4xl" :
+    item.type === "oral_motor" ? "text-2xl md:text-3xl" :
+    "text-5xl md:text-6xl";
 
-  const isPracticePhase =
-    phase !== "evaluated" && phase !== "saved" && phase !== "reward";
+  const isPracticePhase = phase !== "evaluated" && phase !== "saved" && phase !== "reward";
 
   return (
-    <div className="bg-surface rounded-3xl p-6 shadow-sm animate-slide-up">
-      {/* Header */}
-      <div className="mb-4">
+    <div className="bg-surface border border-border rounded-xl p-5 animate-slide-up">
+      {/* ── Header ── */}
+      <div className="mb-5">
         {missionIndex !== undefined && totalMissions !== undefined && (
-          <p className="text-xs font-semibold text-text-muted uppercase tracking-widest mb-0.5">
+          <p className="text-xs font-semibold text-text-muted uppercase tracking-widest mb-1">
             ภารกิจที่ {missionIndex + 1} / {totalMissions}
           </p>
         )}
         <p className="text-sm text-text-muted">{stageName}</p>
-        <p className="text-base font-bold text-text">{item.instruction}</p>
+        <p className="text-base font-semibold text-text">{item.instruction}</p>
       </div>
 
-      {/* Target Display */}
+      {/* ── Target Display ── */}
       <div
-        className="rounded-3xl p-8 text-center mb-6"
-        style={{ backgroundColor: `${accentColor}12` }}
+        className="rounded-xl px-6 py-8 text-center mb-5"
+        style={{ backgroundColor: `${accentColor}10` }}
       >
         {item.type === "sound_choice" ? (
-          /* Don't reveal the answer — show a musical note prompt */
           <>
-            <p className="text-5xl mb-3" aria-hidden="true">
-              {item.emoji ?? "🎵"}
-            </p>
-            <p className="text-base font-semibold text-text-muted">
-              {item.instruction}
-            </p>
+            <div
+              className="w-14 h-14 rounded-full flex items-center justify-center mx-auto mb-3"
+              style={{ backgroundColor: `${accentColor}20` }}
+              aria-hidden="true"
+            >
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke={accentColor} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M9 18V5l12-2v13" />
+                <circle cx="6" cy="18" r="3" />
+                <circle cx="18" cy="16" r="3" />
+              </svg>
+            </div>
+            <p className="text-sm font-medium text-text-muted">{item.instruction}</p>
           </>
         ) : (
           <>
             {item.emoji && (
-              <p className="text-5xl mb-3" aria-hidden="true">{item.emoji}</p>
+              <p className="text-4xl mb-3 leading-none" aria-hidden="true">{item.emoji}</p>
             )}
-            <p className={`font-bold ${sizeClass}`} style={{ color: accentColor }}>
+            <p
+              className={`font-bold leading-tight ${sizeClass}`}
+              style={{ color: accentColor }}
+            >
               {item.target}
             </p>
             {item.hint && isPracticePhase && (
-              <p className="text-sm text-text-muted mt-3 italic leading-relaxed">
-                💡 {item.hint}
+              <p className="text-sm text-text-muted mt-3 leading-relaxed">
+                {item.hint}
               </p>
             )}
           </>
         )}
       </div>
 
-      {/* ── Evaluated phase ────────────────────────────────────────────────── */}
+      {/* ── Evaluated phase ── */}
       {phase === "evaluated" && result && mockEval && (
         <div className="animate-slide-up space-y-4">
           <EvaluationResultCard result={result} accentColor={accentColor} />
 
           <div
-            className="rounded-2xl p-4 text-sm space-y-2"
-            style={{ backgroundColor: `${accentColor}08` }}
+            className="rounded-xl p-4 text-sm space-y-1.5 border"
+            style={{ backgroundColor: `${accentColor}06`, borderColor: `${accentColor}20` }}
           >
             <p className="font-semibold text-text">{mockEval.feedback}</p>
             {mockEval.recommendation && (
               <p className="text-text-muted">{mockEval.recommendation}</p>
             )}
             {usesRecorder(item.type) && (
-              <p className="text-xs text-text-muted mt-2">
-                💡 ผลประเมินนี้เป็นตัวอย่าง (Mock) ระบบ AI จริงยังไม่พร้อมใช้งาน
+              <p className="text-xs text-text-muted pt-1 border-t border-border/50">
+                ผลประเมินนี้เป็นตัวอย่าง (Mock) ระบบ AI จริงยังไม่พร้อมใช้งาน
               </p>
             )}
           </div>
@@ -279,104 +253,98 @@ export default function PracticeCard({
           <div className="flex gap-3">
             <button
               onClick={handleRetry}
-              className="flex-1 py-3 rounded-2xl border-2 border-primary text-primary font-semibold hover:bg-primary/5 transition-all active:scale-[0.98]"
+              className="flex-1 py-3 rounded-xl border-2 border-primary text-primary font-semibold text-sm hover:bg-primary/5 transition-all active:scale-[0.98]"
             >
-              🔄 ลองอีกครั้ง
+              ลองอีกครั้ง
             </button>
             <button
               onClick={handleAccept}
-              className="flex-1 py-3 rounded-2xl bg-primary text-white font-semibold hover:bg-primary/90 transition-all active:scale-[0.98]"
+              className="flex-1 py-3 rounded-xl bg-primary text-white font-semibold text-sm hover:bg-primary/90 transition-all active:scale-[0.98]"
             >
-              ✓ ยอมรับผล
+              ยืนยันผล
             </button>
           </div>
         </div>
       )}
 
-      {/* ── Saved phase ────────────────────────────────────────────────────── */}
+      {/* ── Saved phase ── */}
       {phase === "saved" && savedAttempt && result && (
         <div className="animate-slide-up space-y-4">
           <SessionSummaryCard attempt={savedAttempt} accentColor={accentColor} />
           <div className="flex gap-3">
             <button
               onClick={handleRetry}
-              className="flex-1 py-3 rounded-2xl border-2 border-primary text-primary font-semibold hover:bg-primary/5 transition-all active:scale-[0.98]"
+              className="flex-1 py-3 rounded-xl border-2 border-primary text-primary font-semibold text-sm hover:bg-primary/5 transition-all active:scale-[0.98]"
             >
-              🔄 ลองอีกครั้ง
+              ลองอีกครั้ง
             </button>
             <button
               onClick={handleContinue}
-              className="flex-1 py-3 rounded-2xl bg-secondary text-white font-semibold hover:bg-secondary/90 transition-all active:scale-[0.98] shadow-md"
+              className="flex-1 py-3 rounded-xl bg-secondary text-white font-semibold text-sm hover:bg-secondary/90 transition-all active:scale-[0.98] shadow-sm"
             >
-              🚀 ดูรางวัล
+              ดูรางวัล
             </button>
           </div>
         </div>
       )}
 
-      {/* ── Reward phase ───────────────────────────────────────────────────── */}
+      {/* ── Reward phase ── */}
       {phase === "reward" && result && (
-        <div className="animate-bounce-in text-center space-y-4">
+        <div className="animate-bounce-in space-y-4">
           <RewardBadge stars={result.stars} message={result.message} />
           {onNext && (
             <button
               onClick={onNext}
-              className="w-full py-3 rounded-2xl bg-secondary text-white font-semibold text-lg hover:bg-secondary/90 transition-all active:scale-[0.98] shadow-md"
+              className="w-full py-3 rounded-xl bg-secondary text-white font-semibold text-base hover:bg-secondary/90 transition-all active:scale-[0.98] shadow-sm"
             >
-              {isLastMission ? "🏆 ดูผลสรุประดับ" : "🚀 ภารกิจต่อไป"}
+              {isLastMission ? "ดูผลสรุประดับ" : "ภารกิจต่อไป"}
             </button>
           )}
         </div>
       )}
 
-      {/* ── Practice phase ─────────────────────────────────────────────────── */}
+      {/* ── Practice phase ── */}
       {isPracticePhase && (
         <>
-          {/* Oral Motor — single tap to complete */}
+          {/* Oral Motor */}
           {item.type === "oral_motor" && (
             <div className="text-center space-y-3">
-              <p className="text-sm text-text-muted">
-                ทำตามภารกิจด้านบน แล้วกดปุ่มเมื่อเสร็จ
-              </p>
+              <p className="text-sm text-text-muted">ทำตามภารกิจด้านบน แล้วกดปุ่มเมื่อเสร็จ</p>
               <button
                 onClick={handleOralMotorComplete}
-                className="w-full py-4 rounded-2xl font-bold text-lg text-white transition-all active:scale-[0.98] shadow-md hover:opacity-90"
+                className="w-full py-3.5 rounded-xl font-bold text-base text-white transition-all active:scale-[0.98] shadow-sm hover:opacity-90"
                 style={{ backgroundColor: accentColor }}
               >
-                ✅ เสร็จแล้ว!
+                เสร็จแล้ว
               </button>
             </div>
           )}
 
-          {/* Sound Choice — tap a button */}
+          {/* Sound Choice */}
           {item.type === "sound_choice" && item.soundChoices && (
             <div className="space-y-3">
-              <p className="text-center text-sm text-text-muted font-medium">
-                แตะตัวเลือกที่ถูกต้อง
-              </p>
+              <p className="text-center text-sm text-text-muted font-medium">เลือกคำตอบที่ถูกต้อง</p>
               <div className="grid grid-cols-2 gap-3">
                 {item.soundChoices.map((choice) => (
                   <button
                     key={choice}
                     onClick={() => handleSoundChoice(choice)}
-                    className="py-6 rounded-2xl border-2 border-gray-200 bg-bg text-2xl font-bold text-text hover:border-primary/40 hover:bg-primary/5 transition-all active:scale-[0.96]"
+                    className="py-5 rounded-xl border-2 border-border bg-bg dark:bg-white/3 text-2xl font-bold text-text hover:border-primary/40 hover:bg-primary/5 transition-all active:scale-[0.96]"
                   >
                     {choice}
                   </button>
                 ))}
               </div>
               {item.hint && (
-                <p className="text-center text-xs text-text-muted italic">
-                  💡 {item.hint}
-                </p>
+                <p className="text-center text-xs text-text-muted">{item.hint}</p>
               )}
             </div>
           )}
 
-          {/* Recorder — for test, sound_production, word, sentence */}
+          {/* Recorder */}
           {usesRecorder(item.type) && (
             <>
-              <div className="flex justify-center mb-6">
+              <div className="flex justify-center mb-5">
                 <button
                   onClick={handleListen}
                   disabled={
@@ -384,17 +352,25 @@ export default function PracticeCard({
                     recorder.state === "recording" ||
                     recorder.state === "requesting_permission"
                   }
-                  className={`flex flex-col items-center gap-2 px-6 py-4 rounded-2xl transition-all ${
+                  className={`flex flex-col items-center gap-1.5 px-6 py-3.5 rounded-xl transition-all text-sm font-medium ${
                     phase === "listening"
-                      ? "bg-info/20 text-info animate-pulse-gentle"
-                      : "bg-bg text-text hover:bg-gray-100"
+                      ? "bg-info/15 text-info animate-pulse-gentle border border-info/25"
+                      : "bg-bg dark:bg-white/5 border border-border text-text-muted hover:text-text hover:border-primary/30"
                   } disabled:opacity-50 disabled:cursor-not-allowed`}
                   aria-label="ฟังเสียงตัวอย่าง"
                 >
-                  <span className="text-3xl">
-                    {phase === "listening" ? "🔊" : "🔈"}
-                  </span>
-                  <span className="text-sm font-medium">ฟังเสียง</span>
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                    <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" />
+                    {phase === "listening" ? (
+                      <>
+                        <path d="M15.54 8.46a5 5 0 0 1 0 7.07" />
+                        <path d="M19.07 4.93a10 10 0 0 1 0 14.14" />
+                      </>
+                    ) : (
+                      <path d="M15.54 8.46a5 5 0 0 1 0 7.07" />
+                    )}
+                  </svg>
+                  {phase === "listening" ? "กำลังเล่นเสียง..." : "ฟังเสียงตัวอย่าง"}
                 </button>
               </div>
 
