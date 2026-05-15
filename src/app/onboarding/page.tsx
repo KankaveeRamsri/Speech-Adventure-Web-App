@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import {
   saveProfile,
@@ -8,6 +8,18 @@ import {
 } from "@/lib/child-profile/childProfileStorage";
 import { setSelectedSoundId } from "@/lib/speechProgressStorage";
 import { mockTargetSounds } from "@/data/speechAdventureMockData";
+import {
+  exportData,
+  importData,
+  clearAllData,
+  readBackupFile,
+  getStorageSummary,
+} from "@/lib/local-data/localDataBackup";
+import { loadDemoProgress } from "@/lib/demo/speechAdventureDemoData";
+import { DEMO_ATTEMPT_COUNT } from "@/lib/demo/speechAdventureDemoData";
+import { clearObservations } from "@/lib/observations/observationStorage";
+import { clearProgress, replaceProgress } from "@/lib/speechProgressStorage";
+import { replaceObservations } from "@/lib/observations/observationStorage";
 
 type Step = 1 | 2 | 3 | 4 | 5;
 
@@ -400,11 +412,247 @@ export default function OnboardingPage() {
                   ข้าม Pre-test ไปที่แผนที่การฝึกก่อน
                 </button>
               )}
+
+              {/* ── Data Management (edit mode only) ── */}
+              {isEdit && <DataManagerSection />}
             </div>
           )}
 
         </div>
       </div>
     </main>
+  );
+}
+
+// ── Data Manager Section ──────────────────────────────────────────────────────
+
+type ConfirmState = "clear" | "import" | null;
+
+function DataManagerSection() {
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [confirmState, setConfirmState] = useState<ConfirmState>(null);
+  const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
+  const [storageInfo, setStorageInfo] = useState(getStorageSummary());
+
+  useEffect(() => {
+    setStorageInfo(getStorageSummary());
+  }, []);
+
+  const flash = (type: "success" | "error", text: string) => {
+    setMessage({ type, text });
+    setTimeout(() => setMessage(null), 4000);
+  };
+
+  // ── Export ──
+  const handleExport = () => {
+    try {
+      exportData();
+      flash("success", "ส่งออกข้อมูลสำเร็จ — ไฟล์จะถูกดาวน์โหลดไปยังเครื่องของคุณ");
+    } catch {
+      flash("error", "เกิดข้อผิดพลาดในการส่งออกข้อมูล");
+    }
+  };
+
+  // ── Import ──
+  const handleImportFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // Reset input so the same file can be re-selected
+    if (fileInputRef.current) fileInputRef.current.value = "";
+
+    try {
+      const backup = await readBackupFile(file);
+      const result = importData(backup);
+
+      if (result.success) {
+        // Trigger storage subscribers to refresh
+        const rawProgress = localStorage.getItem("speech-adventure-progress-v1");
+        if (rawProgress) {
+          try { replaceProgress(JSON.parse(rawProgress)); } catch { /* ignore */ }
+        }
+        const rawObs = localStorage.getItem("speech-adventure-observations-v1");
+        if (rawObs) {
+          try { replaceObservations(JSON.parse(rawObs)); } catch { /* ignore */ }
+        }
+
+        setStorageInfo(getStorageSummary());
+        flash("success", "นำเข้าข้อมูลสำเร็จ — ข้อมูลถูกกู้คืนแล้ว");
+      } else {
+        flash("error", result.error);
+      }
+    } catch (err) {
+      flash("error", err instanceof Error ? err.message : "ไม่สามารถอ่านไฟล์ได้");
+    }
+
+    setConfirmState(null);
+  };
+
+  const confirmImport = () => setConfirmState("import");
+
+  // ── Clear ──
+  const handleClear = () => {
+    clearProgress();
+    clearObservations();
+    clearAllData();
+    setStorageInfo(getStorageSummary());
+    setConfirmState(null);
+    flash("success", "ล้างข้อมูลทั้งหมดสำเร็จ — ยังคงตั้งค่าธีมและเมนูไว้");
+  };
+
+  // ── Demo ──
+  const handleLoadDemo = () => {
+    loadDemoProgress();
+    setStorageInfo(getStorageSummary());
+    flash("success", `โหลดข้อมูลสาธิตสำเร็จ (${DEMO_ATTEMPT_COUNT} ครั้ง)`);
+  };
+
+  return (
+    <div className="mt-8 pt-6 border-t border-border">
+      <div className="mb-4">
+        <h3 className="text-base font-bold text-text">จัดการข้อมูล</h3>
+        <p className="text-sm text-text-muted mt-0.5">
+          ข้อมูลทั้งหมดเก็บไว้ในเครื่องของคุณ (localStorage) — ยังไม่มีระบบออนไลน์
+        </p>
+      </div>
+
+      {/* Storage status */}
+      <div className="flex items-center gap-3 flex-wrap mb-4">
+        {storageInfo.hasProfile && (
+          <span className="inline-flex items-center px-2.5 py-1 rounded-full bg-success/10 text-success text-xs font-semibold">
+            มีโปรไฟล์
+          </span>
+        )}
+        {storageInfo.hasProgress && (
+          <span className="inline-flex items-center px-2.5 py-1 rounded-full bg-info/10 text-info text-xs font-semibold">
+            มีข้อมูลการฝึก
+          </span>
+        )}
+        {storageInfo.hasObservations && (
+          <span className="inline-flex items-center px-2.5 py-1 rounded-full bg-secondary/10 text-secondary text-xs font-semibold">
+            มีบันทึก
+          </span>
+        )}
+        {!storageInfo.hasProfile && !storageInfo.hasProgress && !storageInfo.hasObservations && (
+          <span className="text-xs text-text-muted">ยังไม่มีข้อมูลในระบบ</span>
+        )}
+      </div>
+
+      {/* Flash message */}
+      {message && (
+        <div
+          className={`mb-4 px-4 py-3 rounded-xl text-sm font-medium ${
+            message.type === "success"
+              ? "bg-success/10 text-success border border-success/20"
+              : "bg-error/10 text-error border border-error/20"
+          }`}
+          role="alert"
+        >
+          {message.text}
+        </div>
+      )}
+
+      {/* Confirm dialogs */}
+      {confirmState === "clear" && (
+        <div className="mb-4 bg-surface border border-error/25 rounded-xl p-4 text-center">
+          <p className="text-sm font-semibold text-text mb-1">ล้างข้อมูลทั้งหมด?</p>
+          <p className="text-xs text-text-muted mb-4">
+            ข้อมูลโปรไฟล์ การฝึก บันทึก จะถูกลบทั้งหมด ไม่สามารถกู้คืนได้
+          </p>
+          <div className="flex gap-3 justify-center">
+            <button
+              onClick={() => setConfirmState(null)}
+              className="px-5 py-2 rounded-xl border border-border text-text-muted font-medium text-sm hover:bg-gray-50 dark:hover:bg-white/5 transition-all"
+            >
+              ยกเลิก
+            </button>
+            <button
+              onClick={handleClear}
+              className="px-5 py-2 rounded-xl bg-error text-white font-semibold text-sm hover:bg-error/90 transition-all"
+            >
+              ล้างข้อมูล
+            </button>
+          </div>
+        </div>
+      )}
+
+      {confirmState === "import" && (
+        <div className="mb-4 bg-surface border border-primary/20 rounded-xl p-4 text-center">
+          <p className="text-sm font-semibold text-text mb-1">นำเข้าข้อมูลสำรอง?</p>
+          <p className="text-xs text-text-muted mb-4">
+            ข้อมูลปัจจุบันจะถูกแทนที่ด้วยข้อมูลจากไฟล์สำรอง
+          </p>
+          <div className="flex gap-3 justify-center">
+            <button
+              onClick={() => setConfirmState(null)}
+              className="px-5 py-2 rounded-xl border border-border text-text-muted font-medium text-sm hover:bg-gray-50 dark:hover:bg-white/5 transition-all"
+            >
+              ยกเลิก
+            </button>
+            <button
+              onClick={() => fileInputRef.current?.click()}
+              className="px-5 py-2 rounded-xl bg-primary text-white font-semibold text-sm hover:bg-primary/90 transition-all"
+            >
+              เลือกไฟล์และนำเข้า
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Action buttons */}
+      {!confirmState && (
+        <div className="space-y-2">
+          <div className="grid grid-cols-2 gap-2">
+            <button
+              onClick={handleExport}
+              className="flex items-center justify-center gap-2 py-2.5 rounded-xl bg-surface border border-border text-sm font-semibold text-text hover:border-primary/30 hover:shadow-sm transition-all active:scale-[0.98]"
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                <polyline points="7 10 12 15 17 10" />
+                <line x1="12" y1="15" x2="12" y2="3" />
+              </svg>
+              ส่งออกข้อมูล
+            </button>
+            <button
+              onClick={confirmImport}
+              className="flex items-center justify-center gap-2 py-2.5 rounded-xl bg-surface border border-border text-sm font-semibold text-text hover:border-primary/30 hover:shadow-sm transition-all active:scale-[0.98]"
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                <polyline points="17 8 12 3 7 8" />
+                <line x1="12" y1="3" x2="12" y2="15" />
+              </svg>
+              นำเข้าข้อมูล
+            </button>
+          </div>
+
+          <div className="grid grid-cols-2 gap-2">
+            <button
+              onClick={handleLoadDemo}
+              className="flex items-center justify-center gap-2 py-2.5 rounded-xl bg-primary/8 border border-primary/15 text-sm font-semibold text-primary hover:bg-primary/12 transition-all active:scale-[0.98]"
+            >
+              โหลดข้อมูลสาธิต
+            </button>
+            <button
+              onClick={() => setConfirmState("clear")}
+              className="flex items-center justify-center gap-2 py-2.5 rounded-xl border border-error/30 text-sm font-semibold text-error hover:bg-error/8 transition-all active:scale-[0.98]"
+            >
+              ล้างข้อมูลทั้งหมด
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Hidden file input for import */}
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept=".json,application/json"
+        onChange={handleImportFile}
+        className="hidden"
+        aria-hidden="true"
+      />
+    </div>
   );
 }
