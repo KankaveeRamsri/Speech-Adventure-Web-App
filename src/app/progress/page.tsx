@@ -15,6 +15,7 @@ import {
   DEMO_ATTEMPT_COUNT,
 } from "@/lib/demo/speechAdventureDemoData";
 import type { ProgressSummary } from "@/types/speechAdventure";
+import { calculateRewards } from "@/lib/rewards/calculateRewards";
 
 // ─── Report Generator ───────────────────────────────────────────────────────
 
@@ -77,7 +78,7 @@ function BackIcon() {
 }
 
 export default function ProgressDashboardPage() {
-  const { summary, clearProgress, getStageStatus, getStageAttempts, isHydrated } = useSpeechProgress();
+  const { progress, summary, clearProgress, getStageStatus, getStageAttempts, isHydrated } = useSpeechProgress();
   const { profile, hasProfile } = useChildProfile();
   const [showResetConfirm, setShowResetConfirm] = useState(false);
   const [showDemoConfirm, setShowDemoConfirm] = useState(false);
@@ -104,6 +105,7 @@ export default function ProgressDashboardPage() {
 
   const completedCount = stageData.filter((s) => s.status === "completed").length;
   const hasData = isHydrated && summary.totalAttempts > 0;
+  const rewardResult = isHydrated ? calculateRewards(progress) : null;
   const hasReview = isHydrated && summary.reviewScore > 0;
   const report = generateReport(summary, completedCount);
   const dateStr = isHydrated ? formatThaiDate() : "";
@@ -509,6 +511,40 @@ export default function ProgressDashboardPage() {
             * ผลประเมินนี้เป็นข้อมูลสาธิต (Mock Evaluation) ยังไม่ใช่ AI จริง
           </p>
         </section>
+
+        {/* ── Rewards Preview ── */}
+        {rewardResult && (
+          <Link
+            href="/rewards"
+            className="block group bg-surface border border-border rounded-xl p-4 hover:border-primary/30 hover:shadow-sm transition-all"
+            aria-label="ดูเหรียญตราและรางวัล"
+          >
+            <div className="flex items-center justify-between gap-4">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-secondary/12 flex items-center justify-center flex-shrink-0">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#FFB347" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                    <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" />
+                  </svg>
+                </div>
+                <div>
+                  <p className="text-sm font-bold text-text">รางวัลและเหรียญตรา</p>
+                  <p className="text-xs text-text-muted">
+                    ได้รับ {rewardResult.earnedCount} / {rewardResult.totalBadges} เหรียญ
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                <div className="text-right">
+                  <p className="text-lg font-bold text-secondary leading-none">★ {summary.starsEarned}</p>
+                  <p className="text-xs text-text-muted">ดาวสะสม</p>
+                </div>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="text-text-muted group-hover:text-primary transition-colors" aria-hidden="true">
+                  <path d="M9 18l6-6-6-6" />
+                </svg>
+              </div>
+            </div>
+          </Link>
+        )}
 
         {/* ── Back to Training ── */}
         <div className="flex justify-center pt-2">

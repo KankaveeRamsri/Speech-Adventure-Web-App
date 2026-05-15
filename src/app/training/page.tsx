@@ -13,6 +13,7 @@ import {
   mockTrainingStages,
 } from "@/data/speechAdventureMockData";
 import type { TrainingStage } from "@/types/speechAdventure";
+import { calculateRewards } from "@/lib/rewards/calculateRewards";
 
 function BackIcon() {
   return (
@@ -34,6 +35,7 @@ function ChartIcon() {
 
 export default function TrainingMapPage() {
   const {
+    progress,
     getStageStatus,
     getStageAttempts,
     summary,
@@ -63,6 +65,7 @@ export default function TrainingMapPage() {
   const selectedSound = mockTargetSounds.find((s) => s.id === selectedSoundId);
   const currentStage = liveStages.find((s) => s.status === "current");
   const completedCount = liveStages.filter((s) => s.status === "completed").length;
+  const rewardResult = isHydrated ? calculateRewards(progress) : null;
 
   return (
     <main className="min-h-screen bg-bg">
@@ -203,6 +206,35 @@ export default function TrainingMapPage() {
               ฝึกต่อ
             </a>
           </div>
+        )}
+
+        {/* ── Rewards mini-card ── */}
+        {isHydrated && rewardResult && (
+          <Link
+            href="/rewards"
+            className="flex items-center justify-between gap-4 bg-surface border border-border rounded-xl px-4 py-3 hover:border-secondary/40 hover:shadow-sm transition-all group"
+            aria-label="ดูรางวัลและเหรียญตรา"
+          >
+            <div className="flex items-center gap-3">
+              <div className="w-8 h-8 rounded-xl bg-secondary/12 flex items-center justify-center flex-shrink-0">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#FFB347" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                  <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" />
+                </svg>
+              </div>
+              <div>
+                <p className="text-sm font-semibold text-text">รางวัล</p>
+                <p className="text-xs text-text-muted">
+                  {rewardResult.earnedCount} / {rewardResult.totalBadges} เหรียญตรา
+                </p>
+              </div>
+            </div>
+            <div className="flex items-center gap-2 text-right">
+              <p className="text-sm font-bold text-secondary">★ {summary.starsEarned}</p>
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="text-text-muted group-hover:text-secondary transition-colors" aria-hidden="true">
+                <path d="M9 18l6-6-6-6" />
+              </svg>
+            </div>
+          </Link>
         )}
 
         {/* ── Training Journey Map ── */}
