@@ -1,10 +1,10 @@
 "use client";
 
 import Link from "next/link";
-import ThemeToggle from "@/components/ui/ThemeToggle";
 import ChildProfileCard from "@/components/speech-adventure/ChildProfileCard";
 import TargetSoundSelector from "@/components/speech-adventure/TargetSoundSelector";
 import TrainingMap from "@/components/speech-adventure/TrainingMap";
+import AppShell from "@/components/layout/AppShell";
 import { useSpeechProgress } from "@/hooks/useSpeechProgress";
 import { useChildProfile } from "@/hooks/useChildProfile";
 import {
@@ -14,24 +14,6 @@ import {
 } from "@/data/speechAdventureMockData";
 import type { TrainingStage } from "@/types/speechAdventure";
 import { calculateRewards } from "@/lib/rewards/calculateRewards";
-
-function BackIcon() {
-  return (
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <path d="M19 12H5M12 5l-7 7 7 7" />
-    </svg>
-  );
-}
-
-function ChartIcon() {
-  return (
-    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <line x1="18" x2="18" y1="20" y2="10" />
-      <line x1="12" x2="12" y1="20" y2="4" />
-      <line x1="6" x2="6" y1="20" y2="14" />
-    </svg>
-  );
-}
 
 export default function TrainingMapPage() {
   const {
@@ -68,34 +50,7 @@ export default function TrainingMapPage() {
   const rewardResult = isHydrated ? calculateRewards(progress) : null;
 
   return (
-    <main className="min-h-screen bg-bg">
-      {/* ── Top Bar ── */}
-      <nav className="sticky top-0 z-20 bg-surface/90 backdrop-blur-md border-b border-border">
-        <div className="flex items-center justify-between px-6 py-3 max-w-3xl mx-auto">
-          <Link
-            href="/"
-            className="flex items-center gap-2 text-text-muted hover:text-text transition-colors px-2 py-1 rounded-lg hover:bg-gray-100 dark:hover:bg-white/8"
-            aria-label="กลับหน้าแรก"
-          >
-            <BackIcon />
-            <span className="text-sm font-medium hidden sm:inline">กลับ</span>
-          </Link>
-
-          <h1 className="font-semibold text-text text-sm">แผนที่การฝึก</h1>
-
-          <div className="flex items-center gap-1">
-            <Link
-              href="/progress"
-              className="flex items-center gap-1.5 text-sm font-medium text-primary hover:text-primary/80 px-2.5 py-1.5 rounded-lg hover:bg-primary/8 transition-all"
-            >
-              <ChartIcon />
-              <span className="hidden sm:inline">รายงาน</span>
-            </Link>
-            <ThemeToggle />
-          </div>
-        </div>
-      </nav>
-
+    <AppShell>
       <div className="max-w-3xl mx-auto px-4 sm:px-6 py-6 space-y-5">
 
         {/* ── Setup banner (shown when no profile is set) ── */}
@@ -181,7 +136,7 @@ export default function TrainingMapPage() {
           </div>
         )}
 
-        {/* ── Current stage CTA ── */}
+        {/* ── Current stage Next Action card ── */}
         {isHydrated && currentStage && (
           <div
             className="flex items-center justify-between gap-4 rounded-xl px-5 py-4 border"
@@ -191,9 +146,9 @@ export default function TrainingMapPage() {
             }}
           >
             <div className="flex items-center gap-3">
-              <span className="text-2xl">{currentStage.icon}</span>
+              <span className="text-2xl" aria-hidden="true">{currentStage.icon}</span>
               <div>
-                <p className="text-xs font-semibold text-text-muted uppercase tracking-wide">ระดับปัจจุบัน</p>
+                <p className="text-xs font-semibold text-text-muted uppercase tracking-wide">ขั้นต่อไปที่แนะนำ</p>
                 <p className="font-bold text-text text-sm">{currentStage.name}</p>
                 <p className="text-xs text-text-muted">{currentStage.shortGoal}</p>
               </div>
@@ -203,13 +158,13 @@ export default function TrainingMapPage() {
               className="flex-shrink-0 px-4 py-2 rounded-xl text-sm font-semibold text-white transition-all hover:scale-[1.02] active:scale-[0.98]"
               style={{ backgroundColor: currentStage.accentColor }}
             >
-              ฝึกต่อ
+              ฝึกเลย
             </a>
           </div>
         )}
 
         {/* ── Rewards mini-card ── */}
-        {isHydrated && rewardResult && (
+        {isHydrated && rewardResult && rewardResult.earnedCount > 0 && (
           <Link
             href="/rewards"
             className="flex items-center justify-between gap-4 bg-surface border border-border rounded-xl px-4 py-3 hover:border-secondary/40 hover:shadow-sm transition-all group"
@@ -244,7 +199,9 @@ export default function TrainingMapPage() {
           </h2>
           <TrainingMap stages={liveStages} />
         </div>
+
+        <div className="pb-4" />
       </div>
-    </main>
+    </AppShell>
   );
 }

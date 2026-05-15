@@ -2,7 +2,7 @@
 
 import { useCallback } from "react";
 import Link from "next/link";
-import ThemeToggle from "@/components/ui/ThemeToggle";
+import AppShell from "@/components/layout/AppShell";
 import ReportHeader from "@/components/report/ReportHeader";
 import ReportMetricCard from "@/components/report/ReportMetricCard";
 import ReportStageTable from "@/components/report/ReportStageTable";
@@ -102,14 +102,6 @@ function formatThaiDate(date: Date): string {
 
 // ── Sub-components ────────────────────────────────────────────────────────────
 
-function BackIcon() {
-  return (
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <path d="M19 12H5M12 5l-7 7 7 7" />
-    </svg>
-  );
-}
-
 function SectionLabel({ children }: { children: React.ReactNode }) {
   return (
     <p className="text-xs font-bold text-text-muted uppercase tracking-wider mb-3 print:text-gray-500">
@@ -202,21 +194,7 @@ export default function ReportPage() {
   // ── Empty state ─────────────────────────────────────────────────────────────
   if (isHydrated && !hasData) {
     return (
-      <main className="min-h-screen bg-bg">
-        <nav className="sticky top-0 z-20 bg-surface/90 backdrop-blur-md border-b border-border print:hidden">
-          <div className="flex items-center justify-between px-6 py-3 max-w-3xl mx-auto">
-            <Link
-              href="/progress"
-              className="flex items-center gap-2 text-text-muted hover:text-text transition-colors px-2 py-1 rounded-lg hover:bg-gray-100 dark:hover:bg-white/8"
-            >
-              <BackIcon />
-              <span className="text-sm font-medium hidden sm:inline">กลับ</span>
-            </Link>
-            <h1 className="font-semibold text-text text-sm">รายงานผู้ปกครอง / ครู</h1>
-            <ThemeToggle />
-          </div>
-        </nav>
-
+      <AppShell>
         <div className="max-w-3xl mx-auto px-4 sm:px-6 py-16 text-center">
           <div className="w-16 h-16 rounded-2xl bg-primary/8 flex items-center justify-center mx-auto mb-4">
             <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#6C63FF" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
@@ -246,44 +224,41 @@ export default function ReportPage() {
             </button>
           </div>
         </div>
-      </main>
+      </AppShell>
     );
   }
 
   // ── Full report ─────────────────────────────────────────────────────────────
+
+  const SECTION_NAV = [
+    { href: "#summary", label: "สรุป" },
+    { href: "#stages", label: "ระดับ" },
+    { href: "#analysis", label: "วิเคราะห์" },
+    { href: "#notes", label: "บันทึก" },
+    { href: "#print", label: "พิมพ์" },
+  ];
+
+  const anchorLinkCls =
+    "flex-shrink-0 px-4 py-1.5 rounded-full text-sm font-medium text-text-muted hover:text-text hover:bg-gray-100 dark:hover:bg-white/8 transition-all";
+
   return (
-    <main className="min-h-screen bg-bg print:bg-white pb-20">
-
-      {/* ── Top Nav (hidden on print) ── */}
-      <nav className="sticky top-0 z-20 bg-surface/90 backdrop-blur-md border-b border-border print:hidden">
-        <div className="flex items-center justify-between px-6 py-3 max-w-3xl mx-auto">
-          <Link
-            href="/progress"
-            className="flex items-center gap-2 text-text-muted hover:text-text transition-colors px-2 py-1 rounded-lg hover:bg-gray-100 dark:hover:bg-white/8"
-            aria-label="กลับหน้าความก้าวหน้า"
-          >
-            <BackIcon />
-            <span className="text-sm font-medium hidden sm:inline">กลับ</span>
-          </Link>
-
-          <h1 className="font-semibold text-text text-sm">รายงานผู้ปกครอง / ครู</h1>
-
-          <div className="flex items-center gap-1">
-            <Link
-              href="/training"
-              className="text-sm font-medium text-primary hover:text-primary/80 px-2.5 py-1.5 rounded-lg hover:bg-primary/8 transition-all hidden sm:block"
-            >
-              ฝึกต่อ
-            </Link>
-            <ThemeToggle />
-          </div>
+    <AppShell>
+      {/* ── Sticky section navigation (hidden on print) ── */}
+      <div className="sticky top-14 z-20 bg-surface/95 backdrop-blur-md border-b border-border print:hidden">
+        <div className="flex overflow-x-auto gap-1 px-4 py-2 max-w-3xl mx-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+          {SECTION_NAV.map((item) => (
+            <a key={item.href} href={item.href} className={anchorLinkCls}>
+              {item.label}
+            </a>
+          ))}
         </div>
-      </nav>
+      </div>
 
       {/* ── Report Content ── */}
       <div className="max-w-3xl mx-auto px-4 sm:px-6 py-6 space-y-5 print:px-6 print:py-4 print:space-y-4">
 
-        {/* 1. Header */}
+        {/* 1. Header — anchor: summary */}
+        <div id="summary" className="scroll-mt-32">
         <ReportHeader
           childName={liveProfile.name}
           childNickname={liveProfile.nickname}
@@ -295,6 +270,7 @@ export default function ReportPage() {
           reportDate={reportDate}
           totalAttempts={summary.totalAttempts}
         />
+        </div>
 
         {/* 2. Overview metrics */}
         {hasData && (
@@ -472,8 +448,8 @@ export default function ReportPage() {
           </div>
         </section>
 
-        {/* 4. Stage breakdown */}
-        <section aria-label="ผลการฝึกแต่ละระดับ">
+        {/* 4. Stage breakdown — anchor: stages */}
+        <section id="stages" className="scroll-mt-32" aria-label="ผลการฝึกแต่ละระดับ">
           <ReportStageTable stages={stageData} />
         </section>
 
@@ -549,7 +525,8 @@ export default function ReportPage() {
           </section>
         )}
 
-        {/* 7. Narrative summary */}
+        {/* 7. Narrative summary — anchor: analysis */}
+        <div id="analysis" className="scroll-mt-32">
         <ReportSummaryCard
           headline={narrative.headline}
           details={narrative.details}
@@ -558,11 +535,13 @@ export default function ReportPage() {
           reportDate={reportDate}
           isMock
         />
+        </div>
 
-        {/* 8. Parent / Teacher Observations */}
+        {/* 8. Parent / Teacher Observations — anchor: notes */}
         {recentNotes.length > 0 && (
           <section
-            className="bg-surface border border-border rounded-2xl p-5 print:border-gray-200 print:rounded-lg"
+            id="notes"
+            className="scroll-mt-32 bg-surface border border-border rounded-2xl p-5 print:border-gray-200 print:rounded-lg"
             aria-label="บันทึกของผู้ปกครองและครู"
           >
             <SectionLabel>บันทึกจากผู้ปกครอง / ครู</SectionLabel>
@@ -655,8 +634,12 @@ export default function ReportPage() {
 
       </div>
 
-      {/* Print actions bar */}
-      {hasData && <PrintActions onPrint={handlePrint} backHref="/progress" />}
-    </main>
+      {/* Print actions bar — anchor: print */}
+      {hasData && (
+        <div id="print" className="scroll-mt-32">
+          <PrintActions onPrint={handlePrint} backHref="/progress" />
+        </div>
+      )}
+    </AppShell>
   );
 }
