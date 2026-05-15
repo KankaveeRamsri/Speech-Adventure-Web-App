@@ -17,8 +17,10 @@ import {
   DEMO_ATTEMPT_COUNT,
 } from "@/lib/demo/speechAdventureDemoData";
 import { clearObservations } from "@/lib/observations/observationStorage";
-import type { ProgressSummary } from "@/types/speechAdventure";
+import type { ProgressSummary, PracticeSession, PracticeAttempt } from "@/types/speechAdventure";
 import { calculateRewards } from "@/lib/rewards/calculateRewards";
+import SessionDetailDrawer from "@/components/details/SessionDetailDrawer";
+import AttemptDetailDrawer from "@/components/details/AttemptDetailDrawer";
 
 // ─── Report Generator ───────────────────────────────────────────────────────
 
@@ -86,6 +88,8 @@ export default function ProgressDashboardPage() {
   const { notes, addNote, updateNote, deleteNote } = useObservationNotes();
   const [showResetConfirm, setShowResetConfirm] = useState(false);
   const [showDemoConfirm, setShowDemoConfirm] = useState(false);
+  const [selectedSession, setSelectedSession] = useState<PracticeSession | null>(null);
+  const [selectedAttempt, setSelectedAttempt] = useState<PracticeAttempt | null>(null);
 
   const liveProfile = {
     ...mockChildProfile,
@@ -386,9 +390,11 @@ export default function ProgressDashboardPage() {
                 })();
 
                 return (
-                  <div
+                  <button
                     key={session.id}
-                    className="flex items-center gap-3 bg-bg dark:bg-white/3 rounded-xl p-4 border border-border"
+                    type="button"
+                    onClick={() => setSelectedSession(session)}
+                    className="w-full flex items-center gap-3 bg-bg dark:bg-white/3 rounded-xl p-4 border border-border text-left hover:border-primary/30 hover:shadow-sm transition-all active:scale-[0.99] cursor-pointer"
                   >
                     <div
                       className="w-10 h-10 rounded-xl flex items-center justify-center text-lg flex-shrink-0"
@@ -423,7 +429,14 @@ export default function ProgressDashboardPage() {
                         ยังไม่เสร็จ
                       </span>
                     )}
-                  </div>
+                    <svg
+                      width="14" height="14" viewBox="0 0 24 24" fill="none"
+                      stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"
+                      className="text-text-muted flex-shrink-0 ml-1" aria-hidden="true"
+                    >
+                      <path d="M9 18l6-6-6-6" />
+                    </svg>
+                  </button>
                 );
               })}
             </div>
@@ -451,7 +464,10 @@ export default function ProgressDashboardPage() {
         )}
 
         {/* ── Section 6: Recent Attempts ── */}
-        <RecentAttemptsList attempts={summary.recentAttempts} />
+        <RecentAttemptsList
+          attempts={summary.recentAttempts}
+          onAttemptClick={setSelectedAttempt}
+        />
 
         {/* ── Section 7: Parent / Teacher Notes ── */}
         <section
@@ -684,6 +700,27 @@ export default function ProgressDashboardPage() {
         <div className="pb-8" />
 
       </div>
+
+      {/* ── Detail Drawers ── */}
+      <SessionDetailDrawer
+        session={selectedSession}
+        allAttempts={progress.attempts}
+        onClose={() => setSelectedSession(null)}
+        onAttemptClick={(attempt) => setSelectedAttempt(attempt)}
+      />
+      <AttemptDetailDrawer
+        attempt={selectedAttempt}
+        linkedSession={
+          selectedAttempt?.sessionId
+            ? (progress.sessions.find((s) => s.id === selectedAttempt.sessionId) ?? null)
+            : null
+        }
+        onClose={() => setSelectedAttempt(null)}
+        onSessionClick={(session) => {
+          setSelectedAttempt(null);
+          setSelectedSession(session);
+        }}
+      />
     </main>
   );
 }

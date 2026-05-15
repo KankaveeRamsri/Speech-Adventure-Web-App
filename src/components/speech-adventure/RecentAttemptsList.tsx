@@ -3,6 +3,7 @@ import type { PracticeAttempt } from "@/types/speechAdventure";
 interface Props {
   attempts: PracticeAttempt[];
   stageNames?: Record<string, string>;
+  onAttemptClick?: (attempt: PracticeAttempt) => void;
 }
 
 const defaultStageNames: Record<string, string> = {
@@ -29,6 +30,7 @@ function formatDate(iso: string): string {
 export default function RecentAttemptsList({
   attempts,
   stageNames = defaultStageNames,
+  onAttemptClick,
 }: Props) {
   if (attempts.length === 0) {
     return (
@@ -54,10 +56,18 @@ export default function RecentAttemptsList({
       <div className="space-y-2">
         {attempts.map((record) => {
           const isPassed = record.score >= 70;
+          const Row = onAttemptClick ? "button" : "div";
           return (
-            <div
+            <Row
               key={record.id}
-              className="flex items-center gap-3 bg-bg dark:bg-white/3 rounded-xl px-4 py-3 border border-border"
+              {...(onAttemptClick
+                ? { type: "button" as const, onClick: () => onAttemptClick(record) }
+                : {})}
+              className={`w-full flex items-center gap-3 bg-bg dark:bg-white/3 rounded-xl px-4 py-3 border border-border text-left transition-all ${
+                onAttemptClick
+                  ? "hover:border-primary/30 hover:shadow-sm active:scale-[0.99] cursor-pointer"
+                  : ""
+              }`}
             >
               {/* Score badge */}
               <div
@@ -80,7 +90,16 @@ export default function RecentAttemptsList({
                   {stageNames[record.stageId] ?? record.stageId} · {formatDate(record.createdAt)}
                 </p>
               </div>
-            </div>
+              {onAttemptClick && (
+                <svg
+                  width="14" height="14" viewBox="0 0 24 24" fill="none"
+                  stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"
+                  className="text-text-muted flex-shrink-0" aria-hidden="true"
+                >
+                  <path d="M9 18l6-6-6-6" />
+                </svg>
+              )}
+            </Row>
           );
         })}
       </div>
