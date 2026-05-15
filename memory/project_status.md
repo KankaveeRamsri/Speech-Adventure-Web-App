@@ -5,6 +5,7 @@ metadata:
   type: project
 ---
 
+Phase 8 (Mock Speech Evaluation API Route) complete as of 2026-05-15.
 Phase 7 (AI Evaluation Service Preparation) complete as of 2026-05-15.
 
 Central evaluation service lives at `src/lib/speech-evaluation/`:
@@ -17,6 +18,12 @@ Central evaluation service lives at `src/lib/speech-evaluation/`:
 
 **Why:** Isolate mock logic so real AI can be dropped in by changing one constant.
 **How to apply:** Next step is Phase 8 — real AI endpoint. Point `ACTIVE_PROVIDER = "api"` in evaluateSpeech.ts and implement `callAiEvaluationApi(input)`.
+
+Phase 8 additions:
+- API route `POST /api/speech/evaluate` in `src/app/api/speech/evaluate/route.ts`
+- Client helper `src/lib/speech-evaluation/client.ts` with `evaluateSpeechViaApi()`
+- PracticeCard now calls the API route (not the server service directly)
+- Validation: returns 400 for missing/invalid fields; 405 handled by Next.js automatically
 
 Completed features:
 - Core training flow (pretest → level 1–5 → review)

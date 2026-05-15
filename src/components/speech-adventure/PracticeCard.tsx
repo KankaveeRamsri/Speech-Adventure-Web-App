@@ -3,7 +3,7 @@
 import { useState, useCallback } from "react";
 import type { PracticeItem, EvaluationResult, PracticeAttempt } from "@/types/speechAdventure";
 import type { SpeechEvaluationResult } from "@/lib/speech-evaluation/types";
-import { evaluateSpeech } from "@/lib/speech-evaluation/evaluateSpeech";
+import { evaluateSpeechViaApi } from "@/lib/speech-evaluation/client";
 import { useAudioRecorder } from "@/hooks/useAudioRecorder";
 import AudioRecorder from "./AudioRecorder";
 import EvaluationResultCard from "./EvaluationResultCard";
@@ -107,7 +107,7 @@ export default function PracticeCard({
   }, [recorder]);
 
   const handleEvaluate = useCallback(() => {
-    evaluateSpeech({
+    evaluateSpeechViaApi({
       stageId: item.stageSlug,
       practiceItemId: item.id,
       targetSound,
@@ -132,7 +132,7 @@ export default function PracticeCard({
   const handleContinue = () => setPhase("reward");
 
   const handleOralMotorComplete = useCallback(() => {
-    evaluateSpeech({
+    evaluateSpeechViaApi({
       stageId: item.stageSlug,
       practiceItemId: item.id,
       targetSound,
@@ -149,7 +149,7 @@ export default function PracticeCard({
   }, [item, targetSound, onSaveAttempt]);
 
   const handleSoundChoice = useCallback((choice: string) => {
-    evaluateSpeech({
+    evaluateSpeechViaApi({
       stageId: item.stageSlug,
       practiceItemId: item.id,
       targetSound,
