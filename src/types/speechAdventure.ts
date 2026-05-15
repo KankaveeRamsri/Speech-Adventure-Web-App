@@ -15,6 +15,8 @@ export type RecordingState =
 
 export type EvaluationStatus = "passed" | "almost" | "retry";
 
+export type { SpeechEvaluationInput, SpeechEvaluationResult, EvaluationProvider } from "@/lib/speech-evaluation/types";
+
 export interface ChildProfile {
   id: string;
   name: string;
@@ -75,14 +77,8 @@ export interface EvaluationResult {
   isPassed: boolean;
 }
 
-export interface MockEvaluationResult {
-  score: number;
-  confidence: number;
-  status: EvaluationStatus;
-  feedback: string;
-  recommendation?: string;
-  isMock: true;
-}
+/** @deprecated Use SpeechEvaluationResult from @/lib/speech-evaluation/types */
+export type MockEvaluationResult = import("@/lib/speech-evaluation/types").SpeechEvaluationResult;
 
 export interface AudioAttempt {
   id: string;
@@ -91,7 +87,7 @@ export interface AudioAttempt {
   audioUrl: string;
   durationMs: number;
   createdAt: string;
-  evaluation?: MockEvaluationResult;
+  evaluation?: import("@/lib/speech-evaluation/types").SpeechEvaluationResult;
 }
 
 export interface PracticeAttempt {

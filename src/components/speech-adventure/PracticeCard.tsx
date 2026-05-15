@@ -1,12 +1,9 @@
 "use client";
 
 import { useState, useCallback } from "react";
-import type {
-  PracticeItem,
-  EvaluationResult,
-  MockEvaluationResult,
-  PracticeAttempt,
-} from "@/types/speechAdventure";
+import type { PracticeItem, EvaluationResult, PracticeAttempt } from "@/types/speechAdventure";
+import type { SpeechEvaluationResult } from "@/lib/speech-evaluation/types";
+import { evaluateSpeech } from "@/lib/speech-evaluation/evaluateSpeech";
 import { useAudioRecorder } from "@/hooks/useAudioRecorder";
 import AudioRecorder from "./AudioRecorder";
 import EvaluationResultCard from "./EvaluationResultCard";
@@ -25,26 +22,15 @@ interface Props {
   onNext?: () => void;
 }
 
-function generateMockEvaluation(): { mock: MockEvaluationResult; result: EvaluationResult } {
-  const pool: Array<{ mock: MockEvaluationResult; result: EvaluationResult }> = [
-    {
-      mock: { score: 95, confidence: 0.97, status: "passed", feedback: "ยอดเยี่ยม! เสียงออกมาชัดเจนมาก!", recommendation: "ลองฝึกระดับถัดไปได้เลยนะ", isMock: true },
-      result: { score: 95, maxScore: 100, stars: 5, message: "ยอดเยี่ยม! เก่งมาก!", isPassed: true },
-    },
-    {
-      mock: { score: 82, confidence: 0.85, status: "passed", feedback: "ดีมาก! ออกเสียงได้ดีขึ้นแล้ว!", recommendation: "ลองฟังเสียงตัวอย่างแล้วฝึกตามอีกสักหน่อย", isMock: true },
-      result: { score: 82, maxScore: 100, stars: 4, message: "ดีมาก! ใกล้เก่งแล้ว!", isPassed: true },
-    },
-    {
-      mock: { score: 68, confidence: 0.72, status: "almost", feedback: "เกือบจะผ่านแล้ว! ลองอีกสักครั้ง!", recommendation: "ออกเสียงให้ช้าลงและชัดขึ้นอีกนิด", isMock: true },
-      result: { score: 68, maxScore: 100, stars: 3, message: "ดีขึ้นแล้ว! ลองอีกครั้งนะ!", isPassed: true },
-    },
-    {
-      mock: { score: 50, confidence: 0.55, status: "retry", feedback: "สู้ต่อนะ! ลองฟังเสียงตัวอย่างแล้วฝึกอีกครั้ง!", recommendation: "เริ่มจากการฟังเสียงตัวอย่างก่อน แล้วค่อยๆ ออกเสียงตาม", isMock: true },
-      result: { score: 50, maxScore: 100, stars: 2, message: "พยายามอีกนิดนะ!", isPassed: false },
-    },
-  ];
-  return pool[Math.floor(Math.random() * pool.length)];
+function toUIResult(evalResult: SpeechEvaluationResult): EvaluationResult {
+  const { score, status } = evalResult;
+  const stars = score >= 85 ? 5 : score >= 70 ? 4 : score >= 55 ? 3 : score >= 40 ? 2 : 1;
+  const message =
+    score >= 85 ? "ยอดเยี่ยม! เก่งมาก!" :
+    score >= 70 ? "ดีมาก! ใกล้เก่งแล้ว!" :
+    score >= 55 ? "ดีขึ้นแล้ว! ลองอีกครั้งนะ!" :
+    "พยายามอีกนิดนะ!";
+  return { score, maxScore: 100, stars, message, isPassed: status !== "retry" };
 }
 
 function computeStars(score: number): number {
@@ -54,9 +40,10 @@ function computeStars(score: number): number {
 }
 
 function buildAttempt(
-  item: PracticeItem, targetSound: string, score: number, confidence: number,
-  status: "passed" | "almost" | "retry", feedback: string,
-  recommendation: string | undefined, durationMs: number
+  item: PracticeItem,
+  targetSound: string,
+  evalResult: SpeechEvaluationResult,
+  durationMs: number,
 ): PracticeAttempt {
   return {
     id: `attempt-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
@@ -66,9 +53,13 @@ function buildAttempt(
     targetSound,
     promptText: item.target,
     durationMs,
-    score, confidence, status, feedback, recommendation,
-    starsEarned: computeStars(score),
-    createdAt: new Date().toISOString(),
+    score: evalResult.score,
+    confidence: evalResult.confidence,
+    status: evalResult.status,
+    feedback: evalResult.feedback,
+    recommendation: evalResult.recommendation,
+    starsEarned: computeStars(evalResult.score),
+    createdAt: evalResult.createdAt,
   };
 }
 
@@ -89,7 +80,7 @@ export default function PracticeCard({
   const recorder = useAudioRecorder();
   const [phase, setPhase] = useState<"idle" | "listening" | "recording" | "evaluated" | "saved" | "reward">("idle");
   const [result, setResult] = useState<EvaluationResult | null>(null);
-  const [mockEval, setMockEval] = useState<MockEvaluationResult | null>(null);
+  const [evalResult, setEvalResult] = useState<SpeechEvaluationResult | null>(null);
   const [savedAttempt, setSavedAttempt] = useState<PracticeAttempt | null>(null);
 
   const handleListen = () => {
@@ -107,67 +98,71 @@ export default function PracticeCard({
     setPhase("idle");
   }, [recorder]);
 
-  const handleEvaluate = useCallback(() => {
-    const { mock, result: evalResult } = generateMockEvaluation();
-    setResult(evalResult);
-    setMockEval(mock);
-    setPhase("evaluated");
-  }, []);
-
   const handleRetry = useCallback(() => {
     recorder.clearRecording();
     setResult(null);
-    setMockEval(null);
+    setEvalResult(null);
     setSavedAttempt(null);
     setPhase("idle");
   }, [recorder]);
 
+  const handleEvaluate = useCallback(() => {
+    evaluateSpeech({
+      stageId: item.stageSlug,
+      practiceItemId: item.id,
+      targetSound,
+      promptText: item.target,
+      itemType: item.type,
+      durationMs: recorder.durationMs,
+    }).then((ev) => {
+      setEvalResult(ev);
+      setResult(toUIResult(ev));
+      setPhase("evaluated");
+    });
+  }, [item, targetSound, recorder.durationMs]);
+
   const handleAccept = useCallback(() => {
-    if (!mockEval) return;
-    const attempt = buildAttempt(
-      item, targetSound, mockEval.score, mockEval.confidence,
-      mockEval.status, mockEval.feedback, mockEval.recommendation,
-      recorder.durationMs
-    );
+    if (!evalResult) return;
+    const attempt = buildAttempt(item, targetSound, evalResult, recorder.durationMs);
     setSavedAttempt(attempt);
     onSaveAttempt?.(attempt);
     setPhase("saved");
-  }, [mockEval, item, targetSound, recorder.durationMs, onSaveAttempt]);
+  }, [evalResult, item, targetSound, recorder.durationMs, onSaveAttempt]);
 
   const handleContinue = () => setPhase("reward");
 
   const handleOralMotorComplete = useCallback(() => {
-    const score = 75 + Math.floor(Math.random() * 21);
-    const evalResult: EvaluationResult = {
-      score, maxScore: 100, stars: computeStars(score),
-      message: "ยอดเยี่ยม! ทำภารกิจสำเร็จแล้ว!", isPassed: true,
-    };
-    setResult(evalResult);
-    const attempt = buildAttempt(item, targetSound, score, 0.9, "passed", "ทำภารกิจ Oral Motor สำเร็จ!", undefined, 0);
-    setSavedAttempt(attempt);
-    onSaveAttempt?.(attempt);
-    setPhase("reward");
+    evaluateSpeech({
+      stageId: item.stageSlug,
+      practiceItemId: item.id,
+      targetSound,
+      promptText: item.target,
+      itemType: "oral_motor",
+      durationMs: 0,
+    }).then((ev) => {
+      const attempt = buildAttempt(item, targetSound, ev, 0);
+      setSavedAttempt(attempt);
+      setResult(toUIResult(ev));
+      onSaveAttempt?.(attempt);
+      setPhase("reward");
+    });
   }, [item, targetSound, onSaveAttempt]);
 
   const handleSoundChoice = useCallback((choice: string) => {
-    const isCorrect = choice === item.target;
-    const score = isCorrect ? 80 + Math.floor(Math.random() * 16) : 30 + Math.floor(Math.random() * 26);
-    const mock: MockEvaluationResult = {
-      score, confidence: isCorrect ? 0.9 : 0.5,
-      status: isCorrect ? "passed" : "retry",
-      feedback: isCorrect ? `ถูกต้อง! "${choice}" ใช่เลย!` : `คำตอบที่ถูกคือ "${item.target}" ลองอีกครั้ง!`,
-      recommendation: isCorrect ? undefined : "ฟังเสียงให้ดีแล้วลองเลือกใหม่",
-      isMock: true,
-    };
-    const evalResult: EvaluationResult = {
-      score, maxScore: 100, stars: computeStars(score),
-      message: isCorrect ? "ถูกต้อง! เก่งมาก!" : "ยังไม่ถูก ลองอีกครั้ง!",
-      isPassed: isCorrect,
-    };
-    setResult(evalResult);
-    setMockEval(mock);
-    setPhase("evaluated");
-  }, [item.target]);
+    evaluateSpeech({
+      stageId: item.stageSlug,
+      practiceItemId: item.id,
+      targetSound,
+      promptText: item.target,
+      itemType: "sound_choice",
+      durationMs: 0,
+      selectedChoice: choice,
+    }).then((ev) => {
+      setEvalResult(ev);
+      setResult(toUIResult(ev));
+      setPhase("evaluated");
+    });
+  }, [item, targetSound]);
 
   const sizeClass =
     item.type === "sentence" ? "text-xl md:text-2xl" :
@@ -231,7 +226,7 @@ export default function PracticeCard({
       </div>
 
       {/* ── Evaluated phase ── */}
-      {phase === "evaluated" && result && mockEval && (
+      {phase === "evaluated" && result && evalResult && (
         <div className="animate-slide-up space-y-4">
           <EvaluationResultCard result={result} accentColor={accentColor} />
 
@@ -239,9 +234,9 @@ export default function PracticeCard({
             className="rounded-xl p-4 text-sm space-y-1.5 border"
             style={{ backgroundColor: `${accentColor}06`, borderColor: `${accentColor}20` }}
           >
-            <p className="font-semibold text-text">{mockEval.feedback}</p>
-            {mockEval.recommendation && (
-              <p className="text-text-muted">{mockEval.recommendation}</p>
+            <p className="font-semibold text-text">{evalResult.feedback}</p>
+            {evalResult.recommendation && (
+              <p className="text-text-muted">{evalResult.recommendation}</p>
             )}
             {usesRecorder(item.type) && (
               <p className="text-xs text-text-muted pt-1 border-t border-border/50">
