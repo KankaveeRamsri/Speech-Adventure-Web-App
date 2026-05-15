@@ -353,7 +353,97 @@ export default function ProgressDashboardPage() {
           )}
         </section>
 
-        {/* ── Section 5: Recent Attempts ── */}
+        {/* ── Section 5: Recent Practice Sessions ── */}
+        {summary.recentSessions.length > 0 && (
+          <section className="bg-surface border border-border rounded-xl p-5" aria-label="ประวัติการฝึกล่าสุด (เซสชัน)">
+            <p className="text-xs font-semibold text-text-muted uppercase tracking-wider mb-4">
+              ประวัติเซสชันการฝึก
+            </p>
+            <div className="space-y-2">
+              {summary.recentSessions.map((session) => {
+                const sessionStage = mockTrainingStages.find((s) => s.id === session.stageId);
+                const durationText = session.durationMs
+                  ? Math.round(session.durationMs / 60000) > 0
+                    ? `${Math.round(session.durationMs / 60000)} นาที`
+                    : `${Math.round(session.durationMs / 1000)} วินาที`
+                  : "—";
+                const dateStr = (() => {
+                  try {
+                    return new Date(session.startedAt).toLocaleDateString("th-TH", {
+                      day: "numeric",
+                      month: "short",
+                    });
+                  } catch {
+                    return "";
+                  }
+                })();
+
+                return (
+                  <div
+                    key={session.id}
+                    className="flex items-center gap-3 bg-bg dark:bg-white/3 rounded-xl p-4 border border-border"
+                  >
+                    <div
+                      className="w-10 h-10 rounded-xl flex items-center justify-center text-lg flex-shrink-0"
+                      style={{ backgroundColor: `${sessionStage?.accentColor ?? "#6C63FF"}15` }}
+                      aria-hidden="true"
+                    >
+                      {sessionStage?.icon ?? "🎯"}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-semibold text-text truncate">
+                        {sessionStage?.name ?? session.stageId}
+                      </p>
+                      <p className="text-xs text-text-muted">
+                        {dateStr} · {durationText} · เสียง {session.targetSound}
+                      </p>
+                    </div>
+                    <div className="text-right flex-shrink-0 space-y-0.5">
+                      <p className={`text-sm font-bold ${
+                        session.averageScore >= 70 ? "text-success" : "text-secondary"
+                      }`}>
+                        {session.averageScore}%
+                      </p>
+                      <p className="text-xs text-secondary">
+                        ★ {session.starsEarned}
+                      </p>
+                      <p className="text-xs text-text-muted">
+                        {session.completedMissions}/{session.totalMissions} ภารกิจ
+                      </p>
+                    </div>
+                    {session.status === "abandoned" && (
+                      <span className="text-xs text-text-muted bg-gray-100 dark:bg-white/8 px-2 py-0.5 rounded-full flex-shrink-0">
+                        ยังไม่เสร็จ
+                      </span>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* Session stats summary */}
+            {summary.totalSessions > 0 && (
+              <div className="mt-3 grid grid-cols-3 gap-2">
+                <div className="bg-bg dark:bg-white/3 rounded-xl p-3 text-center border border-border">
+                  <p className="text-lg font-bold text-primary">{summary.totalSessions}</p>
+                  <p className="text-xs text-text-muted">เซสชันทั้งหมด</p>
+                </div>
+                <div className="bg-bg dark:bg-white/3 rounded-xl p-3 text-center border border-border">
+                  <p className="text-lg font-bold text-success">{summary.averageSessionScore}%</p>
+                  <p className="text-xs text-text-muted">คะแนนเฉลี่ย/เซสชัน</p>
+                </div>
+                <div className="bg-bg dark:bg-white/3 rounded-xl p-3 text-center border border-border">
+                  <p className="text-lg font-bold text-secondary">
+                    ★ {summary.recentSessions.reduce((s, sess) => s + sess.starsEarned, 0)}
+                  </p>
+                  <p className="text-xs text-text-muted">ดาวจากเซสชัน</p>
+                </div>
+              </div>
+            )}
+          </section>
+        )}
+
+        {/* ── Section 6: Recent Attempts ── */}
         <RecentAttemptsList attempts={summary.recentAttempts} />
 
         {/* ── Section 6: Report Card ── */}

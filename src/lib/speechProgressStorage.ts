@@ -1,6 +1,7 @@
 import type {
   SpeechProgress,
   PracticeAttempt,
+  PracticeSession,
   ProgressSummary,
 } from "@/types/speechAdventure";
 
@@ -37,6 +38,7 @@ const SERVER_PROGRESS: SpeechProgress = {
   childId: DEFAULT_CHILD_ID,
   targetSound: DEFAULT_TARGET_SOUND,
   attempts: [],
+  sessions: [],
   updatedAt: "",
 };
 
@@ -58,6 +60,9 @@ function readFromLocalStorage(): SpeechProgress {
 
     const parsed = JSON.parse(raw) as SpeechProgress;
     if (!parsed || !Array.isArray(parsed.attempts)) return SERVER_PROGRESS;
+
+    // Backward compat: add sessions array if missing
+    if (!parsed.sessions) parsed.sessions = [];
 
     return parsed;
   } catch {
@@ -132,6 +137,7 @@ export function addAttempt(attempt: PracticeAttempt): SpeechProgress {
     childId: currentProgress.childId,
     targetSound: currentProgress.targetSound,
     attempts: [...currentProgress.attempts, attempt],
+    sessions: currentProgress.sessions,
     updatedAt: new Date().toISOString(),
   };
 
@@ -202,6 +208,157 @@ export function setSelectedSoundId(id: string): void {
     try { localStorage.setItem(SOUND_STORAGE_KEY, id); } catch { /* ignore */ }
   }
   soundListeners.forEach((fn) => fn());
+}
+
+// ── Session management ─────────────────────────────────────────────────────────
+
+function updateProgressWithSessions(
+  sessions: PracticeSession[],
+  attempts?: PracticeAttempt[]
+): void {
+  currentProgress = {
+    childId: currentProgress.childId,
+    targetSound: currentProgress.targetSound,
+    attempts: attempts ?? currentProgress.attempts,
+    sessions,
+    updatedAt: new Date().toISOString(),
+  };
+  writeToLocalStorage(currentProgress);
+  notifyListeners();
+}
+
+interface StartSessionInput {
+  childId: string;
+  targetSound: string;
+  stageId: string;
+  totalMissions: number;
+}
+
+export function startPracticeSession(input: StartSessionInput): PracticeSession {
+  initializeIfNeeded();
+
+  const session: PracticeSession = {
+    id: `session-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+    childId: input.childId,
+    targetSound: input.targetSound,
+    stageId: input.stageId,
+    startedAt: new Date().toISOString(),
+    endedAt: undefined,
+    durationMs: undefined,
+    completedMissions: 0,
+    totalMissions: input.totalMissions,
+    averageScore: 0,
+    starsEarned: 0,
+    attemptIds: [],
+    status: "active",
+  };
+
+  updateProgressWithSessions([...currentProgress.sessions, session]);
+  return session;
+}
+
+export function completePracticeSession(sessionId: string): PracticeSession | null {
+  initializeIfNeeded();
+
+  const sessions = currentProgress.sessions.map((s) => {
+    if (s.id !== sessionId) return s;
+
+    const sessionAttempts = currentProgress.attempts.filter((a) =>
+      a.sessionId === sessionId
+    );
+    const completedMissions = new Set(
+      sessionAttempts.map((a) => a.practiceItemId)
+    ).size;
+    const averageScore =
+      sessionAttempts.length > 0
+        ? Math.round(
+            sessionAttempts.reduce((sum, a) => sum + a.score, 0) /
+              sessionAttempts.length
+          )
+        : 0;
+    const starsEarned = sessionAttempts.reduce(
+      (sum, a) => sum + a.starsEarned,
+      0
+    );
+    const now = new Date();
+    const durationMs =
+      now.getTime() - new Date(s.startedAt).getTime();
+
+    return {
+      ...s,
+      endedAt: now.toISOString(),
+      durationMs,
+      completedMissions,
+      averageScore,
+      starsEarned,
+      attemptIds: sessionAttempts.map((a) => a.id),
+      status: "completed" as const,
+    };
+  });
+
+  updateProgressWithSessions(sessions);
+
+  return sessions.find((s) => s.id === sessionId) ?? null;
+}
+
+export function abandonPracticeSession(sessionId: string): PracticeSession | null {
+  initializeIfNeeded();
+
+  const sessions = currentProgress.sessions.map((s) => {
+    if (s.id !== sessionId) return s;
+
+    const sessionAttempts = currentProgress.attempts.filter(
+      (a) => a.sessionId === sessionId
+    );
+    const completedMissions = new Set(
+      sessionAttempts.map((a) => a.practiceItemId)
+    ).size;
+    const averageScore =
+      sessionAttempts.length > 0
+        ? Math.round(
+            sessionAttempts.reduce((sum, a) => sum + a.score, 0) /
+              sessionAttempts.length
+          )
+        : 0;
+    const starsEarned = sessionAttempts.reduce(
+      (sum, a) => sum + a.starsEarned,
+      0
+    );
+    const now = new Date();
+    const durationMs =
+      now.getTime() - new Date(s.startedAt).getTime();
+
+    return {
+      ...s,
+      endedAt: now.toISOString(),
+      durationMs,
+      completedMissions,
+      averageScore,
+      starsEarned,
+      attemptIds: sessionAttempts.map((a) => a.id),
+      status: "abandoned" as const,
+    };
+  });
+
+  updateProgressWithSessions(sessions);
+
+  return sessions.find((s) => s.id === sessionId) ?? null;
+}
+
+export function getActiveSession(stageId: string): PracticeSession | null {
+  initializeIfNeeded();
+  return (
+    currentProgress.sessions.find(
+      (s) => s.stageId === stageId && s.status === "active"
+    ) ?? null
+  );
+}
+
+export function getSessionSummary(sessionId: string): PracticeSession | null {
+  initializeIfNeeded();
+  return (
+    currentProgress.sessions.find((s) => s.id === sessionId) ?? null
+  );
 }
 
 // ── Stage logic ───────────────────────────────────────────────────────────────
@@ -355,6 +512,25 @@ export function calculateProgressSummary(
     )
     .slice(0, 10);
 
+  const sessions = progress.sessions ?? [];
+  const completedSessions = sessions.filter((s) => s.status === "completed");
+  const totalSessions = completedSessions.length;
+  const averageSessionScore =
+    totalSessions > 0
+      ? Math.round(
+          completedSessions.reduce((sum, s) => sum + s.averageScore, 0) /
+            totalSessions
+        )
+      : 0;
+
+  const recentSessions = [...sessions]
+    .filter((s) => s.status !== "active")
+    .sort(
+      (a, b) =>
+        new Date(b.startedAt).getTime() - new Date(a.startedAt).getTime()
+    )
+    .slice(0, 10);
+
   return {
     totalAttempts,
     averageScore,
@@ -369,5 +545,8 @@ export function calculateProgressSummary(
     difficultSounds,
     difficultItems,
     recentAttempts,
+    totalSessions,
+    averageSessionScore,
+    recentSessions,
   };
 }

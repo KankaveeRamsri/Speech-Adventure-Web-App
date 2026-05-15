@@ -474,6 +474,7 @@ export const mockProgressSummary: ProgressSummary = {
   improvement: 33, accuracy: 72,
   difficultSounds: ["ช", "ร", "ฌ"],
   difficultItems: [], recentAttempts: [],
+  totalSessions: 0, averageSessionScore: 0, recentSessions: [],
 };
 
 export const mockPracticeHistory: PracticeHistory[] = [

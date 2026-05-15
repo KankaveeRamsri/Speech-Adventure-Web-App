@@ -1,17 +1,18 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
 import ThemeToggle from "@/components/ui/ThemeToggle";
 import PracticeCard from "@/components/speech-adventure/PracticeCard";
 import LevelCompletionSummary from "@/components/speech-adventure/LevelCompletionSummary";
+import PracticeSessionSummary from "@/components/speech-adventure/PracticeSessionSummary";
 import { useSpeechProgress } from "@/hooks/useSpeechProgress";
 import {
   mockPracticeItemsBySound,
   mockTrainingStages,
 } from "@/data/speechAdventureMockData";
-import type { PracticeAttempt } from "@/types/speechAdventure";
+import type { PracticeAttempt, PracticeSession } from "@/types/speechAdventure";
 
 function BackIcon() {
   return (
@@ -25,7 +26,7 @@ export default function PracticePage() {
   const params = useParams();
   const stageSlug = params.stage as string;
   const stage = mockTrainingStages.find((s) => s.slug === stageSlug);
-  const { addAttempt, selectedSoundId, isHydrated } = useSpeechProgress();
+  const { addAttempt, selectedSoundId, isHydrated, startSession, completeSession } = useSpeechProgress();
 
   const soundContent =
     mockPracticeItemsBySound[selectedSoundId] ??
@@ -36,22 +37,46 @@ export default function PracticePage() {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [showCompletion, setShowCompletion] = useState(false);
   const [sessionAttempts, setSessionAttempts] = useState<PracticeAttempt[]>([]);
+  const [activeSession, setActiveSession] = useState<PracticeSession | null>(null);
+  const [completedSession, setCompletedSession] = useState<PracticeSession | null>(null);
+  const sessionStarted = useRef(false);
+
+  // Start a session when the stage loads with content
+  useEffect(() => {
+    if (!isHydrated || !stage || items.length === 0 || sessionStarted.current) return;
+    sessionStarted.current = true;
+    const session = startSession({
+      childId: "child-001",
+      targetSound: selectedSoundId,
+      stageId: stageSlug,
+      totalMissions: items.length,
+    });
+    setActiveSession(session);
+  }, [isHydrated, stage, stageSlug, items.length, selectedSoundId, startSession]);
 
   const handleSaveAttempt = useCallback(
     (attempt: PracticeAttempt) => {
-      addAttempt(attempt);
-      setSessionAttempts((prev) => [...prev, attempt]);
+      const attemptWithSession = activeSession
+        ? { ...attempt, sessionId: activeSession.id }
+        : attempt;
+      addAttempt(attemptWithSession);
+      setSessionAttempts((prev) => [...prev, attemptWithSession]);
     },
-    [addAttempt]
+    [addAttempt, activeSession]
   );
 
   const handleNext = useCallback(() => {
     if (currentIndex < items.length - 1) {
       setCurrentIndex((prev) => prev + 1);
     } else {
+      // Complete the session when all missions are done
+      if (activeSession) {
+        const completed = completeSession(activeSession.id);
+        if (completed) setCompletedSession(completed);
+      }
       setShowCompletion(true);
     }
-  }, [currentIndex, items.length]);
+  }, [currentIndex, items.length, activeSession, completeSession]);
 
   const handlePrev = useCallback(() => {
     if (currentIndex > 0) {
@@ -63,7 +88,17 @@ export default function PracticePage() {
     setCurrentIndex(0);
     setShowCompletion(false);
     setSessionAttempts([]);
-  }, []);
+    setCompletedSession(null);
+    // Start a new session for retry
+    sessionStarted.current = true;
+    const session = startSession({
+      childId: "child-001",
+      targetSound: selectedSoundId,
+      stageId: stageSlug,
+      totalMissions: items.length,
+    });
+    setActiveSession(session);
+  }, [stageSlug, selectedSoundId, items.length, startSession]);
 
   /* ── Not found ── */
   if (!stage) {
@@ -181,12 +216,20 @@ export default function PracticePage() {
 
       <div className="max-w-3xl mx-auto px-4 sm:px-6 py-5 space-y-4">
         {showCompletion ? (
-          <LevelCompletionSummary
-            attempts={sessionAttempts}
-            stage={stage}
-            totalMissions={items.length}
-            onRetry={handleRetry}
-          />
+          completedSession ? (
+            <PracticeSessionSummary
+              session={completedSession}
+              stage={stage}
+              onRetry={handleRetry}
+            />
+          ) : (
+            <LevelCompletionSummary
+              attempts={sessionAttempts}
+              stage={stage}
+              totalMissions={items.length}
+              onRetry={handleRetry}
+            />
+          )
         ) : (
           <>
             {/* ── Stage info + mission dots ── */}

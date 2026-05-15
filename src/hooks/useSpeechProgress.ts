@@ -4,6 +4,7 @@ import { useCallback, useSyncExternalStore } from "react";
 import type {
   SpeechProgress,
   PracticeAttempt,
+  PracticeSession,
   ProgressSummary,
   StageStatus,
 } from "@/types/speechAdventure";
@@ -20,6 +21,11 @@ import {
   getSelectedSoundId,
   getServerSoundId,
   setSelectedSoundId,
+  startPracticeSession as storageStartSession,
+  completePracticeSession as storageCompleteSession,
+  abandonPracticeSession as storageAbandonSession,
+  getActiveSession as storageGetActiveSession,
+  getSessionSummary as storageGetSessionSummary,
 } from "@/lib/speechProgressStorage";
 
 // ── isHydrated detection ──────────────────────────────────────────────────────
@@ -92,10 +98,40 @@ export function useSpeechProgress() {
     [progress.attempts],
   );
 
+  const startSession = useCallback(
+    (input: { childId: string; targetSound: string; stageId: string; totalMissions: number }) => {
+      return storageStartSession(input);
+    },
+    []
+  );
+
+  const completeSession = useCallback((sessionId: string) => {
+    return storageCompleteSession(sessionId);
+  }, []);
+
+  const abandonSession = useCallback((sessionId: string) => {
+    return storageAbandonSession(sessionId);
+  }, []);
+
+  const getActiveSessionForStage = useCallback(
+    (stageId: string): PracticeSession | null => {
+      return storageGetActiveSession(stageId);
+    },
+    []
+  );
+
+  const getSessionById = useCallback(
+    (sessionId: string): PracticeSession | null => {
+      return storageGetSessionSummary(sessionId);
+    },
+    []
+  );
+
   return {
     progress,
     summary,
     attempts: progress.attempts,
+    sessions: progress.sessions,
     isHydrated,
     selectedSoundId,
     setSelectedSound,
@@ -104,5 +140,10 @@ export function useSpeechProgress() {
     refreshProgress,
     getStageStatus,
     getStageAttempts,
+    startSession,
+    completeSession,
+    abandonSession,
+    getActiveSessionForStage,
+    getSessionById,
   };
 }

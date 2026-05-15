@@ -325,6 +325,85 @@ export default function ReportPage() {
           </section>
         )}
 
+        {/* 2b. Session summary */}
+        {hasData && summary.totalSessions > 0 && (
+          <section
+            className="bg-surface border border-border rounded-2xl p-5 print:border-gray-200 print:rounded-lg"
+            aria-label="สถิติเซสชันการฝึก"
+          >
+            <SectionLabel>สถิติเซสชันการฝึก</SectionLabel>
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 print:grid-cols-4 print:gap-2">
+              <div className="bg-primary/8 border border-primary/15 rounded-xl p-4 text-center print:bg-blue-50 print:border-blue-100">
+                <p className="text-3xl font-bold text-primary print:text-black">{summary.totalSessions}</p>
+                <p className="text-xs text-text-muted mt-1 print:text-gray-500">เซสชันทั้งหมด</p>
+              </div>
+              <div className="bg-success/8 border border-success/15 rounded-xl p-4 text-center print:bg-green-50 print:border-green-100">
+                <p className="text-3xl font-bold text-success print:text-black">{summary.averageSessionScore}%</p>
+                <p className="text-xs text-text-muted mt-1 print:text-gray-500">คะแนนเฉลี่ย/เซสชัน</p>
+              </div>
+              <div className="bg-secondary/8 border border-secondary/15 rounded-xl p-4 text-center print:bg-orange-50 print:border-orange-100">
+                <p className="text-3xl font-bold text-secondary print:text-black">
+                  ★ {summary.recentSessions.reduce((s, sess) => s + sess.starsEarned, 0)}
+                </p>
+                <p className="text-xs text-text-muted mt-1 print:text-gray-500">ดาวจากเซสชัน</p>
+              </div>
+              <div className="bg-info/8 border border-info/15 rounded-xl p-4 text-center print:bg-cyan-50 print:border-cyan-100">
+                <p className="text-3xl font-bold text-info print:text-black">
+                  {summary.recentSessions.length > 0
+                    ? (() => {
+                        const totalMs = summary.recentSessions.reduce(
+                          (s, sess) => s + (sess.durationMs ?? 0), 0
+                        );
+                        return totalMs > 0 ? `${Math.round(totalMs / 60000)} นาที` : "—";
+                      })()
+                    : "—"}
+                </p>
+                <p className="text-xs text-text-muted mt-1 print:text-gray-500">เวลาฝึกรวม</p>
+              </div>
+            </div>
+
+            {/* Latest session highlight */}
+            {summary.recentSessions.length > 0 && (() => {
+              const latest = summary.recentSessions[0];
+              const latestStage = mockTrainingStages.find((s) => s.id === latest.stageId);
+              return (
+                <div className="mt-3 bg-bg dark:bg-white/3 rounded-xl p-4 border border-border print:bg-gray-50 print:border-gray-200">
+                  <p className="text-xs font-semibold text-text-muted mb-1 print:text-gray-500">เซสชันล่าสุด</p>
+                  <div className="flex items-center gap-3">
+                    <div
+                      className="w-9 h-9 rounded-lg flex items-center justify-center text-base flex-shrink-0"
+                      style={{ backgroundColor: `${latestStage?.accentColor ?? "#6C63FF"}15` }}
+                      aria-hidden="true"
+                    >
+                      {latestStage?.icon ?? "🎯"}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-semibold text-text print:text-black">
+                        {latestStage?.name ?? latest.stageId}
+                      </p>
+                      <p className="text-xs text-text-muted print:text-gray-400">
+                        {(() => {
+                          try {
+                            return new Date(latest.startedAt).toLocaleDateString("th-TH", {
+                              day: "numeric", month: "short", year: "numeric",
+                            });
+                          } catch { return ""; }
+                        })()}
+                        {" · "}
+                        {latest.completedMissions}/{latest.totalMissions} ภารกิจ
+                      </p>
+                    </div>
+                    <div className="text-right flex-shrink-0">
+                      <p className="text-sm font-bold text-success print:text-green-700">{latest.averageScore}%</p>
+                      <p className="text-xs text-secondary print:text-yellow-600">★ {latest.starsEarned}</p>
+                    </div>
+                  </div>
+                </div>
+              );
+            })()}
+          </section>
+        )}
+
         {/* 3. Pre-test vs Review */}
         <section
           className="bg-surface border border-border rounded-2xl p-5 print:border-gray-200 print:rounded-lg"

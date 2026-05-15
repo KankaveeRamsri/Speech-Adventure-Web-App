@@ -90,6 +90,24 @@ export interface AudioAttempt {
   evaluation?: import("@/lib/speech-evaluation/types").SpeechEvaluationResult;
 }
 
+export type SessionStatus = "active" | "completed" | "abandoned";
+
+export interface PracticeSession {
+  id: string;
+  childId: string;
+  targetSound: string;
+  stageId: string;
+  startedAt: string;
+  endedAt?: string;
+  durationMs?: number;
+  completedMissions: number;
+  totalMissions: number;
+  averageScore: number;
+  starsEarned: number;
+  attemptIds: string[];
+  status: SessionStatus;
+}
+
 export interface PracticeAttempt {
   id: string;
   childId: string;
@@ -104,6 +122,7 @@ export interface PracticeAttempt {
   feedback: string;
   recommendation?: string;
   starsEarned: number;
+  sessionId?: string;
   createdAt: string;
 }
 
@@ -111,6 +130,7 @@ export interface SpeechProgress {
   childId: string;
   targetSound: string;
   attempts: PracticeAttempt[];
+  sessions: PracticeSession[];
   updatedAt: string;
 }
 
@@ -135,6 +155,9 @@ export interface ProgressSummary {
   difficultSounds: string[];
   difficultItems: DifficultItem[];
   recentAttempts: PracticeAttempt[];
+  totalSessions: number;
+  averageSessionScore: number;
+  recentSessions: PracticeSession[];
 }
 
 export interface PracticeHistory {
