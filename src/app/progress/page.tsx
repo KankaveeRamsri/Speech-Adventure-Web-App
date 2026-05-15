@@ -7,6 +7,7 @@ import ChildProfileCard from "@/components/speech-adventure/ChildProfileCard";
 import RecentAttemptsList from "@/components/speech-adventure/RecentAttemptsList";
 import StageProgressCard from "@/components/speech-adventure/StageProgressCard";
 import { useSpeechProgress } from "@/hooks/useSpeechProgress";
+import { useChildProfile } from "@/hooks/useChildProfile";
 import { mockChildProfile, mockTrainingStages } from "@/data/speechAdventureMockData";
 import {
   loadDemoProgress,
@@ -77,11 +78,15 @@ function BackIcon() {
 
 export default function ProgressDashboardPage() {
   const { summary, clearProgress, getStageStatus, getStageAttempts, isHydrated } = useSpeechProgress();
+  const { profile, hasProfile } = useChildProfile();
   const [showResetConfirm, setShowResetConfirm] = useState(false);
   const [showDemoConfirm, setShowDemoConfirm] = useState(false);
 
   const liveProfile = {
     ...mockChildProfile,
+    name: profile?.name ?? mockChildProfile.name,
+    nickname: profile ? profile.name.split(" ")[0] : mockChildProfile.nickname,
+    age: profile?.age ?? mockChildProfile.age,
     currentStage: summary.currentStageId,
     totalStars: summary.starsEarned,
     totalAttempts: summary.totalAttempts,
@@ -159,6 +164,14 @@ export default function ProgressDashboardPage() {
               สำหรับผู้ปกครองและคุณครู{dateStr ? ` · ${dateStr}` : ""}
             </p>
           </div>
+          {isHydrated && (
+            <Link
+              href="/onboarding"
+              className="flex-shrink-0 text-sm font-medium text-primary hover:text-primary/80 px-3 py-1.5 rounded-xl hover:bg-primary/8 transition-all border border-primary/20"
+            >
+              {hasProfile ? "แก้ไขโปรไฟล์" : "ตั้งค่าโปรไฟล์"}
+            </Link>
+          )}
         </div>
 
         {/* ── Child Profile ── */}

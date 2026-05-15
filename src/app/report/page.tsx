@@ -9,6 +9,7 @@ import ReportStageTable from "@/components/report/ReportStageTable";
 import ReportSummaryCard from "@/components/report/ReportSummaryCard";
 import PrintActions from "@/components/report/PrintActions";
 import { useSpeechProgress } from "@/hooks/useSpeechProgress";
+import { useChildProfile } from "@/hooks/useChildProfile";
 import {
   mockChildProfile,
   mockTrainingStages,
@@ -119,6 +120,7 @@ function SectionLabel({ children }: { children: React.ReactNode }) {
 
 export default function ReportPage() {
   const { summary, getStageStatus, getStageAttempts, isHydrated } = useSpeechProgress();
+  const { profile } = useChildProfile();
 
   const handlePrint = useCallback(() => {
     window.print();
@@ -164,6 +166,9 @@ export default function ReportPage() {
 
   const liveProfile = {
     ...mockChildProfile,
+    name: profile?.name ?? mockChildProfile.name,
+    nickname: profile ? profile.name.split(" ")[0] : mockChildProfile.nickname,
+    age: profile?.age ?? mockChildProfile.age,
     currentStage: summary.currentStageId,
     totalStars: summary.starsEarned,
     totalAttempts: summary.totalAttempts,

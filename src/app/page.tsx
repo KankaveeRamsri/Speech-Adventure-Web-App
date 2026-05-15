@@ -1,5 +1,6 @@
 import HeroSection from "@/components/speech-adventure/HeroSection";
 import ThemeToggle from "@/components/ui/ThemeToggle";
+import LandingCTA from "@/components/landing/LandingCTA";
 import Link from "next/link";
 
 function MicIcon() {
@@ -102,6 +103,9 @@ export default function LandingPage() {
           </div>
 
           <div className="flex items-center gap-1">
+            <Link href="/onboarding" className="text-sm font-medium text-text-muted hover:text-text px-3 py-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-white/8 transition-all hidden sm:block">
+              ตั้งค่า
+            </Link>
             <Link href="/training" className="text-sm font-medium text-text-muted hover:text-text px-3 py-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-white/8 transition-all">
               เริ่มฝึก
             </Link>
@@ -232,20 +236,7 @@ export default function LandingPage() {
           <p className="text-text-muted mb-8 max-w-md mx-auto">
             เริ่มจาก Pre-test เพื่อประเมินระดับเสียงปัจจุบัน แล้วระบบจะแนะนำเส้นทางที่เหมาะสม
           </p>
-          <div className="flex flex-wrap gap-3 justify-center">
-            <Link
-              href="/training"
-              className="inline-flex items-center gap-2 bg-primary text-white font-semibold px-8 py-3.5 rounded-xl text-base hover:bg-primary/90 transition-all hover:scale-[1.02] active:scale-[0.98] shadow-md shadow-primary/25"
-            >
-              เริ่มฝึกเลย
-            </Link>
-            <Link
-              href="/progress"
-              className="inline-flex items-center gap-2 border-2 border-primary text-primary font-semibold px-8 py-3.5 rounded-xl text-base hover:bg-primary/5 transition-all active:scale-[0.98]"
-            >
-              ดูรายงานความก้าวหน้า
-            </Link>
-          </div>
+          <LandingCTA />
         </section>
       </div>
 

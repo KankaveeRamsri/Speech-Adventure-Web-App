@@ -6,6 +6,7 @@ import ChildProfileCard from "@/components/speech-adventure/ChildProfileCard";
 import TargetSoundSelector from "@/components/speech-adventure/TargetSoundSelector";
 import TrainingMap from "@/components/speech-adventure/TrainingMap";
 import { useSpeechProgress } from "@/hooks/useSpeechProgress";
+import { useChildProfile } from "@/hooks/useChildProfile";
 import {
   mockChildProfile,
   mockTargetSounds,
@@ -40,6 +41,7 @@ export default function TrainingMapPage() {
     selectedSoundId,
     setSelectedSound,
   } = useSpeechProgress();
+  const { profile, hasProfile } = useChildProfile();
 
   const liveStages: TrainingStage[] = mockTrainingStages.map((stage) => {
     const status = getStageStatus(stage.id);
@@ -50,6 +52,9 @@ export default function TrainingMapPage() {
 
   const liveProfile = {
     ...mockChildProfile,
+    name: profile?.name ?? mockChildProfile.name,
+    nickname: profile ? profile.name.split(" ")[0] : mockChildProfile.nickname,
+    age: profile?.age ?? mockChildProfile.age,
     currentStage: summary.currentStageId,
     totalStars: summary.starsEarned,
     totalAttempts: summary.totalAttempts,
@@ -90,6 +95,22 @@ export default function TrainingMapPage() {
 
       <div className="max-w-3xl mx-auto px-4 sm:px-6 py-6 space-y-5">
 
+        {/* ── Setup banner (shown when no profile is set) ── */}
+        {isHydrated && !hasProfile && (
+          <div className="flex items-center justify-between gap-3 bg-info/8 border border-info/25 rounded-xl px-4 py-3">
+            <p className="text-sm text-text">
+              <span className="font-semibold">ยังไม่ได้ตั้งค่าโปรไฟล์</span>
+              <span className="text-text-muted ml-1.5">ตั้งค่าเพื่อบันทึกชื่อและเป้าหมายการฝึก</span>
+            </p>
+            <Link
+              href="/onboarding"
+              className="flex-shrink-0 text-sm font-semibold text-primary hover:text-primary/80 transition-colors"
+            >
+              ตั้งค่า →
+            </Link>
+          </div>
+        )}
+
         {/* ── Session header ── */}
         <div className="bg-gradient-to-r from-primary/8 via-surface to-level-sentence/5 border border-border rounded-xl px-5 py-4">
           <div className="flex items-center justify-between flex-wrap gap-2">
@@ -116,11 +137,21 @@ export default function TrainingMapPage() {
         </div>
 
         {/* ── Child Profile (compact) ── */}
-        <ChildProfileCard
-          profile={liveProfile}
-          compact
-          isHydrated={isHydrated}
-        />
+        <div className="relative">
+          <ChildProfileCard
+            profile={liveProfile}
+            compact
+            isHydrated={isHydrated}
+          />
+          {isHydrated && (
+            <Link
+              href="/onboarding"
+              className="absolute top-2 right-2 text-xs text-text-muted hover:text-primary transition-colors px-2 py-1 rounded-lg hover:bg-primary/8"
+            >
+              {hasProfile ? "แก้ไข" : "ตั้งค่า"}
+            </Link>
+          )}
+        </div>
 
         {/* ── Target Sound Selector ── */}
         <TargetSoundSelector

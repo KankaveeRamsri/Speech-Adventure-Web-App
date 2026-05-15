@@ -5,6 +5,7 @@ metadata:
   type: project
 ---
 
+Phase 11 (Onboarding and Child Profile Setup) complete as of 2026-05-15.
 Phase 10 (Parent/Teacher Report View) complete as of 2026-05-15.
 Phase 9 (Demo Data / Presentation Mode) complete as of 2026-05-15.
 Phase 8 (Mock Speech Evaluation API Route) complete as of 2026-05-15.
@@ -26,6 +27,15 @@ Phase 8 additions:
 - Client helper `src/lib/speech-evaluation/client.ts` with `evaluateSpeechViaApi()`
 - PracticeCard now calls the API route (not the server service directly)
 - Validation: returns 400 for missing/invalid fields; 405 handled by Next.js automatically
+
+Phase 11 additions:
+- `src/lib/child-profile/childProfileStorage.ts` — pub-sub localStorage store for `ChildProfileData` (id, name, age, targetSound, trainingGoal, createdAt, updatedAt)
+- `src/hooks/useChildProfile.ts` — `useSyncExternalStore` hook; server snapshot = null (no profile on server)
+- `src/app/onboarding/page.tsx` — 5-step form (welcome → name/age → sound → goal → confirm); edit mode skips welcome and routes back to /training on save
+- `src/components/landing/LandingCTA.tsx` — client component; shows "ตั้งค่าเริ่มต้น" if no profile, "ฝึกต่อ, {name}" if profile exists
+- Landing page uses LandingCTA; added "ตั้งค่า" nav link to /onboarding
+- Training page: setup banner when no profile; edit button on ChildProfileCard; liveProfile merges real name/age
+- Progress and Report pages: liveProfile merges real name/age from ChildProfileData; edit profile button in header
 
 Completed features:
 - Core training flow (pretest → level 1–5 → review)
