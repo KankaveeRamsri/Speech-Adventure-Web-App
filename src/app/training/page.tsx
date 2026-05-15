@@ -123,7 +123,7 @@ export default function TrainingMapPage() {
           </div>
 
           {/* ── Right Column: Side Panel ── */}
-          <aside className="space-y-4 lg:sticky lg:top-16">
+          <aside className="space-y-4 lg:sticky lg:top-4">
 
             {/* Child Profile */}
             <div className="relative">

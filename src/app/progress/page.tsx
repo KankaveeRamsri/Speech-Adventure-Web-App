@@ -160,7 +160,7 @@ export default function ProgressDashboardPage() {
   return (
     <AppShell>
       {/* ── Sticky tab bar ── */}
-      <div className="sticky top-14 z-20 bg-surface/95 backdrop-blur-md border-b border-border">
+      <div className="sticky top-0 lg:top-0 z-20 bg-surface/95 backdrop-blur-md border-b border-border">
         <div className="flex overflow-x-auto gap-1 px-4 py-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
           {TABS.map((tab) => (
             <button

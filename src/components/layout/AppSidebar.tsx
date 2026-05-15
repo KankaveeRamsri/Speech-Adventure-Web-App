@@ -5,6 +5,10 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import NavIcon, { type NavIconName } from "./NavIcon";
 import { useSidebar } from "./SidebarContext";
+import ThemeToggle from "@/components/ui/ThemeToggle";
+import { useSpeechProgress } from "@/hooks/useSpeechProgress";
+import { useChildProfile } from "@/hooks/useChildProfile";
+import { mockTrainingStages } from "@/data/speechAdventureMockData";
 
 const NAV_ITEMS: { href: string; label: string; icon: NavIconName; exact?: boolean }[] = [
   { href: "/", label: "หน้าแรก", icon: "home", exact: true },
@@ -17,11 +21,7 @@ const NAV_ITEMS: { href: string; label: string; icon: NavIconName; exact?: boole
 
 function MicLogoIcon({ size = 16 }: { size?: number }) {
   return (
-    <svg
-      width={size} height={size} viewBox="0 0 24 24" fill="none"
-      stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"
-      aria-hidden="true"
-    >
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
       <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z" />
       <path d="M19 10v2a7 7 0 0 1-14 0v-2" />
       <line x1="12" y1="19" x2="12" y2="22" />
@@ -29,10 +29,27 @@ function MicLogoIcon({ size = 16 }: { size?: number }) {
   );
 }
 
-function ChevronIcon({ direction }: { direction: "left" | "right" }) {
+function ChevronLeftIcon() {
   return (
     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      {direction === "left" ? <path d="M15 18l-6-6 6-6" /> : <path d="M9 18l6-6-6-6" />}
+      <path d="M15 18l-6-6 6-6" />
+    </svg>
+  );
+}
+
+function StarFilledIcon({ size = 13 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="#FFB347" stroke="#FFB347" strokeWidth="1" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
+    </svg>
+  );
+}
+
+function CloseIcon() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <line x1="18" y1="6" x2="6" y2="18" />
+      <line x1="6" y1="6" x2="18" y2="18" />
     </svg>
   );
 }
@@ -40,51 +57,115 @@ function ChevronIcon({ direction }: { direction: "left" | "right" }) {
 export default function AppSidebar() {
   const pathname = usePathname();
   const { collapsed, toggle, mounted, mobileOpen, setMobileOpen } = useSidebar();
+  const { summary, isHydrated, selectedSoundId } = useSpeechProgress();
+  const { profile } = useChildProfile();
 
   const isActive = (item: (typeof NAV_ITEMS)[0]) =>
-    item.exact
-      ? pathname === item.href
-      : (pathname?.startsWith(item.href) ?? false);
+    item.exact ? pathname === item.href : (pathname?.startsWith(item.href) ?? false);
+
+  const childName = profile?.name ?? null;
+  const stars = isHydrated ? summary.starsEarned : 0;
+  const currentStageId = isHydrated ? summary.currentStageId : null;
+  const currentStage = mockTrainingStages.find((s) => s.id === currentStageId);
 
   // Close mobile drawer on navigation
-  useEffect(() => {
-    setMobileOpen(false);
-  }, [pathname, setMobileOpen]);
+  useEffect(() => { setMobileOpen(false); }, [pathname, setMobileOpen]);
 
   // Lock body scroll when mobile drawer is open
   useEffect(() => {
-    if (mobileOpen) {
-      document.body.style.overflow = "hidden";
-    } else {
-      document.body.style.overflow = "";
-    }
+    if (mobileOpen) { document.body.style.overflow = "hidden"; }
+    else { document.body.style.overflow = ""; }
     return () => { document.body.style.overflow = ""; };
   }, [mobileOpen]);
 
-  // Use stable widths before hydration to avoid mismatch
   const expandedWidth = "240px";
   const collapsedWidth = "72px";
   const currentWidth = mounted ? (collapsed ? collapsedWidth : expandedWidth) : expandedWidth;
+  const isCollapsed = collapsed && mounted;
 
-  const sidebarContent = (
+  // Collapsible label helper
+  const labelCls = isCollapsed
+    ? "w-0 opacity-0 overflow-hidden"
+    : "w-auto opacity-100";
+
+  // ── Context section (child info + actions) ──
+  const contextSection = (
+    <div className={`px-3 py-3 border-b border-border flex-shrink-0 ${isCollapsed ? "flex items-center justify-center" : "space-y-2.5"}`}>
+      {/* Child name */}
+      {isCollapsed ? (
+        childName && isHydrated ? (
+          <div className="w-8 h-8 rounded-full bg-primary/12 flex items-center justify-center text-xs font-bold text-primary flex-shrink-0" title={childName}>
+            {childName.charAt(0)}
+          </div>
+        ) : null
+      ) : (
+        <>
+          {childName && isHydrated && (
+            <div className="flex items-center gap-2 min-w-0">
+              <div className="w-7 h-7 rounded-full bg-primary/12 flex items-center justify-center text-xs font-bold text-primary flex-shrink-0">
+                {childName.charAt(0)}
+              </div>
+              <span className="text-sm font-semibold text-text truncate">{childName}</span>
+            </div>
+          )}
+
+          {/* Target sound + Stars row */}
+          <div className="flex items-center gap-2 flex-wrap">
+            {isHydrated && selectedSoundId && (
+              <span className="inline-flex items-center px-2 py-0.5 rounded-full bg-primary/10 text-primary text-xs font-bold">
+                เสียง {selectedSoundId}
+              </span>
+            )}
+            {isHydrated && stars > 0 && (
+              <Link href="/rewards" className="flex items-center gap-1 text-xs font-bold text-secondary hover:text-secondary/80 transition-colors" aria-label={`ดาวสะสม ${stars} ดาว`}>
+                <StarFilledIcon size={12} />
+                <span>{stars}</span>
+              </Link>
+            )}
+          </div>
+
+          {/* Continue Training CTA */}
+          {isHydrated && currentStage && (
+            <Link
+              href={`/training/${currentStage.slug}`}
+              className="flex items-center justify-center gap-1.5 w-full px-3 py-2 rounded-xl bg-primary text-white text-xs font-semibold hover:bg-primary/90 transition-all active:scale-[0.97]"
+            >
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <path d="M5 3l14 9-14 9V3z" />
+              </svg>
+              ฝึกต่อ
+            </Link>
+          )}
+
+          {/* Theme toggle */}
+          <div className="flex items-center justify-between">
+            <span className="text-xs text-text-muted">ธีม</span>
+            <ThemeToggle />
+          </div>
+        </>
+      )}
+    </div>
+  );
+
+  // ── Desktop sidebar content ──
+  const desktopSidebar = (
     <>
       {/* Logo / Brand */}
       <div className="flex items-center gap-3 px-4 h-14 border-b border-border flex-shrink-0">
-        <div className="w-8 h-8 rounded-xl bg-primary flex items-center justify-center flex-shrink-0">
+        <Link href="/" className="w-8 h-8 rounded-xl bg-primary flex items-center justify-center flex-shrink-0 hover:bg-primary/90 transition-colors" aria-label="หน้าแรก">
           <MicLogoIcon size={16} />
-        </div>
-        <div
-          className={`min-w-0 overflow-hidden transition-all duration-200 ${
-            collapsed && mounted ? "w-0 opacity-0" : "w-auto opacity-100"
-          }`}
-        >
+        </Link>
+        <div className={`min-w-0 overflow-hidden transition-all duration-200 ${labelCls}`}>
           <p className="text-sm font-bold text-text leading-tight whitespace-nowrap">Speech</p>
           <p className="text-xs font-semibold text-primary leading-tight whitespace-nowrap">Adventure</p>
         </div>
       </div>
 
+      {/* Context (child info, actions) */}
+      {contextSection}
+
       {/* Navigation */}
-      <nav className="flex-1 px-3 py-4 space-y-0.5 overflow-y-auto overflow-x-hidden">
+      <nav className="flex-1 px-3 py-3 space-y-0.5 overflow-y-auto overflow-x-hidden">
         {NAV_ITEMS.map((item) => {
           const active = isActive(item);
           return (
@@ -92,7 +173,7 @@ export default function AppSidebar() {
               key={item.href}
               href={item.href}
               aria-current={active ? "page" : undefined}
-              title={collapsed && mounted ? item.label : undefined}
+              title={isCollapsed ? item.label : undefined}
               className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all ${
                 active
                   ? "bg-primary/10 text-primary"
@@ -102,11 +183,7 @@ export default function AppSidebar() {
               <span className="flex-shrink-0 flex items-center justify-center w-5">
                 <NavIcon name={item.icon} active={active} size={17} />
               </span>
-              <span
-                className={`truncate whitespace-nowrap transition-all duration-200 ${
-                  collapsed && mounted ? "w-0 opacity-0 overflow-hidden" : "w-auto opacity-100"
-                }`}
-              >
+              <span className={`truncate whitespace-nowrap transition-all duration-200 ${labelCls}`}>
                 {item.label}
               </span>
             </Link>
@@ -114,48 +191,32 @@ export default function AppSidebar() {
         })}
       </nav>
 
-      {/* Footer: Premium prototype badge */}
+      {/* Footer: Prototype badge */}
       <div className="px-3 py-3 border-t border-border flex-shrink-0">
-        <div
-          className={`rounded-xl bg-primary/6 border border-primary/12 px-3 py-2.5 transition-all duration-200 ${
-            collapsed && mounted ? "flex items-center justify-center" : ""
-          }`}
-        >
-          <div className={`flex items-center gap-2 ${collapsed && mounted ? "" : "mb-1.5"}`}>
+        <div className={`rounded-xl bg-primary/6 border border-primary/12 px-3 py-2.5 transition-all duration-200 ${isCollapsed ? "flex items-center justify-center" : ""}`}>
+          <div className={`flex items-center gap-2 ${isCollapsed ? "" : "mb-1"}`}>
             <div className="w-2 h-2 rounded-full bg-primary/60 flex-shrink-0" aria-hidden="true" />
-            <span
-              className={`text-xs font-semibold text-primary whitespace-nowrap transition-all duration-200 ${
-                collapsed && mounted ? "sr-only" : ""
-              }`}
-            >
+            <span className={`text-xs font-semibold text-primary whitespace-nowrap transition-all duration-200 ${isCollapsed ? "sr-only" : ""}`}>
               Prototype
             </span>
           </div>
-          <p
-            className={`text-xs text-text-muted/60 transition-all duration-200 ${
-              collapsed && mounted ? "hidden" : ""
-            }`}
-          >
+          <p className={`text-xs text-text-muted/60 transition-all duration-200 ${isCollapsed ? "hidden" : ""}`}>
             v0.1 · Demo Mode
           </p>
         </div>
       </div>
 
-      {/* Collapse toggle (desktop only) */}
+      {/* Collapse toggle */}
       <div className="px-3 pb-3 flex-shrink-0 hidden lg:block">
         <button
           onClick={toggle}
-          aria-label={collapsed && mounted ? "ขยายเมนู" : "ย่อเมนู"}
+          aria-label={isCollapsed ? "ขยายเมนู" : "ย่อเมนู"}
           className="w-full flex items-center justify-center gap-2 px-3 py-2 rounded-xl text-text-muted hover:text-text hover:bg-gray-50 dark:hover:bg-white/5 transition-all"
         >
-          <span className={`transition-transform duration-200 ${collapsed && mounted ? "rotate-180" : ""}`}>
-            <ChevronIcon direction="left" />
+          <span className={`transition-transform duration-200 ${isCollapsed ? "rotate-180" : ""}`}>
+            <ChevronLeftIcon />
           </span>
-          <span
-            className={`text-xs font-medium whitespace-nowrap transition-all duration-200 ${
-              collapsed && mounted ? "w-0 opacity-0 overflow-hidden" : "w-auto opacity-100"
-            }`}
-          >
+          <span className={`text-xs font-medium whitespace-nowrap transition-all duration-200 ${labelCls}`}>
             ย่อเมนู
           </span>
         </button>
@@ -171,7 +232,7 @@ export default function AppSidebar() {
         style={{ width: currentWidth }}
         aria-label="เมนูหลัก"
       >
-        {sidebarContent}
+        {desktopSidebar}
       </aside>
 
       {/* Mobile overlay */}
@@ -191,30 +252,59 @@ export default function AppSidebar() {
         aria-label="เมนูหลัก"
         aria-hidden={!mobileOpen}
       >
-        {/* Close button */}
+        {/* Drawer header */}
         <div className="flex items-center justify-between px-4 h-14 border-b border-border flex-shrink-0">
-          <div className="flex items-center gap-3">
+          <Link href="/" className="flex items-center gap-3" aria-label="หน้าแรก">
             <div className="w-8 h-8 rounded-xl bg-primary flex items-center justify-center flex-shrink-0">
               <MicLogoIcon size={16} />
             </div>
-            <div>
-              <p className="text-sm font-bold text-text leading-tight">Speech Adventure</p>
-            </div>
-          </div>
+            <p className="text-sm font-bold text-text leading-tight">Speech Adventure</p>
+          </Link>
           <button
             onClick={() => setMobileOpen(false)}
             aria-label="ปิดเมนู"
             className="w-8 h-8 rounded-lg flex items-center justify-center text-text-muted hover:text-text hover:bg-gray-100 dark:hover:bg-white/10 transition-all"
           >
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-              <line x1="18" y1="6" x2="6" y2="18" />
-              <line x1="6" y1="6" x2="18" y2="18" />
-            </svg>
+            <CloseIcon />
           </button>
         </div>
 
+        {/* Mobile context */}
+        <div className="px-4 py-3 border-b border-border flex-shrink-0 space-y-2.5">
+          {childName && isHydrated && (
+            <div className="flex items-center gap-2 min-w-0">
+              <div className="w-7 h-7 rounded-full bg-primary/12 flex items-center justify-center text-xs font-bold text-primary flex-shrink-0">
+                {childName.charAt(0)}
+              </div>
+              <span className="text-sm font-semibold text-text truncate">{childName}</span>
+            </div>
+          )}
+          <div className="flex items-center gap-2 flex-wrap">
+            {isHydrated && selectedSoundId && (
+              <span className="inline-flex items-center px-2 py-0.5 rounded-full bg-primary/10 text-primary text-xs font-bold">
+                เสียง {selectedSoundId}
+              </span>
+            )}
+            {isHydrated && stars > 0 && (
+              <Link href="/rewards" className="flex items-center gap-1 text-xs font-bold text-secondary hover:text-secondary/80 transition-colors" aria-label={`ดาวสะสม ${stars} ดาว`}>
+                <StarFilledIcon size={12} />
+                <span>{stars}</span>
+              </Link>
+            )}
+          </div>
+          {isHydrated && currentStage && (
+            <Link
+              href={`/training/${currentStage.slug}`}
+              onClick={() => setMobileOpen(false)}
+              className="flex items-center justify-center gap-1.5 w-full px-3 py-2 rounded-xl bg-primary text-white text-xs font-semibold hover:bg-primary/90 transition-all active:scale-[0.97]"
+            >
+              ฝึกต่อ
+            </Link>
+          )}
+        </div>
+
         {/* Mobile nav items */}
-        <nav className="flex-1 px-3 py-4 space-y-0.5 overflow-y-auto">
+        <nav className="flex-1 px-3 py-3 space-y-0.5 overflow-y-auto">
           {NAV_ITEMS.map((item) => {
             const active = isActive(item);
             return (
@@ -238,9 +328,13 @@ export default function AppSidebar() {
         </nav>
 
         {/* Mobile footer */}
-        <div className="px-3 py-3 border-t border-border flex-shrink-0">
+        <div className="px-3 py-3 border-t border-border flex-shrink-0 space-y-2">
+          <div className="flex items-center justify-between px-1">
+            <span className="text-xs text-text-muted">ธีม</span>
+            <ThemeToggle />
+          </div>
           <div className="rounded-xl bg-primary/6 border border-primary/12 px-3 py-2.5">
-            <div className="flex items-center gap-2 mb-1.5">
+            <div className="flex items-center gap-2 mb-1">
               <div className="w-2 h-2 rounded-full bg-primary/60 flex-shrink-0" aria-hidden="true" />
               <span className="text-xs font-semibold text-primary">Prototype</span>
             </div>

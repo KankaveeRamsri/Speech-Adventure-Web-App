@@ -244,7 +244,7 @@ export default function ReportPage() {
   return (
     <AppShell>
       {/* ── Sticky section navigation (hidden on print) ── */}
-      <div className="sticky top-14 z-20 bg-surface/95 backdrop-blur-md border-b border-border print:hidden">
+      <div className="sticky top-0 lg:top-0 z-20 bg-surface/95 backdrop-blur-md border-b border-border print:hidden">
         <div className="flex overflow-x-auto gap-1 px-4 py-2 max-w-3xl mx-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
           {SECTION_NAV.map((item) => (
             <a key={item.href} href={item.href} className={anchorLinkCls}>
@@ -258,7 +258,7 @@ export default function ReportPage() {
       <div className="max-w-3xl mx-auto px-4 sm:px-6 py-6 space-y-5 print:px-6 print:py-4 print:space-y-4">
 
         {/* 1. Header — anchor: summary */}
-        <div id="summary" className="scroll-mt-32">
+        <div id="summary" className="scroll-mt-20">
         <ReportHeader
           childName={liveProfile.name}
           childNickname={liveProfile.nickname}
@@ -449,7 +449,7 @@ export default function ReportPage() {
         </section>
 
         {/* 4. Stage breakdown — anchor: stages */}
-        <section id="stages" className="scroll-mt-32" aria-label="ผลการฝึกแต่ละระดับ">
+        <section id="stages" className="scroll-mt-20" aria-label="ผลการฝึกแต่ละระดับ">
           <ReportStageTable stages={stageData} />
         </section>
 
@@ -526,7 +526,7 @@ export default function ReportPage() {
         )}
 
         {/* 7. Narrative summary — anchor: analysis */}
-        <div id="analysis" className="scroll-mt-32">
+        <div id="analysis" className="scroll-mt-20">
         <ReportSummaryCard
           headline={narrative.headline}
           details={narrative.details}
@@ -541,7 +541,7 @@ export default function ReportPage() {
         {recentNotes.length > 0 && (
           <section
             id="notes"
-            className="scroll-mt-32 bg-surface border border-border rounded-2xl p-5 print:border-gray-200 print:rounded-lg"
+            className="scroll-mt-20 bg-surface border border-border rounded-2xl p-5 print:border-gray-200 print:rounded-lg"
             aria-label="บันทึกของผู้ปกครองและครู"
           >
             <SectionLabel>บันทึกจากผู้ปกครอง / ครู</SectionLabel>
@@ -636,7 +636,7 @@ export default function ReportPage() {
 
       {/* Print actions bar — anchor: print */}
       {hasData && (
-        <div id="print" className="scroll-mt-32">
+        <div id="print" className="scroll-mt-20">
           <PrintActions onPrint={handlePrint} backHref="/progress" />
         </div>
       )}

@@ -26,10 +26,12 @@ function AppShellInner({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="min-h-screen bg-bg print:bg-white">
+      {/* Minimal mobile top bar — hidden on desktop */}
       <AppTopBar />
       <AppSidebar />
+      {/* pt-11: below thin mobile bar (hidden on desktop) | lg:pt-0: no top bar on desktop | pb-16 lg:pb-0: above mobile bottom nav */}
       <main
-        className="pt-14 pb-16 lg:pb-0 print:pt-0 print:pl-0 print:pb-0 transition-[padding-left] duration-200 ease-in-out"
+        className="pt-11 lg:pt-0 pb-16 lg:pb-0 print:pt-0 print:pl-0 print:pb-0 transition-[padding-left] duration-200 ease-in-out"
         style={{ paddingLeft: isDesktop ? sidebarPad : undefined }}
       >
         {children}
