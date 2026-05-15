@@ -4,13 +4,14 @@ import Link from "next/link";
 import AppShell from "@/components/layout/AppShell";
 import { useSpeechProgress } from "@/hooks/useSpeechProgress";
 import { calculateRewards } from "@/lib/rewards/calculateRewards";
-import type { RewardBadge, EarnedReward, RewardProgress } from "@/types/rewards";
+import { mockTrainingStages } from "@/data/speechAdventureMockData";
+import type { EarnedReward, RewardProgress } from "@/types/rewards";
 
 // ── Icons ──────────────────────────────────────────────────────────────────────
 
-function LockIcon() {
+function LockIcon({ size = 12 }: { size?: number }) {
   return (
-    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
       <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
       <path d="M7 11V7a5 5 0 0 1 10 0v4" />
     </svg>
@@ -27,9 +28,31 @@ function BadgeIcon({ iconPath, color, size = 20 }: { iconPath: string; color: st
   );
 }
 
-// ── Badge Card ─────────────────────────────────────────────────────────────────
+function CheckCircleIcon() {
+  return (
+    <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <polyline points="20 6 9 17 4 12" />
+    </svg>
+  );
+}
 
-function EarnedBadgeCard({ reward }: { reward: EarnedReward }) {
+function SparkleIcon() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M12 2l1.09 6.26L18 9.27l-4.91 1.01L12 18l-1.09-7.73L6 9.27l4.91-1.01L12 2z" />
+    </svg>
+  );
+}
+
+// ── Determine if a badge was earned recently (7 days) ──────────────────────────
+
+function isRecentlyEarned(reward: EarnedReward, recentIds: Set<string>): boolean {
+  return recentIds.has(reward.badge.id);
+}
+
+// ── Badge Cards ─────────────────────────────────────────────────────────────────
+
+function EarnedBadgeCard({ reward, isRecent }: { reward: EarnedReward; isRecent: boolean }) {
   const { badge, earnedAt } = reward;
   const dateStr = (() => {
     try {
@@ -40,20 +63,40 @@ function EarnedBadgeCard({ reward }: { reward: EarnedReward }) {
   })();
 
   return (
-    <div className="flex flex-col items-center text-center p-4 bg-surface border border-border rounded-2xl shadow-sm hover:shadow-md transition-all hover:-translate-y-0.5 animate-fade-in">
+    <div
+      className={`relative flex flex-col items-center text-center p-5 bg-surface border rounded-2xl transition-all group hover:shadow-md hover:-translate-y-0.5 ${
+        isRecent
+          ? "border-primary/30 shadow-sm shadow-primary/8"
+          : "border-border shadow-sm"
+      }`}
+    >
+      {/* Recently earned accent dot */}
+      {isRecent && (
+        <span className="absolute top-3 right-3 flex items-center gap-1 text-primary">
+          <SparkleIcon />
+        </span>
+      )}
+
       <div
-        className="w-14 h-14 rounded-2xl flex items-center justify-center mb-3"
-        style={{ backgroundColor: `${badge.color}18` }}
+        className="w-16 h-16 rounded-2xl flex items-center justify-center mb-3 relative"
+        style={{ backgroundColor: `${badge.color}14` }}
         aria-label={badge.name}
       >
-        <BadgeIcon iconPath={badge.iconPath} color={badge.color} size={22} />
+        <BadgeIcon iconPath={badge.iconPath} color={badge.color} size={26} />
+        {/* Completed check mark */}
+        <span
+          className="absolute -bottom-1 -right-1 w-5 h-5 rounded-full flex items-center justify-center text-white"
+          style={{ backgroundColor: badge.color }}
+        >
+          <CheckCircleIcon />
+        </span>
       </div>
       <h3 className="text-xs font-bold text-text leading-tight mb-0.5">{badge.name}</h3>
       <p className="text-xs text-text-muted leading-snug mb-2">{badge.description}</p>
       {dateStr && (
         <span
-          className="inline-block text-xs font-medium px-2 py-0.5 rounded-full"
-          style={{ color: badge.color, backgroundColor: `${badge.color}14` }}
+          className="inline-block text-xs font-medium px-2.5 py-0.5 rounded-full"
+          style={{ color: badge.color, backgroundColor: `${badge.color}12` }}
         >
           {dateStr}
         </span>
@@ -66,51 +109,48 @@ function LockedBadgeCard({ progress }: { progress: RewardProgress }) {
   const { badge, current, target, percentage, hint } = progress;
 
   return (
-    <div className="flex flex-col items-center text-center p-4 bg-bg dark:bg-white/2 border border-border rounded-2xl">
-      <div className="relative w-14 h-14 rounded-2xl flex items-center justify-center mb-3 bg-gray-100 dark:bg-white/6">
-        <div className="opacity-25">
-          <BadgeIcon iconPath={badge.iconPath} color={badge.color} size={22} />
+    <div className="flex flex-col items-center text-center p-5 bg-bg dark:bg-white/2 border border-dashed border-border/60 rounded-2xl">
+      <div className="relative w-16 h-16 rounded-2xl flex items-center justify-center mb-3 bg-gray-100 dark:bg-white/6">
+        <div className="opacity-20">
+          <BadgeIcon iconPath={badge.iconPath} color={badge.color} size={26} />
         </div>
-        <span className="absolute -top-1.5 -right-1.5 w-5 h-5 rounded-full bg-gray-300 dark:bg-white/20 flex items-center justify-center text-gray-500 dark:text-white/40">
-          <LockIcon />
+        <span className="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-gray-200 dark:bg-white/15 flex items-center justify-center text-gray-400 dark:text-white/30">
+          <LockIcon size={10} />
         </span>
       </div>
-      <h3 className="text-xs font-bold text-text-muted leading-tight mb-0.5">{badge.name}</h3>
-      <p className="text-xs text-text-muted/70 leading-snug mb-2">{badge.description}</p>
+      <h3 className="text-xs font-bold text-text-muted/60 leading-tight mb-0.5">{badge.name}</h3>
+      <p className="text-xs text-text-muted/40 leading-snug mb-2">{badge.description}</p>
 
-      {/* Progress bar for countable badges */}
       {target > 1 && (
         <div className="w-full mb-1.5">
-          <div className="h-1 bg-gray-200 dark:bg-white/10 rounded-full overflow-hidden">
+          <div className="h-1 bg-gray-200 dark:bg-white/8 rounded-full overflow-hidden">
             <div
               className="h-full rounded-full transition-all duration-700"
-              style={{ width: `${percentage}%`, backgroundColor: badge.color }}
+              style={{ width: `${percentage}%`, backgroundColor: badge.color, opacity: 0.5 }}
             />
           </div>
-          <p className="text-xs text-text-muted mt-1">
+          <p className="text-xs text-text-muted/50 mt-1">
             {current} / {target}
           </p>
         </div>
       )}
 
-      <p className="text-xs text-text-muted/60 italic">{hint}</p>
+      <p className="text-xs text-text-muted/40 italic">{hint}</p>
     </div>
   );
 }
-
-// ── In-Progress Card (closer to earning) ──────────────────────────────────────
 
 function InProgressCard({ progress }: { progress: RewardProgress }) {
   const { badge, current, target, percentage, hint } = progress;
 
   return (
     <div
-      className="flex items-center gap-4 p-4 bg-surface border rounded-xl transition-all"
-      style={{ borderColor: `${badge.color}30` }}
+      className="flex items-center gap-4 p-4 bg-surface border rounded-xl transition-all hover:shadow-sm"
+      style={{ borderColor: `${badge.color}25` }}
     >
       <div
         className="w-11 h-11 rounded-xl flex items-center justify-center flex-shrink-0"
-        style={{ backgroundColor: `${badge.color}14` }}
+        style={{ backgroundColor: `${badge.color}10` }}
       >
         <div className="opacity-60">
           <BadgeIcon iconPath={badge.iconPath} color={badge.color} size={18} />
@@ -141,12 +181,12 @@ function RecentBadgeBanner({ reward }: { reward: EarnedReward }) {
   const { badge } = reward;
   return (
     <div
-      className="flex items-center gap-3 px-4 py-3 rounded-xl border animate-slide-up"
-      style={{ backgroundColor: `${badge.color}0C`, borderColor: `${badge.color}30` }}
+      className="flex items-center gap-3 px-4 py-3 rounded-xl border"
+      style={{ backgroundColor: `${badge.color}0A`, borderColor: `${badge.color}25` }}
     >
       <div
         className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0"
-        style={{ backgroundColor: `${badge.color}18` }}
+        style={{ backgroundColor: `${badge.color}14` }}
       >
         <BadgeIcon iconPath={badge.iconPath} color={badge.color} size={16} />
       </div>
@@ -156,6 +196,128 @@ function RecentBadgeBanner({ reward }: { reward: EarnedReward }) {
         <p className="text-xs text-text-muted truncate">{badge.description}</p>
       </div>
     </div>
+  );
+}
+
+// ── Next Reward / Next Action Card ─────────────────────────────────────────────
+
+function NextActionCard({
+  nextBadge,
+  allCompleted,
+  currentStageId,
+}: {
+  nextBadge: RewardProgress | null;
+  allCompleted: boolean;
+  currentStageId: string | null;
+}) {
+  // All badges earned
+  if (allCompleted) {
+    return (
+      <section
+        className="rounded-2xl border border-success/20 p-5"
+        style={{ background: "linear-gradient(135deg, rgba(76,175,130,0.06) 0%, rgba(108,99,255,0.03) 100%)" }}
+        aria-label="ขั้นต่อไป"
+      >
+        <div className="flex items-center gap-3 mb-3">
+          <div className="w-10 h-10 rounded-xl bg-success/10 flex items-center justify-center flex-shrink-0">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#4CAF82" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <polyline points="20 6 9 17 4 12" />
+            </svg>
+          </div>
+          <div>
+            <p className="text-sm font-bold text-success">ปลดล็อกครบแล้ว!</p>
+            <p className="text-xs text-text-muted">น้องได้รับเหรียญตราครบทุกเหรียญแล้ว</p>
+          </div>
+        </div>
+        <div className="flex gap-3">
+          <Link
+            href="/training/review"
+            className="flex-1 flex items-center justify-center gap-2 bg-primary text-white font-semibold py-2.5 rounded-xl text-sm hover:bg-primary/90 transition-all active:scale-[0.98]"
+          >
+            ทบทวน Review
+          </Link>
+          <Link
+            href="/onboarding"
+            className="flex-1 flex items-center justify-center gap-2 border border-primary/30 text-primary font-semibold py-2.5 rounded-xl text-sm hover:bg-primary/8 transition-all active:scale-[0.98]"
+          >
+            เปลี่ยนเสียงเป้าหมาย
+          </Link>
+        </div>
+      </section>
+    );
+  }
+
+  // No data / no progress
+  if (!nextBadge) {
+    const nextStage = currentStageId
+      ? mockTrainingStages.find((s) => s.id === currentStageId)
+      : null;
+
+    return (
+      <section
+        className="rounded-2xl border border-primary/15 p-5"
+        style={{ background: "linear-gradient(135deg, rgba(108,99,255,0.06) 0%, rgba(255,179,71,0.03) 100%)" }}
+        aria-label="ขั้นต่อไป"
+      >
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center flex-shrink-0">
+            <SparkleIcon />
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-bold text-text">เริ่มต้นสะสมเหรียญ</p>
+            <p className="text-xs text-text-muted">ฝึกภารกิจแรกเพื่อปลดล็อกเหรียญตรา</p>
+          </div>
+          <Link
+            href={nextStage ? `/training/${nextStage.slug}` : "/training"}
+            className="flex-shrink-0 px-4 py-2 rounded-xl bg-primary text-white text-sm font-semibold hover:bg-primary/90 transition-all active:scale-[0.98]"
+          >
+            ฝึกเลย
+          </Link>
+        </div>
+      </section>
+    );
+  }
+
+  // Closest badge to unlock
+  const { badge, current, target, percentage, hint } = nextBadge;
+
+  return (
+    <section
+      className="rounded-2xl border p-5"
+      style={{
+        borderColor: `${badge.color}25`,
+        background: `linear-gradient(135deg, ${badge.color}08 0%, transparent 60%)`,
+      }}
+      aria-label="เหรียญตราถัดไป"
+    >
+      <div className="flex items-center gap-3 mb-3">
+        <div
+          className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0"
+          style={{ backgroundColor: `${badge.color}14` }}
+        >
+          <BadgeIcon iconPath={badge.iconPath} color={badge.color} size={18} />
+        </div>
+        <div className="flex-1 min-w-0">
+          <p className="text-xs font-semibold uppercase tracking-wider" style={{ color: badge.color }}>เหรียญตราถัดไป</p>
+          <p className="text-sm font-bold text-text">{badge.name}</p>
+        </div>
+        {target > 1 && (
+          <span className="text-sm font-bold text-text-muted flex-shrink-0">
+            {current}<span className="text-text-muted/50 font-medium">/{target}</span>
+          </span>
+        )}
+      </div>
+      <div className="h-2 bg-gray-100 dark:bg-white/8 rounded-full overflow-hidden mb-2">
+        <div
+          className="h-full rounded-full transition-all duration-700"
+          style={{ width: `${percentage}%`, backgroundColor: badge.color }}
+        />
+      </div>
+      <div className="flex items-center justify-between">
+        <p className="text-xs text-text-muted">{hint}</p>
+        <span className="text-xs font-semibold" style={{ color: badge.color }}>{percentage}%</span>
+      </div>
+    </section>
   );
 }
 
@@ -173,10 +335,41 @@ export default function RewardsPage() {
 
   const totalStars = summary.starsEarned;
   const earnPercent = totalBadges > 0 ? Math.round((earnedCount / totalBadges) * 100) : 0;
+  const allCompleted = isHydrated && earnedCount === totalBadges;
+
+  // Closest badge to unlock: highest percentage among locked, or first in-progress
+  const nextBadge = allCompleted ? null : (inProgress[0] ?? notStarted[0] ?? null);
+
+  // Set of recently earned badge IDs for accent styling
+  const recentIds = new Set(recentAchievements.map((r) => r.badge.id));
+
+  // Current stage for CTA
+  const currentStage = isHydrated
+    ? mockTrainingStages.find((s) => s.id === summary.currentStageId)
+    : null;
 
   return (
     <AppShell>
-      <div className="max-w-3xl mx-auto px-4 sm:px-6 py-6 space-y-5">
+      <div className="max-w-5xl mx-auto px-4 sm:px-6 py-6 space-y-6">
+
+        {/* ── Page Header ── */}
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+          <div>
+            <h1 className="text-xl font-bold text-text">รางวัลและเหรียญตรา</h1>
+            <p className="text-sm text-text-muted mt-0.5">ติดตามความสำเร็จและแรงบันดาลใจของน้อง</p>
+          </div>
+          {isHydrated && summary.totalAttempts > 0 && (
+            <Link
+              href={currentStage ? `/training/${currentStage.slug}` : "/training"}
+              className="flex-shrink-0 inline-flex items-center gap-2 bg-primary text-white font-semibold px-5 py-2.5 rounded-xl text-sm hover:bg-primary/90 transition-all hover:scale-[1.02] active:scale-[0.98] shadow-sm shadow-primary/20"
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <path d="M5 3l14 9-14 9V3z" />
+              </svg>
+              ฝึกต่อ
+            </Link>
+          )}
+        </div>
 
         {/* ── Hero stat bar ── */}
         <div
@@ -219,6 +412,15 @@ export default function RewardsPage() {
           </div>
         </div>
 
+        {/* ── Next Reward / Next Action Card ── */}
+        {isHydrated && (
+          <NextActionCard
+            nextBadge={nextBadge ?? null}
+            allCompleted={allCompleted}
+            currentStageId={summary.currentStageId}
+          />
+        )}
+
         {/* ── No data state ── */}
         {isHydrated && summary.totalAttempts === 0 && (
           <section className="bg-surface border border-border rounded-2xl p-8 text-center">
@@ -256,9 +458,13 @@ export default function RewardsPage() {
             <p className="text-xs font-semibold text-text-muted uppercase tracking-wider mb-3">
               เหรียญตราที่ได้รับ ({earned.length})
             </p>
-            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
               {earned.map((r) => (
-                <EarnedBadgeCard key={r.badge.id} reward={r} />
+                <EarnedBadgeCard
+                  key={r.badge.id}
+                  reward={r}
+                  isRecent={isRecentlyEarned(r, recentIds)}
+                />
               ))}
             </div>
           </section>
@@ -268,7 +474,7 @@ export default function RewardsPage() {
         {isHydrated && inProgress.length > 0 && (
           <section aria-label="กำลังดำเนินการ">
             <p className="text-xs font-semibold text-text-muted uppercase tracking-wider mb-3">ใกล้จะปลดล็อกแล้ว</p>
-            <div className="space-y-2">
+            <div className="grid gap-2 sm:grid-cols-2">
               {inProgress.map((p) => (
                 <InProgressCard key={p.badge.id} progress={p} />
               ))}
@@ -282,7 +488,7 @@ export default function RewardsPage() {
             <p className="text-xs font-semibold text-text-muted uppercase tracking-wider mb-3">
               รอการปลดล็อก ({notStarted.length})
             </p>
-            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
               {notStarted.map((p) => (
                 <LockedBadgeCard key={p.badge.id} progress={p} />
               ))}
@@ -292,36 +498,38 @@ export default function RewardsPage() {
 
         {/* ── Skeleton while hydrating ── */}
         {!isHydrated && (
-          <section className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+          <section className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
             {Array.from({ length: 6 }).map((_, i) => (
-              <div key={i} className="h-36 rounded-2xl bg-gray-100 dark:bg-white/6 animate-pulse" />
+              <div key={i} className="h-40 rounded-2xl bg-gray-100 dark:bg-white/6 animate-pulse" />
             ))}
           </section>
         )}
 
-        {/* ── CTA Buttons ── */}
-        <div className="flex flex-col sm:flex-row gap-3 pt-2">
-          <Link
-            href="/training"
-            className="flex-1 flex items-center justify-center gap-2 bg-primary text-white font-semibold py-3 rounded-xl hover:bg-primary/90 transition-all hover:scale-[1.02] active:scale-[0.98] shadow-sm shadow-primary/20 text-sm"
-          >
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-              <path d="M5 3l14 9-14 9V3z" />
-            </svg>
-            ไปฝึกต่อ
-          </Link>
-          <Link
-            href="/progress"
-            className="flex-1 flex items-center justify-center gap-2 border border-primary text-primary font-semibold py-3 rounded-xl hover:bg-primary/8 transition-all hover:scale-[1.02] active:scale-[0.98] text-sm"
-          >
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-              <line x1="18" x2="18" y1="20" y2="10" />
-              <line x1="12" x2="12" y1="20" y2="4" />
-              <line x1="6" x2="6" y1="20" y2="14" />
-            </svg>
-            ดูรายงาน
-          </Link>
-        </div>
+        {/* ── Bottom CTA ── */}
+        {isHydrated && summary.totalAttempts > 0 && (
+          <div className="flex flex-col sm:flex-row gap-3 pt-2">
+            <Link
+              href="/training"
+              className="flex-1 flex items-center justify-center gap-2 bg-primary text-white font-semibold py-3 rounded-xl hover:bg-primary/90 transition-all hover:scale-[1.02] active:scale-[0.98] shadow-sm shadow-primary/20 text-sm"
+            >
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <path d="M5 3l14 9-14 9V3z" />
+              </svg>
+              ไปฝึกต่อ
+            </Link>
+            <Link
+              href="/progress"
+              className="flex-1 flex items-center justify-center gap-2 border border-primary text-primary font-semibold py-3 rounded-xl hover:bg-primary/8 transition-all hover:scale-[1.02] active:scale-[0.98] text-sm"
+            >
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <line x1="18" x2="18" y1="20" y2="10" />
+                <line x1="12" x2="12" y1="20" y2="4" />
+                <line x1="6" x2="6" y1="20" y2="14" />
+              </svg>
+              ดูรายงาน
+            </Link>
+          </div>
+        )}
 
         <div className="pb-4" />
       </div>
