@@ -51,9 +51,9 @@ export default function TrainingMapPage() {
 
   return (
     <AppShell>
-      <div className="max-w-3xl mx-auto px-4 sm:px-6 py-6 space-y-5">
+      <div className="max-w-6xl mx-auto px-4 sm:px-6 py-6 space-y-6">
 
-        {/* ── Setup banner (shown when no profile is set) ── */}
+        {/* ── Setup banner ── */}
         {isHydrated && !hasProfile && (
           <div className="flex items-center justify-between gap-3 bg-info/8 border border-info/25 rounded-xl px-4 py-3">
             <p className="text-sm text-text">
@@ -69,135 +69,157 @@ export default function TrainingMapPage() {
           </div>
         )}
 
-        {/* ── Session header ── */}
-        <div className="bg-gradient-to-r from-primary/8 via-surface to-level-sentence/5 border border-border rounded-xl px-5 py-4">
-          <div className="flex items-center justify-between flex-wrap gap-2">
+        {/* ── Page Header ── */}
+        <header>
+          <nav className="text-xs text-text-muted mb-2" aria-label="Breadcrumb">
+            <Link href="/" className="hover:text-primary transition-colors">หน้าหลัก</Link>
+            <span className="mx-1.5 text-disabled">/</span>
+            <span className="text-text font-medium">ฝึกออกเสียง</span>
+          </nav>
+          <div className="flex items-end justify-between gap-4">
             <div>
-              <h2 className="font-bold text-text text-base">Training Cockpit</h2>
+              <h1 className="text-xl font-bold text-text">ฝึกออกเสียง</h1>
               <p className="text-sm text-text-muted mt-0.5">
-                เลือกเสียงและระดับที่ต้องการฝึก
+                เลือกเสียงเป้าหมายและระดับที่ต้องการฝึก
               </p>
             </div>
             {isHydrated && (
-              <div className="flex items-center gap-3 text-sm">
-                <div className="text-center">
-                  <p className="font-bold text-primary text-xl leading-none">{completedCount}</p>
-                  <p className="text-xs text-text-muted">/ 7 ระดับ</p>
+              <div className="flex items-center gap-4 flex-shrink-0">
+                <div className="text-center hidden sm:block">
+                  <p className="font-bold text-primary text-lg leading-none">{completedCount}<span className="text-text-muted text-xs font-normal">/7</span></p>
+                  <p className="text-xs text-text-muted">ระดับผ่าน</p>
                 </div>
-                <div className="w-px h-8 bg-border" />
-                <div className="text-center">
-                  <p className="font-bold text-secondary text-xl leading-none">★ {summary.starsEarned}</p>
-                  <p className="text-xs text-text-muted">ดาว</p>
-                </div>
+                {currentStage && (
+                  <a
+                    href={`/training/${currentStage.slug}`}
+                    className="px-5 py-2.5 rounded-xl text-sm font-semibold text-white transition-all hover:scale-[1.02] active:scale-[0.98] shadow-sm"
+                    style={{ backgroundColor: currentStage.accentColor }}
+                  >
+                    ฝึกต่อ →
+                  </a>
+                )}
               </div>
             )}
           </div>
-        </div>
+        </header>
 
-        {/* ── Child Profile (compact) ── */}
-        <div className="relative">
-          <ChildProfileCard
-            profile={liveProfile}
-            compact
-            isHydrated={isHydrated}
-          />
-          {isHydrated && (
-            <Link
-              href="/onboarding"
-              className="absolute top-2 right-2 text-xs text-text-muted hover:text-primary transition-colors px-2 py-1 rounded-lg hover:bg-primary/8"
-            >
-              {hasProfile ? "แก้ไข" : "ตั้งค่า"}
-            </Link>
-          )}
-        </div>
+        {/* ── 2-Column Layout ── */}
+        <div className="lg:grid lg:grid-cols-[1fr_320px] lg:gap-6 lg:items-start space-y-6 lg:space-y-0">
 
-        {/* ── Target Sound Selector ── */}
-        <TargetSoundSelector
-          sounds={mockTargetSounds}
-          selectedId={isHydrated ? selectedSoundId : null}
-          onSelect={setSelectedSound}
-        />
+          {/* ── Left Column: Sound Selector + Journey Map ── */}
+          <div className="space-y-5 min-w-0">
+            <TargetSoundSelector
+              sounds={mockTargetSounds}
+              selectedId={isHydrated ? selectedSoundId : null}
+              onSelect={setSelectedSound}
+            />
 
-        {/* ── Selected sound indicator ── */}
-        {isHydrated && selectedSound && (
-          <div className="flex items-center gap-3 bg-primary/8 border border-primary/20 rounded-xl px-4 py-3">
-            <span
-              className="w-10 h-10 rounded-xl flex items-center justify-center text-xl font-bold text-primary flex-shrink-0"
-              style={{ backgroundColor: "rgba(108,99,255,0.12)" }}
-            >
-              {selectedSound.label}
-            </span>
-            <div>
-              <p className="text-sm font-semibold text-primary">
-                กำลังฝึกเสียง: {selectedSound.description}
-              </p>
-              <p className="text-xs text-text-muted">เปลี่ยนเสียงได้จากด้านบน</p>
-            </div>
+            <section>
+              <h2 className="text-sm font-semibold text-text-muted uppercase tracking-wider mb-3 px-1">
+                เส้นทางการฝึก
+              </h2>
+              <TrainingMap stages={liveStages} />
+            </section>
           </div>
-        )}
 
-        {/* ── Current stage Next Action card ── */}
-        {isHydrated && currentStage && (
-          <div
-            className="flex items-center justify-between gap-4 rounded-xl px-5 py-4 border"
-            style={{
-              backgroundColor: `${currentStage.accentColor}10`,
-              borderColor: `${currentStage.accentColor}30`,
-            }}
-          >
-            <div className="flex items-center gap-3">
-              <span className="text-2xl" aria-hidden="true">{currentStage.icon}</span>
-              <div>
-                <p className="text-xs font-semibold text-text-muted uppercase tracking-wide">ขั้นต่อไปที่แนะนำ</p>
-                <p className="font-bold text-text text-sm">{currentStage.name}</p>
-                <p className="text-xs text-text-muted">{currentStage.shortGoal}</p>
+          {/* ── Right Column: Side Panel ── */}
+          <aside className="space-y-4 lg:sticky lg:top-16">
+
+            {/* Child Profile */}
+            <div className="relative">
+              <ChildProfileCard
+                profile={liveProfile}
+                compact
+                isHydrated={isHydrated}
+              />
+              {isHydrated && (
+                <Link
+                  href="/onboarding"
+                  className="absolute top-2 right-2 text-xs text-text-muted hover:text-primary transition-colors px-2 py-1 rounded-lg hover:bg-primary/8"
+                >
+                  {hasProfile ? "แก้ไข" : "ตั้งค่า"}
+                </Link>
+              )}
+            </div>
+
+            {/* Selected Sound Summary */}
+            {isHydrated && selectedSound && (
+              <div className="flex items-center gap-3 bg-primary/6 border border-primary/15 rounded-xl px-4 py-3">
+                <span
+                  className="w-9 h-9 rounded-lg flex items-center justify-center text-lg font-bold text-primary flex-shrink-0"
+                  style={{ backgroundColor: "rgba(108,99,255,0.10)" }}
+                >
+                  {selectedSound.label}
+                </span>
+                <div className="min-w-0">
+                  <p className="text-sm font-semibold text-text truncate">
+                    เสียง /{selectedSound.label}/
+                  </p>
+                  <p className="text-xs text-text-muted truncate">{selectedSound.description}</p>
+                </div>
               </div>
-            </div>
-            <a
-              href={`/training/${currentStage.slug}`}
-              className="flex-shrink-0 px-4 py-2 rounded-xl text-sm font-semibold text-white transition-all hover:scale-[1.02] active:scale-[0.98]"
-              style={{ backgroundColor: currentStage.accentColor }}
-            >
-              ฝึกเลย
-            </a>
-          </div>
-        )}
+            )}
 
-        {/* ── Rewards mini-card ── */}
-        {isHydrated && rewardResult && rewardResult.earnedCount > 0 && (
-          <Link
-            href="/rewards"
-            className="flex items-center justify-between gap-4 bg-surface border border-border rounded-xl px-4 py-3 hover:border-secondary/40 hover:shadow-sm transition-all group"
-            aria-label="ดูรางวัลและเหรียญตรา"
-          >
-            <div className="flex items-center gap-3">
-              <div className="w-8 h-8 rounded-xl bg-secondary/12 flex items-center justify-center flex-shrink-0">
-                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#FFB347" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                  <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" />
+            {/* Next Best Action */}
+            {isHydrated && currentStage && (
+              <div
+                className="rounded-xl px-4 py-3.5 border"
+                style={{
+                  backgroundColor: `${currentStage.accentColor}08`,
+                  borderColor: `${currentStage.accentColor}25`,
+                }}
+              >
+                <p className="text-xs font-semibold text-text-muted uppercase tracking-wide mb-2">ขั้นต่อไปที่แนะนำ</p>
+                <div className="flex items-center gap-3">
+                  <span className="text-xl flex-shrink-0" aria-hidden="true">{currentStage.icon}</span>
+                  <div className="min-w-0 flex-1">
+                    <p className="font-semibold text-text text-sm leading-snug">{currentStage.name}</p>
+                    <p className="text-xs text-text-muted mt-0.5">{currentStage.shortGoal}</p>
+                  </div>
+                </div>
+                <a
+                  href={`/training/${currentStage.slug}`}
+                  className="block w-full text-center mt-3 px-4 py-2 rounded-xl text-sm font-semibold text-white transition-all hover:scale-[1.01] active:scale-[0.98]"
+                  style={{ backgroundColor: currentStage.accentColor }}
+                >
+                  ฝึกเลย
+                </a>
+              </div>
+            )}
+
+            {/* Rewards Summary */}
+            {isHydrated && rewardResult && rewardResult.earnedCount > 0 && (
+              <Link
+                href="/rewards"
+                className="flex items-center justify-between gap-3 bg-surface border border-border rounded-xl px-4 py-3 hover:border-secondary/40 hover:shadow-sm transition-all group"
+                aria-label="ดูรางวัลและเหรียญตรา"
+              >
+                <div className="flex items-center gap-2.5">
+                  <div className="w-7 h-7 rounded-lg bg-secondary/12 flex items-center justify-center flex-shrink-0">
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#FFB347" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                      <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" />
+                    </svg>
+                  </div>
+                  <div>
+                    <p className="text-sm font-semibold text-text leading-tight">รางวัล</p>
+                    <p className="text-xs text-text-muted">
+                      {rewardResult.earnedCount}/{rewardResult.totalBadges} เหรียญ
+                    </p>
+                  </div>
+                </div>
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="text-text-muted group-hover:text-secondary transition-colors flex-shrink-0" aria-hidden="true">
+                  <path d="M9 18l6-6-6-6" />
                 </svg>
-              </div>
-              <div>
-                <p className="text-sm font-semibold text-text">รางวัล</p>
-                <p className="text-xs text-text-muted">
-                  {rewardResult.earnedCount} / {rewardResult.totalBadges} เหรียญตรา
-                </p>
-              </div>
-            </div>
-            <div className="flex items-center gap-2 text-right">
-              <p className="text-sm font-bold text-secondary">★ {summary.starsEarned}</p>
-              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="text-text-muted group-hover:text-secondary transition-colors" aria-hidden="true">
-                <path d="M9 18l6-6-6-6" />
-              </svg>
-            </div>
-          </Link>
-        )}
+              </Link>
+            )}
 
-        {/* ── Training Journey Map ── */}
-        <div>
-          <h2 className="text-sm font-semibold text-text-muted uppercase tracking-wider mb-3 px-1">
-            เส้นทางทั้งหมด
-          </h2>
-          <TrainingMap stages={liveStages} />
+            {/* Quick stats on mobile (hidden on desktop since sidebar shows them) */}
+            {!isHydrated && (
+              <div className="bg-surface border border-border rounded-xl p-4 text-center">
+                <p className="text-sm text-text-muted">กำลังโหลดข้อมูล...</p>
+              </div>
+            )}
+          </aside>
         </div>
 
         <div className="pb-4" />

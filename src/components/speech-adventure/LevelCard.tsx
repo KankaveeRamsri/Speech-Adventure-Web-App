@@ -13,16 +13,22 @@ export default function LevelCard({ stage, index }: Props) {
 
   return (
     <div
-      className={`relative bg-surface border rounded-xl p-4 transition-all duration-200 ${
+      className={`relative bg-surface border rounded-xl transition-all duration-200 ${
         isLocked
-          ? "opacity-50 border-border"
+          ? "opacity-40 border-border"
           : isCurrent
-          ? "border-2 shadow-md hover:shadow-lg hover:-translate-y-0.5"
+          ? "border-l-4 shadow-lg hover:shadow-xl hover:-translate-y-0.5 cursor-default"
+          : isCompleted
+          ? "border-border hover:shadow-sm hover:-translate-y-0.5"
           : "border-border hover:shadow-md hover:-translate-y-0.5"
       }`}
-      style={isCurrent ? { borderColor: stage.accentColor } : undefined}
+      style={
+        isCurrent
+          ? { borderLeftColor: stage.accentColor, borderColor: `${stage.accentColor}30` }
+          : undefined
+      }
     >
-      {/* Current stage glow overlay in dark mode */}
+      {/* Current stage glow */}
       {isCurrent && (
         <div
           className="absolute inset-0 rounded-xl opacity-5 dark:opacity-10 pointer-events-none"
@@ -30,36 +36,44 @@ export default function LevelCard({ stage, index }: Props) {
         />
       )}
 
-      <div className="flex items-start gap-3 relative">
+      <div className={`flex items-center gap-3 relative ${isCurrent ? "p-4" : isCompleted ? "p-3.5" : "p-4"}`}>
         {/* Icon */}
         <div
-          className="flex-shrink-0 w-10 h-10 rounded-xl flex items-center justify-center text-lg"
-          style={{ backgroundColor: isLocked ? undefined : `${stage.accentColor}18` }}
+          className={`flex-shrink-0 rounded-xl flex items-center justify-center ${
+            isCurrent ? "w-11 h-11" : "w-9 h-9"
+          }`}
+          style={{ backgroundColor: isLocked ? undefined : `${stage.accentColor}15` }}
           aria-hidden="true"
         >
           {isLocked ? (
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#94A3B8" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#94A3B8" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
               <path d="M7 11V7a5 5 0 0 1 10 0v4" />
             </svg>
+          ) : isCompleted ? (
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#4CAF82" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <polyline points="20 6 9 17 4 12" />
+            </svg>
           ) : (
-            <span className="text-xl">{stage.icon}</span>
+            <span className={isCurrent ? "text-xl" : "text-lg"}>{stage.icon}</span>
           )}
         </div>
 
         {/* Content */}
         <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2 mb-1 flex-wrap">
-            {/* Step indicator */}
+          <div className="flex items-center gap-2 mb-0.5 flex-wrap">
             <span
               className="text-xs font-semibold px-2 py-0.5 rounded-full text-white flex-shrink-0"
               style={{ backgroundColor: isLocked ? "#94A3B8" : stage.accentColor }}
             >
-              {index + 1} / 7
+              {index + 1}
             </span>
+            <h3 className={`font-semibold text-text leading-snug ${isCurrent ? "text-sm" : "text-sm"}`}>
+              {stage.name}
+            </h3>
             {isCompleted && (
-              <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-success/15 text-success flex-shrink-0">
-                สำเร็จแล้ว
+              <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-success/12 text-success flex-shrink-0">
+                สำเร็จ
               </span>
             )}
             {isCurrent && (
@@ -71,12 +85,10 @@ export default function LevelCard({ stage, index }: Props) {
               </span>
             )}
           </div>
-
-          <h3 className="font-semibold text-text text-sm leading-snug">{stage.name}</h3>
           <p className="text-xs text-text-muted mt-0.5">{stage.shortGoal}</p>
 
-          {/* Stars */}
-          <div className="flex items-center gap-1.5 mt-2">
+          {/* Stars row */}
+          <div className="flex items-center gap-1.5 mt-1.5">
             <div className="flex items-center gap-0.5">
               {Array.from({ length: stage.starsTotal }).map((_, i) => (
                 <span
@@ -93,30 +105,42 @@ export default function LevelCard({ stage, index }: Props) {
             </span>
           </div>
         </div>
-      </div>
 
-      {/* CTA Button */}
-      <div className="mt-3 relative">
-        {isLocked ? (
-          <button
-            disabled
-            className="w-full py-2 rounded-xl bg-bg dark:bg-white/5 text-text-muted font-medium text-xs cursor-not-allowed border border-border"
-          >
-            ยังไม่ปลดล็อค
-          </button>
-        ) : (
+        {/* Inline action button (desktop) */}
+        {!isLocked && (
           <Link
             href={`/training/${stage.slug}`}
-            className="block w-full text-center py-2 rounded-xl font-semibold text-xs transition-all hover:scale-[1.01] active:scale-[0.98]"
-            style={{
-              backgroundColor: isCurrent ? stage.accentColor : `${stage.accentColor}15`,
-              color: isCurrent ? "#fff" : stage.accentColor,
-            }}
+            className={`hidden sm:flex-shrink-0 sm:flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all hover:scale-[1.02] active:scale-[0.98] flex-shrink-0 ${
+              isCurrent
+                ? "text-white shadow-sm"
+                : "border border-current hover:bg-black/5 dark:hover:bg-white/5"
+            }`}
+            style={
+              isCurrent
+                ? { backgroundColor: stage.accentColor, color: "#fff" }
+                : { color: stage.accentColor }
+            }
           >
             {isCompleted ? "ทบทวน" : isCurrent && stage.starsEarned > 0 ? "ฝึกต่อ" : "เริ่มฝึก"}
           </Link>
         )}
       </div>
+
+      {/* Mobile full-width CTA */}
+      {!isLocked && (
+        <Link
+          href={`/training/${stage.slug}`}
+          className="sm:hidden block text-center py-2 text-xs font-semibold border-t border-border/50 transition-all hover:bg-bg"
+          style={{ color: stage.accentColor }}
+        >
+          {isCompleted ? "ทบทวน" : isCurrent && stage.starsEarned > 0 ? "ฝึกต่อ" : "เริ่มฝึก"}
+        </Link>
+      )}
+      {isLocked && (
+        <div className="sm:hidden text-center py-2 text-xs text-text-muted border-t border-border/50 cursor-not-allowed">
+          ยังไม่ปลดล็อค
+        </div>
+      )}
     </div>
   );
 }
