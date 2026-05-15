@@ -139,10 +139,10 @@ export default function ProgressDashboardPage() {
 
           <div className="flex items-center gap-1">
             <Link
-              href="/training"
+              href="/report"
               className="text-sm font-medium text-primary hover:text-primary/80 px-2.5 py-1.5 rounded-lg hover:bg-primary/8 transition-all hidden sm:block"
             >
-              ฝึกต่อ
+              รายงานครู/ผู้ปกครอง
             </Link>
             <ThemeToggle />
           </div>

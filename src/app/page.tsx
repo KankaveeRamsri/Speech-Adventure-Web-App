@@ -105,8 +105,11 @@ export default function LandingPage() {
             <Link href="/training" className="text-sm font-medium text-text-muted hover:text-text px-3 py-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-white/8 transition-all">
               เริ่มฝึก
             </Link>
-            <Link href="/progress" className="text-sm font-medium text-text-muted hover:text-text px-3 py-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-white/8 transition-all">
+            <Link href="/progress" className="text-sm font-medium text-text-muted hover:text-text px-3 py-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-white/8 transition-all hidden sm:block">
               ความก้าวหน้า
+            </Link>
+            <Link href="/report" className="text-sm font-medium text-text-muted hover:text-text px-3 py-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-white/8 transition-all">
+              รายงาน
             </Link>
             <div className="w-px h-5 bg-border mx-1" />
             <ThemeToggle />
