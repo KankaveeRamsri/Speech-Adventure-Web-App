@@ -1,8 +1,43 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import AppTopBar from "./AppTopBar";
 import AppSidebar from "./AppSidebar";
 import MobileNav from "./MobileNav";
+import { SidebarProvider, useSidebar } from "./SidebarContext";
+
+function AppShellInner({ children }: { children: React.ReactNode }) {
+  const { collapsed, mounted } = useSidebar();
+  const [isDesktop, setIsDesktop] = useState(false);
+
+  useEffect(() => {
+    const mq = window.matchMedia("(min-width: 1024px)");
+    setIsDesktop(mq.matches);
+    const handler = (e: MediaQueryListEvent) => setIsDesktop(e.matches);
+    mq.addEventListener("change", handler);
+    return () => mq.removeEventListener("change", handler);
+  }, []);
+
+  const expandedPad = "240px";
+  const collapsedPad = "72px";
+  const sidebarPad = mounted
+    ? (collapsed ? collapsedPad : expandedPad)
+    : expandedPad;
+
+  return (
+    <div className="min-h-screen bg-bg print:bg-white">
+      <AppTopBar />
+      <AppSidebar />
+      <main
+        className="pt-14 pb-16 lg:pb-0 print:pt-0 print:pl-0 print:pb-0 transition-[padding-left] duration-200 ease-in-out"
+        style={{ paddingLeft: isDesktop ? sidebarPad : undefined }}
+      >
+        {children}
+      </main>
+      <MobileNav />
+    </div>
+  );
+}
 
 interface Props {
   children: React.ReactNode;
@@ -10,14 +45,8 @@ interface Props {
 
 export default function AppShell({ children }: Props) {
   return (
-    <div className="min-h-screen bg-bg print:bg-white">
-      <AppTopBar />
-      <AppSidebar />
-      {/* pt-14: below fixed topbar | lg:pl-[220px]: beside fixed sidebar | pb-16 lg:pb-0: above fixed mobile nav */}
-      <main className="pt-14 lg:pl-[220px] pb-16 lg:pb-0 print:pt-0 print:pl-0 print:pb-0">
-        {children}
-      </main>
-      <MobileNav />
-    </div>
+    <SidebarProvider>
+      <AppShellInner>{children}</AppShellInner>
+    </SidebarProvider>
   );
 }
