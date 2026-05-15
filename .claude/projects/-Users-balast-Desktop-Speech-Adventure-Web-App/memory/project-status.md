@@ -23,6 +23,7 @@ Speech Adventure is a Thai children's speech therapy web app built with Next.js 
 - Demo data mode (loadDemoProgress in speechAdventureDemoData.ts)
 - Parent/teacher report page (/report)
 - Phase 13: Rewards and badges system (/rewards)
+- Phase 14: Parent/Teacher observation notes (observationStorage, useObservationNotes, /progress, /report, PracticeSessionSummary)
 
 ## Key architecture notes:
 - No Supabase, no real AI

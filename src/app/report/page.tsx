@@ -10,6 +10,8 @@ import ReportSummaryCard from "@/components/report/ReportSummaryCard";
 import PrintActions from "@/components/report/PrintActions";
 import { useSpeechProgress } from "@/hooks/useSpeechProgress";
 import { useChildProfile } from "@/hooks/useChildProfile";
+import { useObservationNotes } from "@/hooks/useObservationNotes";
+import { CATEGORY_META } from "@/types/observations";
 import {
   mockChildProfile,
   mockTrainingStages,
@@ -121,6 +123,7 @@ function SectionLabel({ children }: { children: React.ReactNode }) {
 export default function ReportPage() {
   const { summary, getStageStatus, getStageAttempts, isHydrated } = useSpeechProgress();
   const { profile } = useChildProfile();
+  const { recentNotes } = useObservationNotes();
 
   const handlePrint = useCallback(() => {
     window.print();
@@ -556,7 +559,95 @@ export default function ReportPage() {
           isMock
         />
 
-        {/* 8. Print footer */}
+        {/* 8. Parent / Teacher Observations */}
+        {recentNotes.length > 0 && (
+          <section
+            className="bg-surface border border-border rounded-2xl p-5 print:border-gray-200 print:rounded-lg"
+            aria-label="บันทึกของผู้ปกครองและครู"
+          >
+            <SectionLabel>บันทึกจากผู้ปกครอง / ครู</SectionLabel>
+
+            {/* Recommendation notes highlighted */}
+            {recentNotes.filter((n) => n.category === "recommendation").length > 0 && (
+              <div className="mb-4 space-y-2">
+                {recentNotes
+                  .filter((n) => n.category === "recommendation")
+                  .map((note) => {
+                    const meta = CATEGORY_META[note.category];
+                    return (
+                      <div
+                        key={note.id}
+                        className="rounded-xl p-4 border print:bg-orange-50 print:border-orange-100"
+                        style={{ backgroundColor: `${meta.color}0C`, borderColor: `${meta.color}30` }}
+                      >
+                        <div className="flex items-center gap-2 mb-2">
+                          <span
+                            className="text-xs font-semibold px-2.5 py-0.5 rounded-full"
+                            style={{ backgroundColor: `${meta.color}18`, color: meta.color }}
+                          >
+                            {meta.label}
+                          </span>
+                          {note.title && (
+                            <p className="text-sm font-bold text-text print:text-black">{note.title}</p>
+                          )}
+                        </div>
+                        <p className="text-sm text-text leading-relaxed print:text-black">{note.content}</p>
+                        <p className="text-xs text-text-muted mt-2 print:text-gray-400">
+                          {(() => {
+                            try { return new Date(note.createdAt).toLocaleDateString("th-TH", { day: "numeric", month: "short", year: "numeric" }); }
+                            catch { return ""; }
+                          })()}
+                        </p>
+                      </div>
+                    );
+                  })}
+              </div>
+            )}
+
+            {/* Other notes */}
+            {recentNotes.filter((n) => n.category !== "recommendation").length > 0 && (
+              <div className="space-y-3">
+                {recentNotes
+                  .filter((n) => n.category !== "recommendation")
+                  .slice(0, 5)
+                  .map((note) => {
+                    const meta = CATEGORY_META[note.category];
+                    return (
+                      <div
+                        key={note.id}
+                        className="flex gap-3 py-3 border-b border-border last:border-0 print:border-gray-100"
+                      >
+                        <span
+                          className="shrink-0 text-xs font-semibold px-2.5 py-0.5 rounded-full self-start mt-0.5"
+                          style={{ backgroundColor: `${meta.color}14`, color: meta.color }}
+                        >
+                          {meta.label}
+                        </span>
+                        <div className="flex-1 min-w-0">
+                          {note.title && (
+                            <p className="text-sm font-semibold text-text mb-0.5 print:text-black">{note.title}</p>
+                          )}
+                          <p className="text-sm text-text-muted leading-relaxed print:text-gray-500">{note.content}</p>
+                          <p className="text-xs text-text-muted/50 mt-1 print:text-gray-400">
+                            {(() => {
+                              try { return new Date(note.createdAt).toLocaleDateString("th-TH", { day: "numeric", month: "short" }); }
+                              catch { return ""; }
+                            })()}
+                          </p>
+                        </div>
+                      </div>
+                    );
+                  })}
+              </div>
+            )}
+
+            <p className="text-xs text-text-muted text-center mt-4 print:text-gray-400">
+              ดูบันทึกทั้งหมดได้ที่หน้ารายงานความก้าวหน้า
+            </p>
+          </section>
+        )}
+
+        {/* 10. Print footer */}
         <div className="hidden print:block text-center text-xs text-gray-400 pt-4 border-t border-gray-100">
           <p>Speech Adventure — ระบบฝึกพูดสำหรับเด็กไทย · รายงานนี้สร้างโดยอัตโนมัติจากข้อมูลการฝึก</p>
           <p className="mt-1">Prototype v1.0 · ผลประเมินใช้ Mock Evaluation · AI จริงยังอยู่ระหว่างพัฒนา</p>

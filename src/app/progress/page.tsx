@@ -6,14 +6,17 @@ import ThemeToggle from "@/components/ui/ThemeToggle";
 import ChildProfileCard from "@/components/speech-adventure/ChildProfileCard";
 import RecentAttemptsList from "@/components/speech-adventure/RecentAttemptsList";
 import StageProgressCard from "@/components/speech-adventure/StageProgressCard";
+import ObservationNoteList from "@/components/observations/ObservationNoteList";
 import { useSpeechProgress } from "@/hooks/useSpeechProgress";
 import { useChildProfile } from "@/hooks/useChildProfile";
+import { useObservationNotes } from "@/hooks/useObservationNotes";
 import { mockChildProfile, mockTrainingStages } from "@/data/speechAdventureMockData";
 import {
   loadDemoProgress,
   resetDemoProgress,
   DEMO_ATTEMPT_COUNT,
 } from "@/lib/demo/speechAdventureDemoData";
+import { clearObservations } from "@/lib/observations/observationStorage";
 import type { ProgressSummary } from "@/types/speechAdventure";
 import { calculateRewards } from "@/lib/rewards/calculateRewards";
 
@@ -80,6 +83,7 @@ function BackIcon() {
 export default function ProgressDashboardPage() {
   const { progress, summary, clearProgress, getStageStatus, getStageAttempts, isHydrated } = useSpeechProgress();
   const { profile, hasProfile } = useChildProfile();
+  const { notes, addNote, updateNote, deleteNote } = useObservationNotes();
   const [showResetConfirm, setShowResetConfirm] = useState(false);
   const [showDemoConfirm, setShowDemoConfirm] = useState(false);
 
@@ -112,6 +116,7 @@ export default function ProgressDashboardPage() {
 
   const handleReset = () => {
     clearProgress();
+    clearObservations();
     setShowResetConfirm(false);
   };
 
@@ -448,7 +453,20 @@ export default function ProgressDashboardPage() {
         {/* ── Section 6: Recent Attempts ── */}
         <RecentAttemptsList attempts={summary.recentAttempts} />
 
-        {/* ── Section 6: Report Card ── */}
+        {/* ── Section 7: Parent / Teacher Notes ── */}
+        <section
+          className="bg-surface border border-border rounded-xl p-5"
+          aria-label="บันทึกของผู้ปกครองและครู"
+        >
+          <ObservationNoteList
+            notes={notes}
+            onAdd={addNote}
+            onEdit={updateNote}
+            onDelete={deleteNote}
+          />
+        </section>
+
+        {/* ── Section 8: Report Card ── */}
         <section
           className="bg-surface border border-primary/15 rounded-xl p-5"
           style={{ background: "linear-gradient(135deg, rgba(108,99,255,0.04) 0%, transparent 60%)" }}

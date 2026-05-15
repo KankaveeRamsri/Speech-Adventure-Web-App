@@ -1,8 +1,13 @@
 import type { PracticeAttempt, PracticeSession, SpeechProgress } from "@/types/speechAdventure";
+import type { ObservationNote } from "@/types/observations";
 import {
   replaceProgress,
   clearProgress,
 } from "@/lib/speechProgressStorage";
+import {
+  replaceObservations,
+  clearObservations,
+} from "@/lib/observations/observationStorage";
 
 // ── Demo metadata ─────────────────────────────────────────────────────────────
 
@@ -351,14 +356,73 @@ export const DEMO_PROGRESS: SpeechProgress = {
 
 export const DEMO_ATTEMPT_COUNT = DEMO_ATTEMPTS.length;
 
+// ── Demo Observation Notes ────────────────────────────────────────────────────
+
+export const DEMO_OBSERVATIONS: ObservationNote[] = [
+  {
+    id: "demo-obs-001",
+    childId: DEMO_CHILD_ID,
+    targetType: "session",
+    targetId: "session-l3b",
+    category: "pronunciation",
+    title: "สังเกตการออกเสียง Level 3",
+    content: "น้องมีปัญหากับการออกเสียง 'กระ' ในช่วงต้น แต่พัฒนาขึ้นอย่างเห็นได้ชัดเมื่อฝึกซ้ำๆ ควรฝึก 'กระ' และ 'กลม' ก่อนนอนทุกคืน จะช่วยให้ออกเสียงได้ชัดขึ้นภายใน 1 สัปดาห์",
+    createdAt: ts("2026-05-09", 15),
+    updatedAt: ts("2026-05-09", 15),
+  },
+  {
+    id: "demo-obs-002",
+    childId: DEMO_CHILD_ID,
+    targetType: "general",
+    category: "attention",
+    title: "ความตั้งใจระหว่างการฝึก",
+    content: "น้องตั้งใจฝึกดีมากในช่วง 10 นาทีแรก แต่จะเริ่มเสียสมาธิหลังจากนั้น แนะนำให้แบ่งเซสชันเป็นช่วงสั้นๆ 10-15 นาที แล้วพักดูวิดีโอสั้น 5 นาทีระหว่างรอบ จะช่วยให้น้องรักษาสมาธิได้ดีขึ้น",
+    createdAt: ts("2026-05-10", 16),
+    updatedAt: ts("2026-05-10", 16),
+  },
+  {
+    id: "demo-obs-003",
+    childId: DEMO_CHILD_ID,
+    targetType: "general",
+    category: "progress",
+    title: "พัฒนาการสัปดาห์ที่ 2",
+    content: "เปรียบเทียบกับสัปดาห์แรก น้องออกเสียง 'ก' ได้ชัดขึ้นมากในระดับ Level 4 คะแนนเฉลี่ยขึ้นจาก 65% เป็น 78% ภายในสัปดาห์เดียว ถือว่าพัฒนาการดีมากค่ะ น้องมีความมั่นใจในการพูดมากขึ้นเห็นได้ชัด",
+    createdAt: ts("2026-05-12", 17),
+    updatedAt: ts("2026-05-12", 17),
+  },
+  {
+    id: "demo-obs-004",
+    childId: DEMO_CHILD_ID,
+    targetType: "general",
+    category: "recommendation",
+    title: "คำแนะนำสำหรับผู้ปกครอง",
+    content: "ควรฝึกร่วมกับน้องวันละ 10-15 นาทีอย่างสม่ำเสมอ เน้นคำที่ยากได้แก่ 'กระ' และ 'กลม' โดยออกเสียงช้าๆ ทีละพยางค์ก่อน ควรสร้างบรรยากาศสนุกสนาน ไม่กดดัน ชมเชยทุกครั้งที่น้องทำได้ดี",
+    createdAt: ts("2026-05-13", 14),
+    updatedAt: ts("2026-05-13", 14),
+  },
+  {
+    id: "demo-obs-005",
+    childId: DEMO_CHILD_ID,
+    targetType: "session",
+    targetId: "session-review",
+    category: "progress",
+    title: "บันทึกผลการทดสอบ Review",
+    content: "น้องทำ Review ได้ดีมาก คะแนนเฉลี่ย 82% เทียบกับ Pre-test ที่ได้เพียง 48% พัฒนาการก้าวหน้าชัดเจนมาก ขอชมเชยน้องสำหรับความพยายามตลอด 2 สัปดาห์ที่ผ่านมา แนะนำให้เริ่มฝึกเสียง 'ค' ต่อไปในเดือนหน้า",
+    createdAt: ts("2026-05-14", 12),
+    updatedAt: ts("2026-05-14", 12),
+  },
+];
+
 // ── Helper functions ──────────────────────────────────────────────────────────
 
-/** Replace current progress with demo data and notify all React subscribers. */
+/** Replace current progress and observations with demo data. */
 export function loadDemoProgress(): void {
   replaceProgress(DEMO_PROGRESS);
+  replaceObservations(DEMO_OBSERVATIONS);
 }
 
-/** Clear all progress (alias for clearProgress for symmetry). */
+/** Clear all progress and observations. */
 export function resetDemoProgress(): void {
   clearProgress();
+  clearObservations();
 }

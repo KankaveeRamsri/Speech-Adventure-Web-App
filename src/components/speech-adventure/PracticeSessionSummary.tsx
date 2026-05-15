@@ -1,7 +1,10 @@
 "use client";
 
+import { useState } from "react";
 import Link from "next/link";
 import type { PracticeSession, TrainingStage } from "@/types/speechAdventure";
+import { useObservationNotes } from "@/hooks/useObservationNotes";
+import ObservationNoteForm from "@/components/observations/ObservationNoteForm";
 
 interface Props {
   session: PracticeSession;
@@ -36,6 +39,10 @@ function computeFilledStars(totalStars: number, totalMissions: number): number {
 export default function PracticeSessionSummary({ session, stage, onRetry }: Props) {
   const filledStars = computeFilledStars(session.starsEarned, session.totalMissions);
   const durationText = session.durationMs ? formatDuration(session.durationMs) : "—";
+  const { addNote, getNotesForTarget } = useObservationNotes(session.childId);
+  const [showNoteForm, setShowNoteForm] = useState(false);
+  const [noteSaved, setNoteSaved] = useState(false);
+  const existingNotes = getNotesForTarget("session", session.id);
 
   return (
     <div className="animate-bounce-in space-y-4">
@@ -132,6 +139,77 @@ export default function PracticeSessionSummary({ session, stage, onRetry }: Prop
         >
           ฝึกซ้ำอีกครั้ง
         </button>
+      </div>
+
+      {/* ── Session note ── */}
+      <div className="bg-surface border border-border rounded-xl overflow-hidden">
+        <button
+          type="button"
+          onClick={() => { setShowNoteForm((v) => !v); setNoteSaved(false); }}
+          className="w-full flex items-center justify-between gap-3 px-4 py-3 text-left hover:bg-bg dark:hover:bg-white/3 transition-all"
+          aria-expanded={showNoteForm}
+        >
+          <div className="flex items-center gap-2.5">
+            <div className="w-7 h-7 rounded-lg bg-info/12 flex items-center justify-center flex-shrink-0">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#5BC0EB" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                <polyline points="14 2 14 8 20 8" />
+                <line x1="16" y1="13" x2="8" y2="13" />
+                <line x1="12" y1="17" x2="8" y2="17" />
+              </svg>
+            </div>
+            <div>
+              <p className="text-sm font-semibold text-text">บันทึกของผู้ปกครอง / ครู</p>
+              <p className="text-xs text-text-muted">
+                {existingNotes.length > 0
+                  ? `${existingNotes.length} บันทึก`
+                  : "บันทึกสิ่งที่สังเกตได้ในเซสชันนี้"}
+              </p>
+            </div>
+          </div>
+          <svg
+            width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"
+            className={`text-text-muted transition-transform ${showNoteForm ? "rotate-180" : ""}`}
+            aria-hidden="true"
+          >
+            <polyline points="6 9 12 15 18 9" />
+          </svg>
+        </button>
+
+        {showNoteForm && (
+          <div className="px-4 pb-4 border-t border-border">
+            {noteSaved ? (
+              <div className="py-4 text-center">
+                <div className="w-10 h-10 rounded-xl bg-success/12 flex items-center justify-center mx-auto mb-2">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#4CAF82" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                    <polyline points="20 6 9 17 4 12" />
+                  </svg>
+                </div>
+                <p className="text-sm font-semibold text-success">บันทึกเรียบร้อย</p>
+                <button
+                  type="button"
+                  onClick={() => { setNoteSaved(false); setShowNoteForm(false); }}
+                  className="text-xs text-text-muted hover:text-primary mt-2 transition-colors"
+                >
+                  ปิด
+                </button>
+              </div>
+            ) : (
+              <div className="pt-3">
+                <ObservationNoteForm
+                  targetType="session"
+                  targetId={session.id}
+                  onSave={(data) => {
+                    addNote(data);
+                    setNoteSaved(true);
+                  }}
+                  onCancel={() => setShowNoteForm(false)}
+                  compact
+                />
+              </div>
+            )}
+          </div>
+        )}
       </div>
     </div>
   );
