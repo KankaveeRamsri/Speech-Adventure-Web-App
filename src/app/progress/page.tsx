@@ -8,6 +8,11 @@ import RecentAttemptsList from "@/components/speech-adventure/RecentAttemptsList
 import StageProgressCard from "@/components/speech-adventure/StageProgressCard";
 import { useSpeechProgress } from "@/hooks/useSpeechProgress";
 import { mockChildProfile, mockTrainingStages } from "@/data/speechAdventureMockData";
+import {
+  loadDemoProgress,
+  resetDemoProgress,
+  DEMO_ATTEMPT_COUNT,
+} from "@/lib/demo/speechAdventureDemoData";
 import type { ProgressSummary } from "@/types/speechAdventure";
 
 // ─── Report Generator ───────────────────────────────────────────────────────
@@ -73,6 +78,7 @@ function BackIcon() {
 export default function ProgressDashboardPage() {
   const { summary, clearProgress, getStageStatus, getStageAttempts, isHydrated } = useSpeechProgress();
   const [showResetConfirm, setShowResetConfirm] = useState(false);
+  const [showDemoConfirm, setShowDemoConfirm] = useState(false);
 
   const liveProfile = {
     ...mockChildProfile,
@@ -100,6 +106,19 @@ export default function ProgressDashboardPage() {
   const handleReset = () => {
     clearProgress();
     setShowResetConfirm(false);
+  };
+
+  const handleLoadDemo = () => {
+    if (summary.totalAttempts > 0) {
+      setShowDemoConfirm(true);
+    } else {
+      loadDemoProgress();
+    }
+  };
+
+  const handleConfirmLoadDemo = () => {
+    loadDemoProgress();
+    setShowDemoConfirm(false);
   };
 
   return (
@@ -388,18 +407,72 @@ export default function ProgressDashboardPage() {
           </p>
         </section>
 
-        {/* ── Reset / Back to Training ── */}
-        <div className="flex flex-col items-center gap-4 pt-2 pb-8">
+        {/* ── Back to Training ── */}
+        <div className="flex justify-center pt-2">
           <Link
             href="/training"
             className="w-full max-w-xs flex items-center justify-center gap-2 bg-primary text-white font-semibold py-3 rounded-xl hover:bg-primary/90 transition-all hover:scale-[1.02] active:scale-[0.98] shadow-sm shadow-primary/20"
           >
             กลับไปฝึกต่อ
           </Link>
+        </div>
 
-          {showResetConfirm ? (
-            <div className="bg-surface border border-border rounded-xl p-5 text-center w-full max-w-xs">
-              <p className="text-sm text-text mb-4">ต้องการล้างข้อมูลความก้าวหน้าทั้งหมดหรือไม่?</p>
+        {/* ── Demo / Presentation Controls ── */}
+        <section
+          className="rounded-2xl border border-dashed border-primary/30 bg-primary/4 dark:bg-primary/6 p-5 pb-6"
+          aria-label="ส่วนควบคุมโหมดสาธิต"
+        >
+          {/* Header */}
+          <div className="flex items-center gap-2.5 mb-3">
+            <div className="w-8 h-8 rounded-xl bg-primary/12 flex items-center justify-center flex-shrink-0">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#6C63FF" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <polygon points="23 7 16 12 23 17 23 7" />
+                <rect x="1" y="5" width="15" height="14" rx="2" ry="2" />
+              </svg>
+            </div>
+            <div>
+              <p className="text-sm font-bold text-primary">โหมดนำเสนอ</p>
+              <p className="text-xs text-text-muted">สำหรับสาธิตและนำเสนอโปรเจกต์</p>
+            </div>
+          </div>
+
+          <p className="text-xs text-text-muted leading-relaxed mb-4">
+            กดปุ่ม <strong className="text-text">โหลดข้อมูลสาธิต</strong> เพื่อดูตัวอย่างรายงานความก้าวหน้าที่สมบูรณ์
+            ข้อมูลนี้เป็นตัวอย่างเท่านั้น ({DEMO_ATTEMPT_COUNT} ครั้ง ครอบคลุม 7 ระดับ)
+            ไม่ใช่ข้อมูลการฝึกจริงของเด็ก
+          </p>
+
+          {/* Confirm: load demo */}
+          {showDemoConfirm && (
+            <div className="bg-surface border border-secondary/30 rounded-xl p-4 mb-4 text-center">
+              <p className="text-sm font-semibold text-text mb-1">แทนที่ข้อมูลปัจจุบันด้วยข้อมูลสาธิต?</p>
+              <p className="text-xs text-text-muted mb-4">
+                ข้อมูลการฝึกที่มีอยู่ {summary.totalAttempts} ครั้งจะถูกแทนที่
+              </p>
+              <div className="flex gap-3 justify-center">
+                <button
+                  onClick={() => setShowDemoConfirm(false)}
+                  className="px-5 py-2 rounded-xl border border-border text-text-muted font-medium text-sm hover:bg-gray-50 dark:hover:bg-white/5 transition-all"
+                >
+                  ยกเลิก
+                </button>
+                <button
+                  onClick={handleConfirmLoadDemo}
+                  className="px-5 py-2 rounded-xl bg-primary text-white font-semibold text-sm hover:bg-primary/90 transition-all"
+                >
+                  โหลดเลย
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* Confirm: reset */}
+          {showResetConfirm && (
+            <div className="bg-surface border border-error/25 rounded-xl p-4 mb-4 text-center">
+              <p className="text-sm font-semibold text-text mb-1">ล้างข้อมูลความก้าวหน้าทั้งหมด?</p>
+              <p className="text-xs text-text-muted mb-4">
+                การกระทำนี้ไม่สามารถยกเลิกได้
+              </p>
               <div className="flex gap-3 justify-center">
                 <button
                   onClick={() => setShowResetConfirm(false)}
@@ -409,21 +482,49 @@ export default function ProgressDashboardPage() {
                 </button>
                 <button
                   onClick={handleReset}
-                  className="px-5 py-2 rounded-xl bg-error text-white font-medium text-sm hover:bg-error/90 transition-all"
+                  className="px-5 py-2 rounded-xl bg-error text-white font-semibold text-sm hover:bg-error/90 transition-all"
                 >
                   ล้างข้อมูล
                 </button>
               </div>
             </div>
-          ) : (
-            <button
-              onClick={() => setShowResetConfirm(true)}
-              className="text-sm text-text-muted hover:text-error transition-colors"
-            >
-              ล้างข้อมูลสาธิต
-            </button>
           )}
-        </div>
+
+          {/* Action buttons */}
+          {!showDemoConfirm && !showResetConfirm && (
+            <div className="flex gap-3">
+              <button
+                onClick={handleLoadDemo}
+                className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl bg-primary text-white font-semibold text-sm hover:bg-primary/90 transition-all active:scale-[0.98] shadow-sm"
+              >
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                  <polyline points="7 10 12 15 17 10" />
+                  <line x1="12" y1="15" x2="12" y2="3" />
+                </svg>
+                โหลดข้อมูลสาธิต
+              </button>
+
+              <button
+                onClick={() => {
+                  setShowDemoConfirm(false);
+                  setShowResetConfirm(true);
+                }}
+                disabled={!isHydrated || summary.totalAttempts === 0}
+                className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl border border-error/40 text-error font-semibold text-sm hover:bg-error/8 transition-all active:scale-[0.98] disabled:opacity-40 disabled:cursor-not-allowed"
+              >
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                  <polyline points="3 6 5 6 21 6" />
+                  <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
+                  <path d="M10 11v6M14 11v6" />
+                </svg>
+                ล้างข้อมูล
+              </button>
+            </div>
+          )}
+        </section>
+
+        <div className="pb-8" />
 
       </div>
     </main>

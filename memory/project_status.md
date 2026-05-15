@@ -5,6 +5,7 @@ metadata:
   type: project
 ---
 
+Phase 9 (Demo Data / Presentation Mode) complete as of 2026-05-15.
 Phase 8 (Mock Speech Evaluation API Route) complete as of 2026-05-15.
 Phase 7 (AI Evaluation Service Preparation) complete as of 2026-05-15.
 

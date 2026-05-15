@@ -157,6 +157,14 @@ export function clearProgress(): void {
   }
 }
 
+/** Replace the entire progress snapshot (e.g., load demo data).
+ *  Updates the in-memory cache, persists to localStorage, and notifies subscribers. */
+export function replaceProgress(progress: SpeechProgress): void {
+  currentProgress = progress;
+  writeToLocalStorage(currentProgress);
+  notifyListeners();
+}
+
 // ── Selected sound store ──────────────────────────────────────────────────────
 // Separate from progress — just a string persisted in its own localStorage key.
 // Follows the same stable-reference pattern as the progress store.
