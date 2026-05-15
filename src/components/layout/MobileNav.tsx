@@ -7,9 +7,9 @@ import NavIcon, { type NavIconName } from "./NavIcon";
 const MOBILE_NAV: { href: string; label: string; icon: NavIconName; exact?: boolean }[] = [
   { href: "/", label: "หน้าแรก", icon: "home", exact: true },
   { href: "/training", label: "ฝึก", icon: "training" },
+  { href: "/library", label: "เนื้อหา", icon: "library" },
   { href: "/progress", label: "ก้าวหน้า", icon: "progress" },
   { href: "/rewards", label: "รางวัล", icon: "rewards" },
-  { href: "/report", label: "รายงาน", icon: "report" },
 ];
 
 export default function MobileNav() {

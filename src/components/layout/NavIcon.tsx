@@ -4,6 +4,7 @@ export type NavIconName =
   | "progress"
   | "rewards"
   | "report"
+  | "library"
   | "profile";
 
 interface Props {
@@ -66,6 +67,16 @@ export default function NavIcon({ name, active = false, size = 17 }: Props) {
         <polyline points="14 2 14 8 20 8" />
         <line x1="16" y1="13" x2="8" y2="13" />
         <line x1="16" y1="17" x2="8" y2="17" />
+      </svg>
+    );
+  }
+  if (name === "library") {
+    return (
+      <svg {...shared}>
+        <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" />
+        <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" />
+        <line x1="8" y1="7" x2="16" y2="7" />
+        <line x1="8" y1="11" x2="14" y2="11" />
       </svg>
     );
   }
