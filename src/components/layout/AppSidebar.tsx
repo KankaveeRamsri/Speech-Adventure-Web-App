@@ -17,6 +17,7 @@ const NAV_ITEMS: { href: string; label: string; icon: NavIconName; exact?: boole
   { href: "/progress", label: "ความก้าวหน้า", icon: "progress" },
   { href: "/rewards", label: "รางวัล", icon: "rewards" },
   { href: "/report", label: "รายงาน", icon: "report" },
+  { href: "/demo", label: " Showcase", icon: "demo" },
   { href: "/onboarding", label: "โปรไฟล์", icon: "profile" },
 ];
 
