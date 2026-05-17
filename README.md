@@ -1,36 +1,117 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Speech Adventure — แอปฝึกพูดสำหรับเด็ก
 
-## Getting Started
+เว็บแอปพลิเคชันช่วยฝึกออกเสียงภาษาสำหรับเด็ก สร้างด้วย [Next.js](https://nextjs.org) พร้อมระบบบันทึกความก้าวหน้า รางวัล และรายงานผลสำหรับนักบำบัดและผู้ปกครอง
 
-First, run the development server:
+---
+
+## ฟีเจอร์หลัก
+
+- **ฝึกออกเสียง** — บันทึกเสียงเด็กและประเมินผลด้วย AI แบบเรียลไทม์
+- **แผนที่การฝึก** — แบ่งเป็นด่านและระดับตามหลักสูตรเสียงพูด
+- **ติดตามความก้าวหน้า** — กราฟและสถิติแสดงพัฒนาการของเด็กแต่ละคน
+- **ระบบรางวัล** — ป้ายรางวัล (badge) เพื่อสร้างแรงจูงใจ
+- **คลังหลักสูตร** — ไลบรารีเสียงพูดพร้อมใช้งาน
+- **บันทึกการสังเกต** — เพิ่ม note ระหว่าง session สำหรับนักบำบัด
+- **รายงานผล** — สรุปและพิมพ์รายงานรายเซสชัน
+- **นำเข้า/ส่งออกข้อมูล** — สำรองและกู้คืนข้อมูลในเครื่อง
+- **โหมดสาธิต** — ทดลองใช้งานด้วยข้อมูลตัวอย่าง
+- **โหมดนำเสนอ** — แสดงผลแบบเต็มจอสำหรับสาธิต
+
+---
+
+## เทคโนโลยีที่ใช้
+
+| เทคโนโลยี | เวอร์ชัน |
+|---|---|
+| Next.js | 16.2.6 |
+| React | 19.2.4 |
+| TypeScript | ^5 |
+| Tailwind CSS | ^4 |
+
+---
+
+## การติดตั้งและรันโปรเจกต์
+
+### ข้อกำหนดเบื้องต้น
+
+- Node.js 18 ขึ้นไป
+- npm, yarn, pnpm หรือ bun
+
+### ติดตั้ง dependencies
+
+```bash
+npm install
+```
+
+### รันเซิร์ฟเวอร์สำหรับพัฒนา
 
 ```bash
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+เปิดเบราว์เซอร์ที่ [http://localhost:3000](http://localhost:3000)
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+### Build สำหรับ production
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+```bash
+npm run build
+npm run start
+```
 
-## Learn More
+---
 
-To learn more about Next.js, take a look at the following resources:
+## โครงสร้างโปรเจกต์
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+```
+src/
+├── app/                    # Next.js App Router pages
+│   ├── page.tsx            # หน้าแรก (landing)
+│   ├── onboarding/         # หน้าสร้างโปรไฟล์เด็ก
+│   ├── training/           # หน้าฝึกออกเสียง
+│   ├── progress/           # หน้าติดตามความก้าวหน้า
+│   ├── rewards/            # หน้ารางวัล
+│   ├── library/            # คลังหลักสูตรเสียงพูด
+│   ├── report/             # หน้ารายงานผล
+│   ├── demo/               # โหมดสาธิต
+│   └── api/speech/         # API ประเมินเสียงพูด
+├── components/             # React components
+│   ├── speech-adventure/   # คอมโพเนนต์หลักของแอป
+│   ├── layout/             # AppShell, Sidebar, NavBar
+│   ├── observations/       # บันทึกการสังเกต
+│   ├── report/             # คอมโพเนนต์รายงาน
+│   └── ui/                 # UI ทั่วไป (ThemeToggle ฯลฯ)
+├── hooks/                  # Custom React hooks
+├── lib/                    # Business logic และ utilities
+│   ├── speech-evaluation/  # ตรรกะการประเมินเสียง
+│   ├── rewards/            # คำนวณรางวัล
+│   ├── observations/       # จัดเก็บบันทึก
+│   └── local-data/         # นำเข้า/ส่งออกข้อมูล
+├── types/                  # TypeScript type definitions
+└── data/                   # ข้อมูลตัวอย่าง
+```
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+---
 
-## Deploy on Vercel
+## คำสั่ง npm ที่ใช้บ่อย
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+```bash
+npm run dev      # รัน development server
+npm run build    # Build สำหรับ production
+npm run start    # รัน production server
+npm run lint     # ตรวจสอบ code style
+```
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+---
+
+## ข้อมูลสำหรับนักพัฒนา
+
+- ข้อมูลผู้ใช้ทั้งหมดเก็บใน **localStorage** ของเบราว์เซอร์ (ไม่มี backend database)
+- การประเมินเสียงพูดใช้ทั้ง mock evaluator และ AI API จริง (`src/app/api/speech/evaluate/`)
+- รองรับ dark/light mode ผ่าน `ThemeProvider`
+- รองรับทั้ง desktop sidebar และ mobile bottom navigation
+
+---
+
+## ลิขสิทธิ์
+
+โปรเจกต์นี้เป็น private repository สงวนสิทธิ์ทั้งหมด
