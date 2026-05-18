@@ -113,7 +113,7 @@ function SectionLabel({ children }: { children: React.ReactNode }) {
 // ── Page ──────────────────────────────────────────────────────────────────────
 
 export default function ReportPage() {
-  const { summary, getStageStatus, getStageAttempts, isHydrated } = useSpeechProgress();
+  const { summary, getStageStatus, getStageAttempts, isHydrated, selectedSoundId } = useSpeechProgress();
   const { profile } = useChildProfile();
   const { recentNotes } = useObservationNotes();
 
@@ -125,7 +125,8 @@ export default function ReportPage() {
 
   const reportDate = isHydrated ? formatThaiDate(new Date()) : "";
 
-  const selectedSound = mockTargetSounds[0];
+  const selectedSound =
+    mockTargetSounds.find((s) => s.id === selectedSoundId) ?? mockTargetSounds[0];
 
   const stageData: StageRow[] = mockTrainingStages.map((stage) => {
     const status = getStageStatus(stage.id);

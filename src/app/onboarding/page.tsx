@@ -5,6 +5,8 @@ import { useRouter } from "next/navigation";
 import {
   saveProfile,
   getProfile,
+  clearProfile,
+  replaceProfile,
 } from "@/lib/child-profile/childProfileStorage";
 import { setSelectedSoundId } from "@/lib/speechProgressStorage";
 import { mockTargetSounds } from "@/data/speechAdventureMockData";
@@ -475,6 +477,10 @@ function DataManagerSection() {
         if (rawObs) {
           try { replaceObservations(JSON.parse(rawObs)); } catch { /* ignore */ }
         }
+        const rawProfile = localStorage.getItem("speech-adventure-profile-v1");
+        if (rawProfile) {
+          try { replaceProfile(JSON.parse(rawProfile)); } catch { /* ignore */ }
+        }
 
         setStorageInfo(getStorageSummary());
         flash("success", "นำเข้าข้อมูลสำเร็จ — ข้อมูลถูกกู้คืนแล้ว");
@@ -494,6 +500,7 @@ function DataManagerSection() {
   const handleClear = () => {
     clearProgress();
     clearObservations();
+    clearProfile();
     clearAllData();
     setStorageInfo(getStorageSummary());
     setConfirmState(null);

@@ -728,7 +728,7 @@ export default function ProgressDashboardPage() {
                 <p className="text-sm font-semibold text-text mb-1">ล้างข้อมูลความก้าวหน้าทั้งหมด?</p>
                 <p className="text-xs text-text-muted mb-4">การกระทำนี้ไม่สามารถยกเลิกได้</p>
                 <div className="flex gap-3 justify-center">
-                  <button onClick={() => setShowResetConfirm(false)} className="px-5 py-2 rounded-xl border border-border text-text-muted font-medium text-sm hover:bg-gray-50 dark:hover:bg-white/5 transition-all">ยกเล็ก</button>
+                  <button onClick={() => setShowResetConfirm(false)} className="px-5 py-2 rounded-xl border border-border text-text-muted font-medium text-sm hover:bg-gray-50 dark:hover:bg-white/5 transition-all">ยกเลิก</button>
                   <button onClick={handleReset} className="px-5 py-2 rounded-xl bg-error text-white font-semibold text-sm hover:bg-error/90 transition-all">ล้างข้อมูล</button>
                 </div>
               </div>

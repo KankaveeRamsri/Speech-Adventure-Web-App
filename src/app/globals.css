@@ -48,6 +48,13 @@ body {
   min-height: 100vh;
 }
 
+@media print {
+  body {
+    background: #ffffff !important;
+    color: #1a1a1a !important;
+  }
+}
+
 /* ── Scrollbar ── */
 ::-webkit-scrollbar { width: 5px; }
 ::-webkit-scrollbar-track { background: transparent; }

@@ -83,3 +83,13 @@ export function clearProfile(): void {
   currentProfile = null;
   notifyListeners();
 }
+
+export function replaceProfile(profile: ChildProfileData): void {
+  currentProfile = profile;
+  if (isBrowser()) {
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(profile));
+    } catch { /* ignore */ }
+  }
+  notifyListeners();
+}
