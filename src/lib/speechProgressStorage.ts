@@ -4,9 +4,11 @@ import type {
   PracticeSession,
   ProgressSummary,
 } from "@/types/speechAdventure";
+import { STORAGE_KEYS } from "@/lib/storage/storageKeys";
+import { localRead, localWrite, localRemove } from "@/lib/storage/local/localStorageClient";
 
-const STORAGE_KEY = "speech-adventure-progress-v1";
-const SOUND_STORAGE_KEY = "speech-adventure-selected-sound-v1";
+const STORAGE_KEY = STORAGE_KEYS.PROGRESS;
+const SOUND_STORAGE_KEY = STORAGE_KEYS.SELECTED_SOUND;
 
 const DEFAULT_CHILD_ID = "child-001";
 const DEFAULT_TARGET_SOUND = "ช";
@@ -55,7 +57,7 @@ function isBrowser(): boolean {
 
 function readFromLocalStorage(): SpeechProgress {
   try {
-    const raw = localStorage.getItem(STORAGE_KEY);
+    const raw = localRead(STORAGE_KEY);
     if (!raw) return SERVER_PROGRESS;
 
     const parsed = JSON.parse(raw) as SpeechProgress;
@@ -70,7 +72,7 @@ function readFromLocalStorage(): SpeechProgress {
   }
 }
 
-/** Populate currentProgress from localStorage exactly once per page load. */
+/** Populate currentProgress from storage exactly once per page load. */
 function initializeIfNeeded(): void {
   if (!isBrowser() || isClientInitialized) return;
   isClientInitialized = true;
@@ -78,12 +80,7 @@ function initializeIfNeeded(): void {
 }
 
 function writeToLocalStorage(progress: SpeechProgress): void {
-  if (!isBrowser()) return;
-  try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(progress));
-  } catch {
-    // Storage full or unavailable — silently fail for prototype
-  }
+  localWrite(STORAGE_KEY, JSON.stringify(progress));
 }
 
 // ── Pub-sub for useSyncExternalStore ─────────────────────────────────────────
@@ -147,20 +144,15 @@ export function addAttempt(attempt: PracticeAttempt): SpeechProgress {
   return currentProgress;
 }
 
-/** Clear all progress from localStorage and reset the in-memory cache. */
+/** Clear all progress from storage and reset the in-memory cache. */
 export function clearProgress(): void {
   if (!isBrowser()) return;
-
-  try {
-    localStorage.removeItem(STORAGE_KEY);
-    // Reassign to SERVER_PROGRESS — this IS a new reference vs real data,
-    // so Object.is detects the change and React re-renders once.
-    currentProgress = SERVER_PROGRESS;
-    // Keep isClientInitialized = true so we don't re-read a stale file.
-    notifyListeners();
-  } catch {
-    // Silently fail
-  }
+  localRemove(STORAGE_KEY);
+  // Reassign to SERVER_PROGRESS — this IS a new reference vs real data,
+  // so Object.is detects the change and React re-renders once.
+  currentProgress = SERVER_PROGRESS;
+  // Keep isClientInitialized = true so we don't re-read a stale entry.
+  notifyListeners();
 }
 
 /** Replace the entire progress snapshot (e.g., load demo data).
@@ -182,10 +174,8 @@ const soundListeners = new Set<() => void>();
 function initializeSoundIfNeeded(): void {
   if (!isBrowser() || isSoundInitialized) return;
   isSoundInitialized = true;
-  try {
-    const stored = localStorage.getItem(SOUND_STORAGE_KEY);
-    if (stored) currentSoundId = stored;
-  } catch { /* ignore */ }
+  const stored = localRead(SOUND_STORAGE_KEY);
+  if (stored) currentSoundId = stored;
 }
 
 export function subscribeToSelectedSound(callback: () => void): () => void {
@@ -204,9 +194,7 @@ export function getServerSoundId(): string {
 
 export function setSelectedSoundId(id: string): void {
   currentSoundId = id;
-  if (isBrowser()) {
-    try { localStorage.setItem(SOUND_STORAGE_KEY, id); } catch { /* ignore */ }
-  }
+  localWrite(SOUND_STORAGE_KEY, id);
   soundListeners.forEach((fn) => fn());
 }
 

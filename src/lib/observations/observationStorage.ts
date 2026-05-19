@@ -1,6 +1,8 @@
 import type { ObservationNote } from "@/types/observations";
+import { STORAGE_KEYS } from "@/lib/storage/storageKeys";
+import { localRead, localWrite, localRemove } from "@/lib/storage/local/localStorageClient";
 
-const STORAGE_KEY = "speech-adventure-observations-v1";
+const STORAGE_KEY = STORAGE_KEYS.OBSERVATIONS;
 
 // ── Stable snapshot pattern (matches speechProgressStorage / childProfileStorage) ─
 
@@ -16,7 +18,7 @@ function isBrowser(): boolean {
 
 function readFromLocalStorage(): ObservationNote[] {
   try {
-    const raw = localStorage.getItem(STORAGE_KEY);
+    const raw = localRead(STORAGE_KEY);
     if (!raw) return SERVER_OBSERVATIONS;
     const parsed = JSON.parse(raw) as ObservationNote[];
     if (!Array.isArray(parsed)) return SERVER_OBSERVATIONS;
@@ -33,10 +35,7 @@ function initializeIfNeeded(): void {
 }
 
 function writeToLocalStorage(notes: ObservationNote[]): void {
-  if (!isBrowser()) return;
-  try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(notes));
-  } catch { /* ignore */ }
+  localWrite(STORAGE_KEY, JSON.stringify(notes));
 }
 
 function notifyListeners(): void {
@@ -94,9 +93,7 @@ export function replaceObservations(notes: ObservationNote[]): void {
 
 export function clearObservations(): void {
   if (!isBrowser()) return;
-  try {
-    localStorage.removeItem(STORAGE_KEY);
-  } catch { /* ignore */ }
+  localRemove(STORAGE_KEY);
   currentObservations = SERVER_OBSERVATIONS;
   notifyListeners();
 }

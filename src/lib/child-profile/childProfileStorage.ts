@@ -1,4 +1,7 @@
-const STORAGE_KEY = "speech-adventure-profile-v1";
+import { STORAGE_KEYS } from "@/lib/storage/storageKeys";
+import { localRead, localWrite, localRemove } from "@/lib/storage/local/localStorageClient";
+
+const STORAGE_KEY = STORAGE_KEYS.PROFILE;
 
 export interface ChildProfileData {
   id: string;
@@ -29,7 +32,7 @@ function isBrowser(): boolean {
 
 function readFromLocalStorage(): ChildProfileData | null {
   try {
-    const raw = localStorage.getItem(STORAGE_KEY);
+    const raw = localRead(STORAGE_KEY);
     if (!raw) return null;
     const parsed = JSON.parse(raw) as ChildProfileData;
     if (!parsed || typeof parsed.name !== "string") return null;
@@ -67,29 +70,19 @@ export function getServerProfile(): ChildProfileData | null {
 
 export function saveProfile(profile: ChildProfileData): void {
   currentProfile = profile;
-  if (isBrowser()) {
-    try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(profile));
-    } catch { /* ignore */ }
-  }
+  localWrite(STORAGE_KEY, JSON.stringify(profile));
   notifyListeners();
 }
 
 export function clearProfile(): void {
   if (!isBrowser()) return;
-  try {
-    localStorage.removeItem(STORAGE_KEY);
-  } catch { /* ignore */ }
+  localRemove(STORAGE_KEY);
   currentProfile = null;
   notifyListeners();
 }
 
 export function replaceProfile(profile: ChildProfileData): void {
   currentProfile = profile;
-  if (isBrowser()) {
-    try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(profile));
-    } catch { /* ignore */ }
-  }
+  localWrite(STORAGE_KEY, JSON.stringify(profile));
   notifyListeners();
 }

@@ -8,7 +8,11 @@ import {
   clearProfile,
   replaceProfile,
 } from "@/lib/child-profile/childProfileStorage";
-import { setSelectedSoundId } from "@/lib/speechProgressStorage";
+import {
+  setSelectedSoundId,
+  replaceProgress,
+  clearProgress,
+} from "@/lib/speechProgressStorage";
 import { mockTargetSounds } from "@/data/speechAdventureMockData";
 import {
   exportData,
@@ -19,9 +23,11 @@ import {
 } from "@/lib/local-data/localDataBackup";
 import { loadDemoProgress } from "@/lib/demo/speechAdventureDemoData";
 import { DEMO_ATTEMPT_COUNT } from "@/lib/demo/speechAdventureDemoData";
-import { clearObservations } from "@/lib/observations/observationStorage";
-import { clearProgress, replaceProgress } from "@/lib/speechProgressStorage";
-import { replaceObservations } from "@/lib/observations/observationStorage";
+import {
+  clearObservations,
+  replaceObservations,
+} from "@/lib/observations/observationStorage";
+import { STORAGE_KEYS } from "@/lib/storage/storageKeys";
 
 type Step = 1 | 2 | 3 | 4 | 5;
 
@@ -468,18 +474,18 @@ function DataManagerSection() {
       const result = importData(backup);
 
       if (result.success) {
-        // Trigger storage subscribers to refresh
-        const rawProgress = localStorage.getItem("speech-adventure-progress-v1");
-        if (rawProgress) {
-          try { replaceProgress(JSON.parse(rawProgress)); } catch { /* ignore */ }
+        // importData wrote to localStorage, but the in-memory caches still hold
+        // the old snapshot. Push the backup data directly into each store so
+        // subscribers are notified with the correct new data.
+        const d = backup.data;
+        if (d[STORAGE_KEYS.PROGRESS]) {
+          try { replaceProgress(d[STORAGE_KEYS.PROGRESS] as Parameters<typeof replaceProgress>[0]); } catch { /* ignore */ }
         }
-        const rawObs = localStorage.getItem("speech-adventure-observations-v1");
-        if (rawObs) {
-          try { replaceObservations(JSON.parse(rawObs)); } catch { /* ignore */ }
+        if (d[STORAGE_KEYS.OBSERVATIONS]) {
+          try { replaceObservations(d[STORAGE_KEYS.OBSERVATIONS] as Parameters<typeof replaceObservations>[0]); } catch { /* ignore */ }
         }
-        const rawProfile = localStorage.getItem("speech-adventure-profile-v1");
-        if (rawProfile) {
-          try { replaceProfile(JSON.parse(rawProfile)); } catch { /* ignore */ }
+        if (d[STORAGE_KEYS.PROFILE]) {
+          try { replaceProfile(d[STORAGE_KEYS.PROFILE] as Parameters<typeof replaceProfile>[0]); } catch { /* ignore */ }
         }
 
         setStorageInfo(getStorageSummary());
