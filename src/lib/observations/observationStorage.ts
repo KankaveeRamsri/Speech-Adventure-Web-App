@@ -1,6 +1,7 @@
 import type { ObservationNote } from "@/types/observations";
 import { STORAGE_KEYS } from "@/lib/storage/storageKeys";
 import { localRead, localWrite, localRemove } from "@/lib/storage/local/localStorageClient";
+import { ObservationNotesArraySchema, parseOrDefault } from "@/lib/validation";
 
 const STORAGE_KEY = STORAGE_KEYS.OBSERVATIONS;
 
@@ -20,9 +21,12 @@ function readFromLocalStorage(): ObservationNote[] {
   try {
     const raw = localRead(STORAGE_KEY);
     if (!raw) return SERVER_OBSERVATIONS;
-    const parsed = JSON.parse(raw) as ObservationNote[];
-    if (!Array.isArray(parsed)) return SERVER_OBSERVATIONS;
-    return parsed;
+    return parseOrDefault(
+      ObservationNotesArraySchema,
+      JSON.parse(raw),
+      SERVER_OBSERVATIONS,
+      "observations",
+    ) as ObservationNote[];
   } catch {
     return SERVER_OBSERVATIONS;
   }

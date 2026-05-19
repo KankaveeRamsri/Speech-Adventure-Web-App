@@ -1,5 +1,6 @@
 import { STORAGE_KEYS } from "@/lib/storage/storageKeys";
 import { localRead, localWrite, localRemove } from "@/lib/storage/local/localStorageClient";
+import { ChildProfileDataSchema, parseOrNull } from "@/lib/validation";
 
 const STORAGE_KEY = STORAGE_KEYS.PROFILE;
 
@@ -34,9 +35,11 @@ function readFromLocalStorage(): ChildProfileData | null {
   try {
     const raw = localRead(STORAGE_KEY);
     if (!raw) return null;
-    const parsed = JSON.parse(raw) as ChildProfileData;
-    if (!parsed || typeof parsed.name !== "string") return null;
-    return parsed;
+    return parseOrNull(
+      ChildProfileDataSchema,
+      JSON.parse(raw),
+      "profile",
+    ) as ChildProfileData | null;
   } catch {
     return null;
   }

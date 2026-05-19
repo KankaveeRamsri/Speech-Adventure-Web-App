@@ -6,6 +6,7 @@ import type {
 } from "@/types/speechAdventure";
 import { STORAGE_KEYS } from "@/lib/storage/storageKeys";
 import { localRead, localWrite, localRemove } from "@/lib/storage/local/localStorageClient";
+import { SpeechProgressSchema, parseOrDefault } from "@/lib/validation";
 
 const STORAGE_KEY = STORAGE_KEYS.PROGRESS;
 const SOUND_STORAGE_KEY = STORAGE_KEYS.SELECTED_SOUND;
@@ -59,14 +60,12 @@ function readFromLocalStorage(): SpeechProgress {
   try {
     const raw = localRead(STORAGE_KEY);
     if (!raw) return SERVER_PROGRESS;
-
-    const parsed = JSON.parse(raw) as SpeechProgress;
-    if (!parsed || !Array.isArray(parsed.attempts)) return SERVER_PROGRESS;
-
-    // Backward compat: add sessions array if missing
-    if (!parsed.sessions) parsed.sessions = [];
-
-    return parsed;
+    return parseOrDefault(
+      SpeechProgressSchema,
+      JSON.parse(raw),
+      SERVER_PROGRESS,
+      "progress",
+    ) as SpeechProgress;
   } catch {
     return SERVER_PROGRESS;
   }
