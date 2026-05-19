@@ -2,24 +2,19 @@
 
 import { useCallback, useSyncExternalStore } from "react";
 import type { ObservationNote, ObservationCategory, ObservationTargetType } from "@/types/observations";
-import {
-  getObservations,
-  getServerObservations,
-  subscribeToObservations,
-  addObservation as storageAdd,
-  updateObservation as storageUpdate,
-  deleteObservation as storageDelete,
-} from "@/lib/observations/observationStorage";
+import { useRepositories } from "@/lib/providers/RepositoryProvider";
 
 function generateId(): string {
   return `obs-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
 }
 
 export function useObservationNotes(childId = "child-001") {
+  const { observations: repo } = useRepositories();
+
   const allNotes = useSyncExternalStore<ObservationNote[]>(
-    subscribeToObservations,
-    getObservations,
-    getServerObservations,
+    repo.subscribe.bind(repo),
+    repo.getNotes.bind(repo),
+    repo.getServerNotes.bind(repo),
   );
 
   const notes = allNotes.filter((n) => n.childId === childId);
@@ -44,24 +39,24 @@ export function useObservationNotes(childId = "child-001") {
         createdAt: now,
         updatedAt: now,
       };
-      storageAdd(note);
+      repo.addNote(note);
       return note;
     },
-    [childId],
+    [childId, repo],
   );
 
   const updateNote = useCallback(
     (id: string, changes: Partial<Pick<ObservationNote, "title" | "content" | "category">>) => {
       const existing = allNotes.find((n) => n.id === id);
       if (!existing) return;
-      storageUpdate({ ...existing, ...changes, updatedAt: new Date().toISOString() });
+      repo.updateNote({ ...existing, ...changes, updatedAt: new Date().toISOString() });
     },
-    [allNotes],
+    [allNotes, repo],
   );
 
   const deleteNote = useCallback((id: string) => {
-    storageDelete(id);
-  }, []);
+    repo.deleteNote(id);
+  }, [repo]);
 
   const getNotesForTarget = useCallback(
     (targetType: ObservationTargetType, targetId?: string) => {

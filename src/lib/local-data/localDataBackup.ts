@@ -6,24 +6,16 @@
  * to avoid a jarring experience after resetting content data.
  */
 
+import { DATA_KEYS, PREFERENCE_KEYS, STORAGE_KEYS } from "@/lib/storage/storageKeys";
+
+// Re-export so existing callers (`onboarding/page.tsx` etc.) can still
+// access DATA_KEYS / PREFERENCE_KEYS from this module if needed.
+export { DATA_KEYS, PREFERENCE_KEYS };
+
 // ── Backup metadata ────────────────────────────────────────────────────────────
 
 const APP_NAME = "Speech Adventure";
 const BACKUP_VERSION = 1;
-
-// Keys that contain user content (exported / cleared)
-const DATA_KEYS = [
-  "speech-adventure-progress-v1",
-  "speech-adventure-selected-sound-v1",
-  "speech-adventure-profile-v1",
-  "speech-adventure-observations-v1",
-] as const;
-
-// UI preference keys — kept on clear for smoother UX
-const PREFERENCE_KEYS = [
-  "speech-adventure-sidebar-collapsed",
-  "speech-adventure-theme",
-] as const;
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -210,9 +202,9 @@ export function getStorageSummary(): {
     return { hasProfile: false, hasProgress: false, hasObservations: false, totalKeys: 0 };
   }
 
-  const profile = localStorage.getItem("speech-adventure-profile-v1");
-  const progress = localStorage.getItem("speech-adventure-progress-v1");
-  const observations = localStorage.getItem("speech-adventure-observations-v1");
+  const profile = localStorage.getItem(STORAGE_KEYS.PROFILE);
+  const progress = localStorage.getItem(STORAGE_KEYS.PROGRESS);
+  const observations = localStorage.getItem(STORAGE_KEYS.OBSERVATIONS);
 
   let totalKeys = 0;
   for (const key of DATA_KEYS) {

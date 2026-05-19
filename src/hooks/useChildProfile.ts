@@ -1,13 +1,7 @@
 "use client";
 
 import { useSyncExternalStore } from "react";
-import {
-  subscribeToProfile,
-  getProfile,
-  getServerProfile,
-  saveProfile,
-  clearProfile,
-} from "@/lib/child-profile/childProfileStorage";
+import { useRepositories } from "@/lib/providers/RepositoryProvider";
 import type { ChildProfileData } from "@/lib/child-profile/childProfileStorage";
 
 export type { ChildProfileData };
@@ -18,10 +12,12 @@ const clientTrue = () => true as const;
 const serverFalse = () => false as const;
 
 export function useChildProfile() {
+  const { profile: repo } = useRepositories();
+
   const profile = useSyncExternalStore(
-    subscribeToProfile,
-    getProfile,
-    getServerProfile
+    repo.subscribe.bind(repo),
+    repo.getProfile.bind(repo),
+    repo.getServerProfile.bind(repo),
   );
 
   // false during SSR + hydration, true right after — matches the server snapshot.
@@ -31,7 +27,7 @@ export function useChildProfile() {
     profile,
     hasProfile: profile !== null,
     isHydrated,
-    saveProfile,
-    clearProfile,
+    saveProfile: (data: ChildProfileData) => repo.saveProfile(data),
+    clearProfile: () => repo.clearProfile(),
   };
 }

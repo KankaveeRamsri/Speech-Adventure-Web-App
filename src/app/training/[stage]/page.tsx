@@ -45,13 +45,15 @@ export default function PracticePage() {
   useEffect(() => {
     if (!isHydrated || !stage || items.length === 0 || sessionStarted.current) return;
     sessionStarted.current = true;
-    const session = startSession({
-      childId: "child-001",
-      targetSound: selectedSoundId,
-      stageId: stageSlug,
-      totalMissions: items.length,
-    });
-    setActiveSession(session);
+    void (async () => {
+      const session = await startSession({
+        childId: "child-001",
+        targetSound: selectedSoundId,
+        stageId: stageSlug,
+        totalMissions: items.length,
+      });
+      setActiveSession(session);
+    })();
   }, [isHydrated, stage, stageSlug, items.length, selectedSoundId, startSession]);
 
   const handleSaveAttempt = useCallback(
@@ -71,8 +73,9 @@ export default function PracticePage() {
     } else {
       // Complete the session when all missions are done
       if (activeSession) {
-        const completed = completeSession(activeSession.id);
-        if (completed) setCompletedSession(completed);
+        void completeSession(activeSession.id).then((completed) => {
+          if (completed) setCompletedSession(completed);
+        });
       }
       setShowCompletion(true);
     }
@@ -91,13 +94,15 @@ export default function PracticePage() {
     setCompletedSession(null);
     // Start a new session for retry
     sessionStarted.current = true;
-    const session = startSession({
-      childId: "child-001",
-      targetSound: selectedSoundId,
-      stageId: stageSlug,
-      totalMissions: items.length,
-    });
-    setActiveSession(session);
+    void (async () => {
+      const session = await startSession({
+        childId: "child-001",
+        targetSound: selectedSoundId,
+        stageId: stageSlug,
+        totalMissions: items.length,
+      });
+      setActiveSession(session);
+    })();
   }, [stageSlug, selectedSoundId, items.length, startSession]);
 
   /* ── Not found ── */
