@@ -5,6 +5,12 @@ metadata:
   type: project
 ---
 
+Phase 26 (Supabase Repository Adapter Drafts) complete as of 2026-05-20. TypeScript fix: `Db*` row types must be `type` aliases (not `interface`) so they get implicit index signatures and satisfy `Record<string, unknown>` required by supabase-js v2 `GenericTable` constraint. Also `InsertChildProfile` needs optional `id?: string` for upsert-with-id calls.
+
+Phase 25 (Supabase Database Migration Foundation) complete as of 2026-05-20. SQL migrations 001–006 in `supabase/migrations/`.
+
+Phase 24 (Supabase Auth Foundation) complete as of 2026-05-20. AuthProvider, useAuth, AuthGuard, sign-in/sign-up pages at `/auth/signin` and `/auth/signup` with redirect aliases at `/sign-in` and `/sign-up`.
+
 Phase 11 (Onboarding and Child Profile Setup) complete as of 2026-05-15.
 Phase 10 (Parent/Teacher Report View) complete as of 2026-05-15.
 Phase 9 (Demo Data / Presentation Mode) complete as of 2026-05-15.

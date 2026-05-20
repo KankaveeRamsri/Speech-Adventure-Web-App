@@ -2,58 +2,218 @@ import type { IObservationRepository } from "@/lib/repositories/IObservationRepo
 import type { ObservationNote } from "@/types/observations";
 import type { SupabaseClient } from "@/lib/supabase/client";
 import type { Database } from "@/types/supabase";
+import { dbToDomainNote, domainToDbNote } from "./mappers";
+import { QueryError, warnRepo } from "./errors";
+
+// ── Stable server snapshot ────────────────────────────────────────────────────
+const SERVER_NOTES: ObservationNote[] = [];
 
 /**
  * Supabase-backed implementation of IObservationRepository.
  *
- * NOT IMPLEMENTED — Phase 3 placeholder.
+ * Cache strategy:
+ *  • Hydrates on first subscribe() call — fetches all notes for the current user's child
+ *  • Cache is replaced (new array reference) on every mutation so
+ *    useSyncExternalStore detects changes correctly
+ *  • Notes are RLS-filtered by child_id on the DB side (via is_own_child())
  *
- * ── Implementation guide (Phase 3) ──────────────────────────────────────────
- * 1. Constructor receives a SupabaseClient<Database>
- * 2. getNotes() queries observation_notes WHERE child_id = <active child>
- *    — Supabase can filter at DB level (vs loading all then filtering in-memory)
- * 3. addNote() → insert into observation_notes with domainToDbNote() mapping
- * 4. updateNote() → update WHERE id = note.id AND author_id = auth.uid()
- * 5. deleteNote() → delete WHERE id = note.id
- * 6. Note: target_id is UUID in DB; string IDs from localStorage need migration
- *    See: docs/architecture/database-schema.md — "Note: target_id เปลี่ยนจาก string เป็น uuid"
- * ────────────────────────────────────────────────────────────────────────────
+ * Note on author_id:
+ *  The domain ObservationNote does not carry authorId — it is injected from
+ *  auth.getUser() at write time. The DB author_id column stores who wrote each note.
+ *
+ * Note on target_id:
+ *  In localStorage, target_id is a string (e.g. "session-1716134400000-abc12").
+ *  In Supabase the column is uuid. String → UUID migration happens in Phase 3/4.
+ *  For now, target_id is stored as-is and the DB column accepts nulls; non-UUID
+ *  strings will cause a DB error at insert time if target_id is non-null.
+ *  TODO (Phase 27): migrate string target_ids to UUIDs before writing to Supabase.
  */
 export class SupabaseObservationRepository implements IObservationRepository {
-  constructor(
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    private readonly client: SupabaseClient<Database>,
-  ) {}
+  private _cache: ObservationNote[] = SERVER_NOTES;
+  private readonly _listeners = new Set<() => void>();
+  private _hydrated = false;
+  private _hydratePromise: Promise<void> | null = null;
+
+  constructor(private readonly client: SupabaseClient<Database>) {}
+
+  // ── useSyncExternalStore plumbing ─────────────────────────────────────────
 
   getNotes(): ObservationNote[] {
-    throw new Error("SupabaseObservationRepository.getNotes: not implemented (Phase 3)");
+    return this._cache;
   }
 
   getServerNotes(): ObservationNote[] {
-    throw new Error("SupabaseObservationRepository.getServerNotes: not implemented (Phase 3)");
+    return SERVER_NOTES;
   }
 
-  subscribe(_callback: () => void): () => void {
-    throw new Error("SupabaseObservationRepository.subscribe: not implemented (Phase 3)");
+  subscribe(callback: () => void): () => void {
+    this._listeners.add(callback);
+    this._triggerHydrate();
+
+    return () => {
+      this._listeners.delete(callback);
+    };
   }
 
-  async addNote(_note: ObservationNote): Promise<void> {
-    throw new Error("SupabaseObservationRepository.addNote: not implemented (Phase 3)");
+  // ── Write operations ──────────────────────────────────────────────────────
+
+  async addNote(note: ObservationNote): Promise<void> {
+    // Optimistic update — add to cache before the network round-trip
+    this._setCache([...this._cache, note]);
+
+    const authorId = await this._getCurrentUserId();
+    if (!authorId) {
+      warnRepo("SupabaseObservationRepository.addNote", "no auth user — note added to cache only");
+      return;
+    }
+
+    const { error } = await this.client
+      .from("observation_notes")
+      .insert(domainToDbNote(note, authorId));
+
+    if (error) {
+      warnRepo("SupabaseObservationRepository.addNote", new QueryError("observation_notes", "insert", error));
+      // Roll back optimistic update on failure
+      this._setCache(this._cache.filter((n) => n.id !== note.id));
+    }
   }
 
-  async updateNote(_updated: ObservationNote): Promise<void> {
-    throw new Error("SupabaseObservationRepository.updateNote: not implemented (Phase 3)");
+  async updateNote(updated: ObservationNote): Promise<void> {
+    const previous = this._cache;
+    this._setCache(this._cache.map((n) => (n.id === updated.id ? updated : n)));
+
+    const { error } = await this.client
+      .from("observation_notes")
+      .update({
+        target_type: updated.targetType,
+        target_id: updated.targetId ?? null,
+        category: updated.category,
+        title: updated.title,
+        content: updated.content,
+      })
+      .eq("id", updated.id);
+
+    if (error) {
+      warnRepo("SupabaseObservationRepository.updateNote", new QueryError("observation_notes", "update", error));
+      // Roll back on failure
+      this._setCache(previous);
+    }
   }
 
-  async deleteNote(_id: string): Promise<void> {
-    throw new Error("SupabaseObservationRepository.deleteNote: not implemented (Phase 3)");
+  async deleteNote(id: string): Promise<void> {
+    const previous = this._cache;
+    this._setCache(this._cache.filter((n) => n.id !== id));
+
+    const { error } = await this.client
+      .from("observation_notes")
+      .delete()
+      .eq("id", id);
+
+    if (error) {
+      warnRepo("SupabaseObservationRepository.deleteNote", new QueryError("observation_notes", "delete", error));
+      // Roll back on failure
+      this._setCache(previous);
+    }
   }
 
-  async replaceNotes(_notes: ObservationNote[]): Promise<void> {
-    throw new Error("SupabaseObservationRepository.replaceNotes: not implemented (Phase 3)");
+  async replaceNotes(notes: ObservationNote[]): Promise<void> {
+    this._setCache(notes);
+
+    const authorId = await this._getCurrentUserId();
+    if (!authorId) {
+      warnRepo("SupabaseObservationRepository.replaceNotes", "no auth user — cache only");
+      return;
+    }
+
+    // Get child_id for the current user
+    const childId = await this._getChildId();
+    if (!childId) return;
+
+    // Delete existing and re-insert (upsert by id is also an option)
+    const { error: delError } = await this.client
+      .from("observation_notes")
+      .delete()
+      .eq("child_id", childId);
+
+    if (delError) {
+      warnRepo("SupabaseObservationRepository.replaceNotes", new QueryError("observation_notes", "delete", delError));
+      return;
+    }
+
+    if (notes.length === 0) return;
+
+    const { error: insError } = await this.client
+      .from("observation_notes")
+      .insert(notes.map((n) => domainToDbNote(n, authorId)));
+
+    if (insError) {
+      warnRepo("SupabaseObservationRepository.replaceNotes", new QueryError("observation_notes", "insert", insError));
+    }
   }
 
   async clearNotes(): Promise<void> {
-    throw new Error("SupabaseObservationRepository.clearNotes: not implemented (Phase 3)");
+    this._setCache(SERVER_NOTES);
+
+    const childId = await this._getChildId();
+    if (!childId) return;
+
+    const { error } = await this.client
+      .from("observation_notes")
+      .delete()
+      .eq("child_id", childId);
+
+    if (error) {
+      warnRepo("SupabaseObservationRepository.clearNotes", new QueryError("observation_notes", "delete", error));
+    }
+  }
+
+  // ── Private helpers ───────────────────────────────────────────────────────
+
+  private _setCache(notes: ObservationNote[]): void {
+    this._cache = notes;
+    this._notify();
+  }
+
+  private _notify(): void {
+    this._listeners.forEach((cb) => cb());
+  }
+
+  private _triggerHydrate(): void {
+    if (this._hydratePromise) return;
+    this._hydratePromise = this._hydrate().catch((err) => {
+      warnRepo("SupabaseObservationRepository._hydrate", err);
+    });
+  }
+
+  private async _hydrate(): Promise<void> {
+    // RLS on observation_notes uses is_own_child(child_id) — the DB filters for us.
+    const { data, error } = await this.client
+      .from("observation_notes")
+      .select("*")
+      .order("created_at", { ascending: false });
+
+    if (error) {
+      warnRepo("SupabaseObservationRepository._hydrate", new QueryError("observation_notes", "select", error));
+      this._hydrated = true;
+      return;
+    }
+
+    this._cache = (data ?? []).map(dbToDomainNote);
+    this._hydrated = true;
+    this._notify();
+  }
+
+  private async _getCurrentUserId(): Promise<string | null> {
+    const { data } = await this.client.auth.getUser();
+    return data.user?.id ?? null;
+  }
+
+  private async _getChildId(): Promise<string | null> {
+    const { data } = await this.client
+      .from("child_profiles")
+      .select("id")
+      .limit(1)
+      .maybeSingle();
+    return data?.id ?? null;
   }
 }

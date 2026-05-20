@@ -25,7 +25,7 @@ import type {
 
 // ── Insert types (server-generated fields become optional) ────────────────────
 
-export type InsertChildProfile = Omit<DbChildProfile, "id" | "created_at" | "updated_at">;
+export type InsertChildProfile = Omit<DbChildProfile, "id" | "created_at" | "updated_at"> & { id?: string };
 export type InsertPracticeSession = Omit<DbPracticeSession, "id" | "created_at">;
 export type InsertPracticeAttempt = Omit<DbPracticeAttempt, "id" | "created_at">;
 export type InsertObservationNote = Omit<DbObservationNote, "id" | "created_at" | "updated_at">;

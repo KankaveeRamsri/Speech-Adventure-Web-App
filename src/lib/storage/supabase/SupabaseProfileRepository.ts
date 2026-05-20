@@ -2,48 +2,141 @@ import type { IProfileRepository } from "@/lib/repositories/IProfileRepository";
 import type { ChildProfileData } from "@/lib/child-profile/childProfileStorage";
 import type { SupabaseClient } from "@/lib/supabase/client";
 import type { Database } from "@/types/supabase";
+import { dbToDomainProfile, domainToDbProfile } from "./mappers";
+import { QueryError, warnRepo } from "./errors";
+
+// ── Stable server snapshot (no profile on the server — no auth context) ───────
+const SERVER_PROFILE: ChildProfileData | null = null;
 
 /**
  * Supabase-backed implementation of IProfileRepository.
  *
- * NOT IMPLEMENTED — Phase 3 placeholder.
+ * Cache strategy (mirrors the stable-snapshot pattern from childProfileStorage):
+ *  • `_cache` holds the current in-memory profile (null = no profile / not yet loaded)
+ *  • `subscribe()` triggers a one-time async hydration from Supabase
+ *  • When hydration resolves the cache is updated and listeners are notified
+ *  • Write operations (save/replace/clear) update the cache synchronously,
+ *    then persist to Supabase asynchronously
  *
- * ── Implementation guide (Phase 3) ──────────────────────────────────────────
- * 1. Constructor receives a SupabaseClient<Database>
- * 2. getProfile() queries child_profiles WHERE user_id = auth.uid()
- * 3. Each user has exactly one profile (unique index on user_id)
- * 4. saveProfile() → upsert into child_profiles with domainToDbProfile() mapping
- * 5. subscribe() uses supabase.channel() realtime for live profile sync
- * 6. For SSR hydration, getServerProfile() always returns null (no server-side auth yet)
- * ────────────────────────────────────────────────────────────────────────────
+ * useSyncExternalStore compatibility:
+ *  • `getProfile()` always returns the same object reference between writes
+ *  • A new object is assigned only when data actually changes
+ *
+ * TODO (activation): verify that `getSupabaseClient()` is called only after
+ * the browser auth session is ready (AuthProvider.isLoading = false).
  */
 export class SupabaseProfileRepository implements IProfileRepository {
-  constructor(
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    private readonly client: SupabaseClient<Database>,
-  ) {}
+  private _cache: ChildProfileData | null = null;
+  private readonly _listeners = new Set<() => void>();
+  private _hydrated = false;
+  private _hydratePromise: Promise<void> | null = null;
+
+  constructor(private readonly client: SupabaseClient<Database>) {}
+
+  // ── useSyncExternalStore plumbing ─────────────────────────────────────────
 
   getProfile(): ChildProfileData | null {
-    throw new Error("SupabaseProfileRepository.getProfile: not implemented (Phase 3)");
+    return this._cache;
   }
 
   getServerProfile(): ChildProfileData | null {
-    throw new Error("SupabaseProfileRepository.getServerProfile: not implemented (Phase 3)");
+    return SERVER_PROFILE;
   }
 
-  subscribe(_callback: () => void): () => void {
-    throw new Error("SupabaseProfileRepository.subscribe: not implemented (Phase 3)");
+  subscribe(callback: () => void): () => void {
+    this._listeners.add(callback);
+    this._triggerHydrate();
+
+    return () => {
+      this._listeners.delete(callback);
+    };
   }
 
-  async saveProfile(_profile: ChildProfileData): Promise<void> {
-    throw new Error("SupabaseProfileRepository.saveProfile: not implemented (Phase 3)");
+  // ── Write operations ──────────────────────────────────────────────────────
+
+  async saveProfile(profile: ChildProfileData): Promise<void> {
+    // Optimistic: update cache immediately so UI is responsive
+    this._setCache(profile);
+
+    const userId = await this._getCurrentUserId();
+    if (!userId) {
+      warnRepo("SupabaseProfileRepository.saveProfile", "no auth user — profile saved to cache only");
+      return;
+    }
+
+    const { error } = await this.client
+      .from("child_profiles")
+      .upsert(
+        // id comes from the domain profile — preserve it for future idempotency
+        { id: profile.id, ...domainToDbProfile(profile, userId) },
+        { onConflict: "user_id" },
+      );
+
+    if (error) {
+      warnRepo("SupabaseProfileRepository.saveProfile", new QueryError("child_profiles", "upsert", error));
+    }
   }
 
-  async replaceProfile(_profile: ChildProfileData): Promise<void> {
-    throw new Error("SupabaseProfileRepository.replaceProfile: not implemented (Phase 3)");
+  async replaceProfile(profile: ChildProfileData): Promise<void> {
+    // replaceProfile is semantically identical to saveProfile for Supabase
+    // (both upsert by user_id). Kept separate to preserve the interface contract.
+    await this.saveProfile(profile);
   }
 
   async clearProfile(): Promise<void> {
-    throw new Error("SupabaseProfileRepository.clearProfile: not implemented (Phase 3)");
+    this._setCache(null);
+
+    const userId = await this._getCurrentUserId();
+    if (!userId) return;
+
+    const { error } = await this.client
+      .from("child_profiles")
+      .delete()
+      .eq("user_id", userId);
+
+    if (error) {
+      warnRepo("SupabaseProfileRepository.clearProfile", new QueryError("child_profiles", "delete", error));
+    }
+  }
+
+  // ── Private helpers ───────────────────────────────────────────────────────
+
+  private _setCache(value: ChildProfileData | null): void {
+    this._cache = value;
+    this._notify();
+  }
+
+  private _notify(): void {
+    this._listeners.forEach((cb) => cb());
+  }
+
+  private _triggerHydrate(): void {
+    if (this._hydratePromise) return;
+    this._hydratePromise = this._hydrate().catch((err) => {
+      warnRepo("SupabaseProfileRepository._hydrate", err);
+    });
+  }
+
+  private async _hydrate(): Promise<void> {
+    const { data, error } = await this.client
+      .from("child_profiles")
+      .select("*")
+      .limit(1)
+      .maybeSingle();
+
+    if (error) {
+      warnRepo("SupabaseProfileRepository._hydrate", new QueryError("child_profiles", "select", error));
+      this._hydrated = true;
+      return;
+    }
+
+    this._cache = data ? dbToDomainProfile(data) : null;
+    this._hydrated = true;
+    this._notify();
+  }
+
+  private async _getCurrentUserId(): Promise<string | null> {
+    const { data } = await this.client.auth.getUser();
+    return data.user?.id ?? null;
   }
 }

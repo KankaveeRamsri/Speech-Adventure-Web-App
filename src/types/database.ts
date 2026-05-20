@@ -15,7 +15,7 @@
 
 // ── child_profiles ────────────────────────────────────────────────────────────
 
-export interface DbChildProfile {
+export type DbChildProfile = {
   id: string;
   user_id: string;
   name: string;
@@ -26,13 +26,13 @@ export interface DbChildProfile {
   avatar_emoji: string;
   created_at: string;
   updated_at: string;
-}
+};
 
 // ── practice_sessions ─────────────────────────────────────────────────────────
 
 export type DbSessionStatus = "active" | "completed" | "abandoned";
 
-export interface DbPracticeSession {
+export type DbPracticeSession = {
   id: string;
   child_id: string;
   target_sound: string;
@@ -46,13 +46,13 @@ export interface DbPracticeSession {
   stars_earned: number;
   status: DbSessionStatus;
   created_at: string;
-}
+};
 
 // ── practice_attempts ─────────────────────────────────────────────────────────
 
 export type DbEvaluationStatus = "passed" | "almost" | "retry";
 
-export interface DbPracticeAttempt {
+export type DbPracticeAttempt = {
   id: string;
   child_id: string;
   session_id: string | null;
@@ -70,7 +70,7 @@ export interface DbPracticeAttempt {
   is_mock: boolean;
   audio_path: string | null;
   created_at: string;
-}
+};
 
 // ── observation_notes ─────────────────────────────────────────────────────────
 
@@ -82,7 +82,7 @@ export type DbObservationCategory =
   | "recommendation"
   | "other";
 
-export interface DbObservationNote {
+export type DbObservationNote = {
   id: string;
   child_id: string;
   author_id: string;
@@ -93,4 +93,4 @@ export interface DbObservationNote {
   content: string;
   created_at: string;
   updated_at: string;
-}
+};
