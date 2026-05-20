@@ -1,10 +1,11 @@
 "use client";
 
+import Link from "next/link";
 import { useSyncPlanPreview } from "@/hooks/useSyncPlanPreview";
 import type { StorageProvider } from "@/lib/config/storageProvider";
 import type { SyncDomainPlan } from "@/lib/sync/syncPlan";
 
-// ── SVG icons (no emoji) ──────────────────────────────────────────────────────
+// ── SVG icons ────────────────────────────────────────────────────────────────
 
 function DeviceIcon() {
   return (
@@ -15,9 +16,9 @@ function DeviceIcon() {
   );
 }
 
-function CloudIcon() {
+function CloudIcon({ size = 14 }: { size?: number }) {
   return (
-    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
       <path d="M18 10h-1.26A8 8 0 1 0 9 20h9a5 5 0 0 0 0-10z" />
     </svg>
   );
@@ -32,9 +33,9 @@ function CheckCircleIcon() {
   );
 }
 
-function AlertTriangleIcon() {
+function AlertTriangleIcon({ size = 14 }: { size?: number }) {
   return (
-    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
       <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
       <line x1="12" y1="9" x2="12" y2="13" />
       <line x1="12" y1="17" x2="12.01" y2="17" />
@@ -42,9 +43,9 @@ function AlertTriangleIcon() {
   );
 }
 
-function UserIcon() {
+function UserIcon({ size = 14 }: { size?: number }) {
   return (
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
       <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
       <circle cx="12" cy="7" r="4" />
     </svg>
@@ -72,7 +73,7 @@ function ClipboardIcon() {
 
 function LockIcon() {
   return (
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
       <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
       <path d="M7 11V7a5 5 0 0 1 10 0v4" />
     </svg>
@@ -88,7 +89,17 @@ function ArrowRightIcon() {
   );
 }
 
-// ── Provider label helpers ─────────────────────────────────────────────────────
+function LogInIcon() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4" />
+      <polyline points="10 17 15 12 10 7" />
+      <line x1="15" y1="12" x2="3" y2="12" />
+    </svg>
+  );
+}
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
 
 function providerLabel(p: StorageProvider): string {
   if (p === "supabase") return "Supabase Cloud";
@@ -109,32 +120,77 @@ function domainLabel(d: SyncDomainPlan["domain"]): string {
 }
 
 function DomainIcon({ domain }: { domain: SyncDomainPlan["domain"] }) {
-  if (domain === "profile") return <UserIcon />;
+  if (domain === "profile") return <UserIcon size={16} />;
   if (domain === "progress") return <BarChartIcon />;
   return <ClipboardIcon />;
 }
 
-// ── Skeleton placeholder ──────────────────────────────────────────────────────
+// ── Skeleton ──────────────────────────────────────────────────────────────────
 
 function SkeletonBlock({ className = "" }: { className?: string }) {
+  return <div className={`rounded-lg bg-border/60 animate-pulse ${className}`} aria-hidden="true" />;
+}
+
+// ── Auth status row ───────────────────────────────────────────────────────────
+
+interface AuthStatusRowProps {
+  isAuthLoading: boolean;
+  isAuthenticated: boolean;
+  userEmail: string | null;
+  isSupabaseEnvSet: boolean;
+}
+
+function AuthStatusRow({ isAuthLoading, isAuthenticated, userEmail, isSupabaseEnvSet }: AuthStatusRowProps) {
+  if (isAuthLoading) {
+    return (
+      <div className="flex items-center gap-2 px-3 py-2.5 rounded-xl bg-surface border border-border">
+        <SkeletonBlock className="w-4 h-4 rounded-full" />
+        <SkeletonBlock className="h-3.5 w-32" />
+      </div>
+    );
+  }
+
+  if (isAuthenticated && userEmail) {
+    return (
+      <div className="flex items-center gap-2 px-3 py-2.5 rounded-xl bg-success/6 border border-success/20">
+        <span className="text-success flex-shrink-0"><CheckCircleIcon /></span>
+        <div className="min-w-0">
+          <span className="text-xs font-semibold text-text">เข้าสู่ระบบแล้ว</span>
+          <span className="text-xs text-text-muted ml-1.5 truncate">{userEmail}</span>
+        </div>
+      </div>
+    );
+  }
+
+  // Not authenticated
   return (
-    <div
-      className={`rounded-lg bg-border/60 animate-pulse ${className}`}
-      aria-hidden="true"
-    />
+    <div className="flex items-center justify-between gap-3 px-3 py-2.5 rounded-xl bg-surface border border-border">
+      <div className="flex items-center gap-2 text-text-muted">
+        <UserIcon size={14} />
+        <span className="text-xs">ยังไม่ได้เข้าสู่ระบบ</span>
+      </div>
+      {isSupabaseEnvSet && (
+        <Link
+          href="/auth/signin"
+          className="inline-flex items-center gap-1 text-xs font-semibold text-primary hover:text-primary/80 transition-colors flex-shrink-0"
+        >
+          <LogInIcon />
+          เข้าสู่ระบบ
+        </Link>
+      )}
+    </div>
   );
 }
 
-// ── Domain count card ─────────────────────────────────────────────────────────
+// ── Domain cards ──────────────────────────────────────────────────────────────
 
 interface DomainCardProps {
   domain: SyncDomainPlan["domain"];
   recordCount: number;
   syncOrder: number;
-  isHydrated: boolean;
 }
 
-function DomainCard({ domain, recordCount, syncOrder, isHydrated }: DomainCardProps) {
+function DomainCard({ domain, recordCount, syncOrder }: DomainCardProps) {
   return (
     <div className="bg-surface border border-border rounded-xl p-4 flex flex-col gap-2">
       <div className="flex items-center justify-between">
@@ -146,37 +202,22 @@ function DomainCard({ domain, recordCount, syncOrder, isHydrated }: DomainCardPr
           ลำดับ {syncOrder}
         </span>
       </div>
-      {isHydrated ? (
-        <p className="text-2xl font-bold text-text">
-          {recordCount}
-          <span className="text-sm font-medium text-text-muted ml-1">รายการ</span>
-        </p>
-      ) : (
-        <SkeletonBlock className="h-8 w-20" />
-      )}
+      <p className="text-2xl font-bold text-text">
+        {recordCount}
+        <span className="text-sm font-medium text-text-muted ml-1">รายการ</span>
+      </p>
     </div>
   );
 }
 
-// ── Untracked domains (no local data or not in plan) ──────────────────────────
-
-interface EmptyDomainCardProps {
-  domain: SyncDomainPlan["domain"];
-  isHydrated: boolean;
-}
-
-function EmptyDomainCard({ domain, isHydrated }: EmptyDomainCardProps) {
+function EmptyDomainCard({ domain }: { domain: SyncDomainPlan["domain"] }) {
   return (
     <div className="bg-surface border border-border/50 rounded-xl p-4 flex flex-col gap-2 opacity-50">
       <div className="flex items-center gap-2 text-text-muted">
         <DomainIcon domain={domain} />
         <span className="text-sm font-semibold text-text-muted">{domainLabel(domain)}</span>
       </div>
-      {isHydrated ? (
-        <p className="text-sm text-text-muted">ไม่มีข้อมูล</p>
-      ) : (
-        <SkeletonBlock className="h-5 w-16" />
-      )}
+      <p className="text-sm text-text-muted">ไม่มีข้อมูล</p>
     </div>
   );
 }
@@ -184,44 +225,53 @@ function EmptyDomainCard({ domain, isHydrated }: EmptyDomainCardProps) {
 // ── Main component ─────────────────────────────────────────────────────────────
 
 export default function CloudSyncPreview() {
-  const { plan, provider, isSupabaseEnvSet, isHydrated, counts } = useSyncPlanPreview();
+  const {
+    plan,
+    provider,
+    isSupabaseEnvSet,
+    isHydrated,
+    isAuthenticated,
+    isAuthLoading,
+    userEmail,
+    counts,
+  } = useSyncPlanPreview();
 
   const allDomains: SyncDomainPlan["domain"][] = ["profile", "progress", "observations"];
-
   const domainMap = new Map(plan.domains.map((d) => [d.domain, d]));
+  const hasAnyData = isHydrated && (counts.hasProfile || counts.attempts > 0 || counts.sessions > 0 || counts.observations > 0);
 
-  // Determine why sync is blocked (for the UI — translated to Thai)
+  // Blocked reasons — ordered by priority, Thai messages
   function getBlockedMessage(): string | null {
     if (!isSupabaseEnvSet) {
-      return "ยังไม่ได้ตั้งค่า Supabase — กรุณาเพิ่ม NEXT_PUBLIC_SUPABASE_URL และ NEXT_PUBLIC_SUPABASE_ANON_KEY";
+      return "ยังไม่ได้ตั้งค่า Supabase — กรุณาเพิ่ม NEXT_PUBLIC_SUPABASE_URL และ NEXT_PUBLIC_SUPABASE_ANON_KEY ใน .env.local";
     }
     if (provider === "local") {
-      return "Storage Provider ปัจจุบันเป็น 'local' — เปลี่ยน NEXT_PUBLIC_STORAGE_PROVIDER=supabase เพื่อเปิดใช้งาน";
+      return "Storage Provider ปัจจุบันเป็น 'local' — เปลี่ยน NEXT_PUBLIC_STORAGE_PROVIDER=supabase ใน .env.local เพื่อเปิดใช้งาน";
     }
-    if (!plan.canSync && plan.blockedReason?.includes("signed in")) {
+    if (!isAuthLoading && !isAuthenticated) {
       return "กรุณาเข้าสู่ระบบก่อนซิงค์ข้อมูล";
     }
-    if (!plan.canSync && plan.blockedReason?.includes("No local data")) {
-      return "ไม่พบข้อมูลในอุปกรณ์นี้ที่ต้องการซิงค์";
+    if (isHydrated && !hasAnyData) {
+      return "ยังไม่มีข้อมูลในอุปกรณ์นี้ที่ต้องการซิงค์";
     }
     return null;
   }
 
   const blockedMessage = getBlockedMessage();
-  const hasAnyData = isHydrated && (counts.hasProfile || counts.attempts > 0 || counts.sessions > 0 || counts.observations > 0);
+
+  // Show sign-in CTA when: Supabase configured, provider not local, and not signed in
+  const showSignInCta = isSupabaseEnvSet && provider !== "local" && !isAuthLoading && !isAuthenticated;
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-4">
 
       {/* ── Status badges ── */}
       <div className="flex flex-wrap items-center gap-2">
-        {/* Active provider */}
         <div className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold ${providerBadgeCls(provider)}`}>
           {provider === "local" ? <DeviceIcon /> : <CloudIcon />}
           <span>{providerLabel(provider)}</span>
         </div>
 
-        {/* Supabase env status */}
         {isSupabaseEnvSet ? (
           <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold bg-success/10 text-success border border-success/20">
             <CheckCircleIcon />
@@ -234,6 +284,14 @@ export default function CloudSyncPreview() {
           </div>
         )}
       </div>
+
+      {/* ── Auth status ── */}
+      <AuthStatusRow
+        isAuthLoading={isAuthLoading}
+        isAuthenticated={isAuthenticated}
+        userEmail={userEmail}
+        isSupabaseEnvSet={isSupabaseEnvSet}
+      />
 
       {/* ── Preview-only warning banner ── */}
       <div className="bg-secondary/8 border border-secondary/20 rounded-xl px-4 py-3 flex items-start gap-3">
@@ -248,11 +306,9 @@ export default function CloudSyncPreview() {
         </div>
       </div>
 
-      {/* ── Data summary heading ── */}
+      {/* ── Data summary ── */}
       <div>
-        <h3 className="text-sm font-semibold text-text mb-3">
-          ข้อมูลที่พบบนอุปกรณ์นี้
-        </h3>
+        <h3 className="text-sm font-semibold text-text mb-3">ข้อมูลที่พบบนอุปกรณ์นี้</h3>
         {!isHydrated ? (
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             {allDomains.map((d) => (
@@ -271,18 +327,9 @@ export default function CloudSyncPreview() {
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             {allDomains.map((d) => {
               const inPlan = domainMap.get(d);
-              if (inPlan) {
-                return (
-                  <DomainCard
-                    key={d}
-                    domain={inPlan.domain}
-                    recordCount={inPlan.recordCount}
-                    syncOrder={inPlan.syncOrder}
-                    isHydrated={isHydrated}
-                  />
-                );
-              }
-              return <EmptyDomainCard key={d} domain={d} isHydrated={isHydrated} />;
+              return inPlan
+                ? <DomainCard key={d} domain={inPlan.domain} recordCount={inPlan.recordCount} syncOrder={inPlan.syncOrder} />
+                : <EmptyDomainCard key={d} domain={d} />;
             })}
           </div>
         )}
@@ -305,9 +352,7 @@ export default function CloudSyncPreview() {
                     <span className="text-xs font-medium text-text">{domainLabel(d.domain)}</span>
                   </div>
                   {i < arr.length - 1 && (
-                    <span className="text-text-muted/40">
-                      <ArrowRightIcon />
-                    </span>
+                    <span className="text-text-muted/40"><ArrowRightIcon /></span>
                   )}
                 </div>
               ))}
@@ -321,12 +366,24 @@ export default function CloudSyncPreview() {
           <div className="mt-0.5 text-info flex-shrink-0">
             <AlertTriangleIcon />
           </div>
-          <p className="text-xs text-text-muted">{blockedMessage}</p>
+          <p className="text-xs text-text-muted leading-relaxed">{blockedMessage}</p>
         </div>
       )}
 
-      {/* ── Action button (always disabled in Phase 28) ── */}
-      <div className="space-y-2">
+      {/* ── Action area ── */}
+      <div className="space-y-3 pt-1">
+        {/* Sign-in CTA (shown when Supabase configured but not signed in) */}
+        {showSignInCta && (
+          <Link
+            href="/auth/signin"
+            className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-xl border border-primary text-primary font-semibold text-sm hover:bg-primary/6 active:scale-[0.98] transition-all"
+          >
+            <LogInIcon />
+            เข้าสู่ระบบเพื่อเปิดใช้งานการซิงค์
+          </Link>
+        )}
+
+        {/* Upload button — always disabled (Phase 28-29 = preview only) */}
         <button
           type="button"
           disabled
@@ -340,6 +397,7 @@ export default function CloudSyncPreview() {
           ฟีเจอร์นี้อยู่ระหว่างพัฒนา — ข้อมูลของคุณปลอดภัยบนอุปกรณ์นี้
         </p>
       </div>
+
     </div>
   );
 }

@@ -17,6 +17,12 @@ export interface SyncPlanPreview {
   isSupabaseEnvSet: boolean;
   /** True after all three hooks have hydrated from localStorage. */
   isHydrated: boolean;
+  /** True when the user has an active Supabase session. */
+  isAuthenticated: boolean;
+  /** True while AuthProvider is restoring the session (show skeleton). */
+  isAuthLoading: boolean;
+  /** Authenticated user's email address, or null if not signed in. */
+  userEmail: string | null;
   /** Counts used to build the plan. */
   counts: {
     attempts: number;
@@ -35,7 +41,7 @@ export function useSyncPlanPreview(): SyncPlanPreview {
   const { profile, hasProfile, isHydrated: profileHydrated } = useChildProfile();
   const childId = profile?.id ?? "child-001";
   const { notes } = useObservationNotes(childId);
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, user, isLoading: isAuthLoading } = useAuth();
 
   const isHydrated = progressHydrated && profileHydrated;
   const isSupabaseEnvSet = isSupabaseConfigured();
@@ -63,5 +69,14 @@ export function useSyncPlanPreview(): SyncPlanPreview {
     [isHydrated, counts, isAuthenticated, isSupabaseEnvSet],
   );
 
-  return { plan, provider, isSupabaseEnvSet, isHydrated, counts };
+  return {
+    plan,
+    provider,
+    isSupabaseEnvSet,
+    isHydrated,
+    isAuthenticated,
+    isAuthLoading,
+    userEmail: user?.email ?? null,
+    counts,
+  };
 }
