@@ -6,23 +6,41 @@
 -- ============================================================
 -- Runs BEFORE enabling RLS (see 002_rls_policies.sql).
 -- Requires: Supabase project with auth schema enabled (default).
+-- Idempotent: safe to re-run after partial failure.
 -- ============================================================
 
 -- ── Enums ─────────────────────────────────────────────────────────────────────
+-- Wrapped in DO $$ ... EXCEPTION WHEN duplicate_object THEN NULL $$
+-- so re-runs after partial failure do not error out.
 
-create type session_status as enum ('active', 'completed', 'abandoned');
-create type evaluation_status as enum ('passed', 'almost', 'retry');
-create type observation_target_type as enum ('session', 'attempt', 'general');
-create type observation_category as enum (
-  'pronunciation', 'attention', 'progress', 'recommendation', 'other'
-);
+do $$ begin
+  create type session_status as enum ('active', 'completed', 'abandoned');
+exception when duplicate_object then null;
+end $$;
+
+do $$ begin
+  create type evaluation_status as enum ('passed', 'almost', 'retry');
+exception when duplicate_object then null;
+end $$;
+
+do $$ begin
+  create type observation_target_type as enum ('session', 'attempt', 'general');
+exception when duplicate_object then null;
+end $$;
+
+do $$ begin
+  create type observation_category as enum (
+    'pronunciation', 'attention', 'progress', 'recommendation', 'other'
+  );
+exception when duplicate_object then null;
+end $$;
 
 -- ── child_profiles ────────────────────────────────────────────────────────────
 -- Maps from: localStorage key `speech-adventure-profile-v1`
 -- Domain type: ChildProfileData (src/lib/child-profile/childProfileStorage.ts)
 -- DB type: DbChildProfile (src/types/database.ts)
 
-create table child_profiles (
+create table if not exists child_profiles (
   id               uuid        primary key default gen_random_uuid(),
   user_id          uuid        not null references auth.users(id) on delete cascade,
   name             text        not null,
@@ -36,7 +54,7 @@ create table child_profiles (
 );
 
 -- One profile per authenticated user (MVP — expand to multi-child later)
-create unique index child_profiles_user_id_idx on child_profiles(user_id);
+create unique index if not exists child_profiles_user_id_idx on child_profiles(user_id);
 
 -- ── practice_sessions ─────────────────────────────────────────────────────────
 -- Maps from: localStorage key `speech-adventure-progress-v1` → sessions[]
@@ -44,7 +62,7 @@ create unique index child_profiles_user_id_idx on child_profiles(user_id);
 -- DB type: DbPracticeSession (src/types/database.ts)
 -- Note: attemptIds[] array in localStorage is NOT migrated — use JOIN instead
 
-create table practice_sessions (
+create table if not exists practice_sessions (
   id                  uuid          primary key default gen_random_uuid(),
   child_id            uuid          not null references child_profiles(id) on delete cascade,
   target_sound        text          not null,
@@ -60,15 +78,15 @@ create table practice_sessions (
   created_at          timestamptz   not null default now()
 );
 
-create index practice_sessions_child_id_idx on practice_sessions(child_id);
-create index practice_sessions_stage_idx on practice_sessions(child_id, stage_id);
+create index if not exists practice_sessions_child_id_idx on practice_sessions(child_id);
+create index if not exists practice_sessions_stage_idx on practice_sessions(child_id, stage_id);
 
 -- ── practice_attempts ─────────────────────────────────────────────────────────
 -- Maps from: localStorage key `speech-adventure-progress-v1` → attempts[]
 -- Domain type: PracticeAttempt (src/types/speechAdventure.ts)
 -- DB type: DbPracticeAttempt (src/types/database.ts)
 
-create table practice_attempts (
+create table if not exists practice_attempts (
   id               uuid              primary key default gen_random_uuid(),
   child_id         uuid              not null references child_profiles(id) on delete cascade,
   session_id       uuid              references practice_sessions(id) on delete set null,
@@ -88,10 +106,10 @@ create table practice_attempts (
   created_at       timestamptz       not null default now()
 );
 
-create index practice_attempts_child_id_idx on practice_attempts(child_id);
-create index practice_attempts_stage_idx on practice_attempts(child_id, stage_id);
-create index practice_attempts_session_idx on practice_attempts(session_id);
-create index practice_attempts_created_at_idx on practice_attempts(child_id, created_at desc);
+create index if not exists practice_attempts_child_id_idx on practice_attempts(child_id);
+create index if not exists practice_attempts_stage_idx on practice_attempts(child_id, stage_id);
+create index if not exists practice_attempts_session_idx on practice_attempts(session_id);
+create index if not exists practice_attempts_created_at_idx on practice_attempts(child_id, created_at desc);
 
 -- ── observation_notes ─────────────────────────────────────────────────────────
 -- Maps from: localStorage key `speech-adventure-observations-v1`
@@ -99,7 +117,7 @@ create index practice_attempts_created_at_idx on practice_attempts(child_id, cre
 -- DB type: DbObservationNote (src/types/database.ts)
 -- Note: target_id changes from string → uuid — string IDs need migration mapping
 
-create table observation_notes (
+create table if not exists observation_notes (
   id          uuid                      primary key default gen_random_uuid(),
   child_id    uuid                      not null references child_profiles(id) on delete cascade,
   author_id   uuid                      not null references auth.users(id),
@@ -112,6 +130,6 @@ create table observation_notes (
   updated_at  timestamptz               not null default now()
 );
 
-create index observation_notes_child_id_idx on observation_notes(child_id);
-create index observation_notes_target_idx on observation_notes(target_type, target_id)
+create index if not exists observation_notes_child_id_idx on observation_notes(child_id);
+create index if not exists observation_notes_target_idx on observation_notes(target_type, target_id)
   where target_id is not null;

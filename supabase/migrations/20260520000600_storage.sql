@@ -7,13 +7,12 @@
 -- Creates the audio-recordings bucket for storing practice audio.
 -- Object path convention: {child_id}/{attempt_id}.webm
 --
--- This migration is safe to run multiple times (on conflict guards).
--- The bucket stays empty until Phase 5 (audio upload feature).
+-- Idempotent:
+--   Bucket insert uses ON CONFLICT DO NOTHING (already safe).
+--   Storage policies use DROP POLICY IF EXISTS before CREATE POLICY
+--   because PostgreSQL has no CREATE POLICY IF NOT EXISTS syntax.
 --
--- ── IMPORTANT ────────────────────────────────────────────────
--- If your Supabase project was created before this migration,
--- the storage.buckets table may already exist. Run as-is —
--- the ON CONFLICT clause prevents duplicate bucket creation.
+-- The bucket stays empty until Phase 5 (audio upload feature).
 -- ============================================================
 
 -- ── Create bucket ─────────────────────────────────────────────────────────────
@@ -49,6 +48,7 @@ on conflict (id) do nothing;
 --                            ┗━━━━━━━━━━━━━━ child_id ━━━━━━━━━━━━━━━┛
 
 -- Upload: owner of the child folder may upload files
+drop policy if exists "audio_recordings: owner upload" on storage.objects;
 create policy "audio_recordings: owner upload"
   on storage.objects
   for insert
@@ -60,6 +60,7 @@ create policy "audio_recordings: owner upload"
   );
 
 -- Download: owner of the child folder may read files
+drop policy if exists "audio_recordings: owner download" on storage.objects;
 create policy "audio_recordings: owner download"
   on storage.objects
   for select
@@ -72,6 +73,7 @@ create policy "audio_recordings: owner download"
 
 -- Delete: owner may delete their own recordings
 --   (Service-role key can always delete — used by cleanup jobs.)
+drop policy if exists "audio_recordings: owner delete" on storage.objects;
 create policy "audio_recordings: owner delete"
   on storage.objects
   for delete

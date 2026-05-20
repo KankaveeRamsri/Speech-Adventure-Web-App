@@ -6,6 +6,7 @@
 -- Run AFTER 002_rls_policies.sql.
 -- Views derive computed data that would otherwise be calculated
 -- in calculateProgressSummary() on the client side.
+-- Idempotent: CREATE OR REPLACE VIEW is safe to re-run.
 -- ============================================================
 
 -- ── child_stage_status ────────────────────────────────────────────────────────
@@ -13,7 +14,7 @@
 -- Replaces the in-memory calculations in calculateProgressSummary() for
 -- the Supabase backend path. The localStorage path still computes these locally.
 
-create view child_stage_status as
+create or replace view child_stage_status as
 select
   child_id,
   stage_id,
@@ -29,7 +30,7 @@ group by child_id, stage_id;
 -- Aggregate stats per child — total sessions, average score, stars.
 -- Useful for the progress dashboard header cards.
 
-create view child_session_summary as
+create or replace view child_session_summary as
 select
   child_id,
   count(*)                        as total_sessions,

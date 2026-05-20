@@ -3,11 +3,10 @@
 import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import {
-  saveProfile,
-  getProfile,
   clearProfile,
   replaceProfile,
 } from "@/lib/child-profile/childProfileStorage";
+import { useChildProfile } from "@/hooks/useChildProfile";
 import {
   setSelectedSoundId,
   replaceProgress,
@@ -68,28 +67,32 @@ export default function OnboardingPage() {
   const [trainingGoal, setTrainingGoal] = useState("daily");
   const [isEdit, setIsEdit] = useState(false);
 
+  // Route saves through the same repository that /training reads from.
+  // Direct childProfileStorage imports only reached localStorage, not
+  // SupabaseProfileRepository, causing /training to always see a null profile.
+  const { saveProfile: repoSaveProfile, profile: existingProfile } = useChildProfile();
+  const editDetectedRef = useRef(false);
+
   useEffect(() => {
-    const existing = getProfile();
-    if (existing) {
-      setName(existing.name);
-      setAge(existing.age);
-      setTargetSound(existing.targetSound);
-      setTrainingGoal(existing.trainingGoal);
-      setIsEdit(true);
-      setStep(2);
-    }
-  }, []);
+    if (editDetectedRef.current || !existingProfile) return;
+    editDetectedRef.current = true;
+    setName(existingProfile.name);
+    setAge(existingProfile.age);
+    setTargetSound(existingProfile.targetSound);
+    setTrainingGoal(existingProfile.trainingGoal);
+    setIsEdit(true);
+    setStep(2);
+  }, [existingProfile]);
 
   const handleFinish = () => {
     const now = new Date().toISOString();
-    const existing = getProfile();
-    saveProfile({
-      id: existing?.id ?? `child-${Date.now()}`,
+    void repoSaveProfile({
+      id: existingProfile?.id ?? `child-${Date.now()}`,
       name: name.trim(),
       age,
       targetSound,
       trainingGoal,
-      createdAt: existing?.createdAt ?? now,
+      createdAt: existingProfile?.createdAt ?? now,
       updatedAt: now,
     });
     setSelectedSoundId(targetSound);
@@ -402,14 +405,13 @@ export default function OnboardingPage() {
                 <button
                   onClick={() => {
                     const now = new Date().toISOString();
-                    const existing = getProfile();
-                    saveProfile({
-                      id: existing?.id ?? `child-${Date.now()}`,
+                    void repoSaveProfile({
+                      id: existingProfile?.id ?? `child-${Date.now()}`,
                       name: name.trim(),
                       age,
                       targetSound,
                       trainingGoal,
-                      createdAt: existing?.createdAt ?? now,
+                      createdAt: existingProfile?.createdAt ?? now,
                       updatedAt: now,
                     });
                     setSelectedSoundId(targetSound);

@@ -4,6 +4,9 @@ import type { SupabaseClient } from "@/lib/supabase/client";
 import type { Database } from "@/types/supabase";
 import { dbToDomainProfile, domainToDbProfile } from "./mappers";
 import { QueryError, warnRepo } from "./errors";
+import { localRead, localWrite, localRemove } from "@/lib/storage/local/localStorageClient";
+import { STORAGE_KEYS } from "@/lib/storage/storageKeys";
+import { ChildProfileDataSchema, parseOrNull } from "@/lib/validation";
 
 // ── Stable server snapshot (no profile on the server — no auth context) ───────
 const SERVER_PROFILE: ChildProfileData | null = null;
@@ -57,10 +60,13 @@ export class SupabaseProfileRepository implements IProfileRepository {
   async saveProfile(profile: ChildProfileData): Promise<void> {
     // Optimistic: update cache immediately so UI is responsive
     this._setCache(profile);
+    // Write-through to localStorage so data survives a page reload when
+    // the user isn't authenticated yet (Supabase would return 0 rows).
+    localWrite(STORAGE_KEYS.PROFILE, JSON.stringify(profile));
 
     const userId = await this._getCurrentUserId();
     if (!userId) {
-      warnRepo("SupabaseProfileRepository.saveProfile", "no auth user — profile saved to cache only");
+      warnRepo("SupabaseProfileRepository.saveProfile", "no auth user — profile saved to cache + localStorage only");
       return;
     }
 
@@ -85,6 +91,7 @@ export class SupabaseProfileRepository implements IProfileRepository {
 
   async clearProfile(): Promise<void> {
     this._setCache(null);
+    localRemove(STORAGE_KEYS.PROFILE);
 
     const userId = await this._getCurrentUserId();
     if (!userId) return;
@@ -126,13 +133,28 @@ export class SupabaseProfileRepository implements IProfileRepository {
 
     if (error) {
       warnRepo("SupabaseProfileRepository._hydrate", new QueryError("child_profiles", "select", error));
+      // Fall back to localStorage so the UI isn't blank when Supabase is unreachable.
+      this._cache = this._readLocalStorage();
       this._hydrated = true;
+      this._notify();
       return;
     }
 
-    this._cache = data ? dbToDomainProfile(data) : null;
+    // Supabase row takes priority; fall back to localStorage when no Supabase
+    // profile exists yet (unauthenticated user or pre-migration state).
+    this._cache = data ? dbToDomainProfile(data) : this._readLocalStorage();
     this._hydrated = true;
     this._notify();
+  }
+
+  private _readLocalStorage(): ChildProfileData | null {
+    try {
+      const raw = localRead(STORAGE_KEYS.PROFILE);
+      if (!raw) return null;
+      return parseOrNull(ChildProfileDataSchema, JSON.parse(raw), "profile") as ChildProfileData | null;
+    } catch {
+      return null;
+    }
   }
 
   private async _getCurrentUserId(): Promise<string | null> {

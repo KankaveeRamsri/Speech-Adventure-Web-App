@@ -376,8 +376,24 @@ export default function CloudSyncPreview() {
   const [showConfirmation, setShowConfirmation] = useState(false);
 
   const allDomains: SyncDomainPlan["domain"][] = ["profile", "progress", "observations"];
-  const domainMap = new Map(plan.domains.map((d) => [d.domain, d]));
-  const hasAnyData = isHydrated && (counts.hasProfile || counts.attempts > 0 || counts.sessions > 0 || counts.observations > 0);
+
+  // Local data existence — independent of auth/sync state.
+  // plan.domains is empty when unauthenticated, so we must NOT use it to decide
+  // whether data cards show. Use raw counts instead so local data is always visible.
+  const localDataDomains: { domain: SyncDomainPlan["domain"]; recordCount: number; syncOrder: 1 | 2 | 3 }[] = isHydrated
+    ? [
+        ...(counts.hasProfile ? [{ domain: "profile" as const, recordCount: 1, syncOrder: 1 as const }] : []),
+        ...(counts.attempts > 0 || counts.sessions > 0
+          ? [{ domain: "progress" as const, recordCount: counts.attempts + counts.sessions, syncOrder: 2 as const }]
+          : []),
+        ...(counts.observations > 0
+          ? [{ domain: "observations" as const, recordCount: counts.observations, syncOrder: 3 as const }]
+          : []),
+      ]
+    : [];
+  const localDataMap = new Map(localDataDomains.map((d) => [d.domain, d]));
+
+  const hasAnyData = isHydrated && localDataDomains.length > 0;
   const hasMigrated = previousMigration !== null || migrationState === "success";
   const isMigrating = migrationState === "checking" || migrationState === "migrating";
 
@@ -545,10 +561,9 @@ export default function CloudSyncPreview() {
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
               {allDomains.map((d) => {
-                const inPlan = domainMap.get(d);
-                const wasMigrated = hasMigrated;
-                return inPlan
-                  ? <DomainCard key={d} domain={inPlan.domain} recordCount={inPlan.recordCount} syncOrder={inPlan.syncOrder} migrated={wasMigrated} />
+                const local = localDataMap.get(d);
+                return local
+                  ? <DomainCard key={d} domain={local.domain} recordCount={local.recordCount} syncOrder={local.syncOrder} migrated={hasMigrated} />
                   : <EmptyDomainCard key={d} domain={d} />;
               })}
             </div>

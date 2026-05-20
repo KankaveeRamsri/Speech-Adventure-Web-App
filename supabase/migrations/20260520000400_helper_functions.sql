@@ -8,6 +8,10 @@
 --   1. is_own_child(uuid) — boolean helper used by RLS policies
 --   2. handle_updated_at() — trigger function for auto-updating updated_at
 --   3. Triggers on child_profiles and observation_notes
+-- Idempotent:
+--   Functions use CREATE OR REPLACE (already safe).
+--   Triggers use DROP TRIGGER IF EXISTS before CREATE TRIGGER because
+--   PostgreSQL has no CREATE TRIGGER IF NOT EXISTS syntax.
 -- ============================================================
 
 
@@ -61,14 +65,18 @@ $$;
 
 
 -- ── 3. Triggers ───────────────────────────────────────────────────────────────
+-- DROP TRIGGER IF EXISTS before CREATE TRIGGER — PostgreSQL does not support
+-- CREATE TRIGGER IF NOT EXISTS, so this is the idempotent equivalent.
 
 -- child_profiles: auto-update updated_at on every row change
+drop trigger if exists set_child_profiles_updated_at on child_profiles;
 create trigger set_child_profiles_updated_at
   before update on child_profiles
   for each row
   execute function handle_updated_at();
 
 -- observation_notes: auto-update updated_at on every row change
+drop trigger if exists set_observation_notes_updated_at on observation_notes;
 create trigger set_observation_notes_updated_at
   before update on observation_notes
   for each row

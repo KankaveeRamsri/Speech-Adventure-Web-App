@@ -16,6 +16,7 @@
 --     2. author_id = auth.uid()  — caller is the note author
 --
 --   Uses is_own_child() from migration 004 (must run first).
+-- Idempotent: DROP POLICY IF EXISTS before every CREATE POLICY.
 -- ============================================================
 
 -- Drop the author-only policies created in 002
@@ -23,6 +24,12 @@ drop policy if exists "observation_notes: author select" on observation_notes;
 drop policy if exists "observation_notes: author insert" on observation_notes;
 drop policy if exists "observation_notes: author update" on observation_notes;
 drop policy if exists "observation_notes: author delete" on observation_notes;
+
+-- Drop corrected owner policies (in case this migration is re-run)
+drop policy if exists "observation_notes: owner select" on observation_notes;
+drop policy if exists "observation_notes: owner insert" on observation_notes;
+drop policy if exists "observation_notes: owner update" on observation_notes;
+drop policy if exists "observation_notes: owner delete" on observation_notes;
 
 -- ── Corrected policies ────────────────────────────────────────────────────────
 
