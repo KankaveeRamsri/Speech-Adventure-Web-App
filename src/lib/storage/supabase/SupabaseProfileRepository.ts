@@ -70,16 +70,29 @@ export class SupabaseProfileRepository implements IProfileRepository {
       return;
     }
 
-    const { error } = await this.client
+    // profile.id is a localStorage placeholder (e.g. "child-1748…"), not a UUID.
+    // Passing it would make PostgreSQL reject the row with "invalid input syntax
+    // for type uuid". Let the DB generate (or preserve) the UUID automatically.
+    const { data: upserted, error } = await this.client
       .from("child_profiles")
       .upsert(
-        // id comes from the domain profile — preserve it for future idempotency
-        { id: profile.id, ...domainToDbProfile(profile, userId) },
+        // Use targetSound as initial selected_sound_id; it can be changed later
+        // via setSelectedSoundId. Do NOT include id — let gen_random_uuid() run.
+        domainToDbProfile(profile, userId, profile.targetSound),
         { onConflict: "user_id" },
-      );
+      )
+      .select("id, updated_at")
+      .single();
 
     if (error) {
       warnRepo("SupabaseProfileRepository.saveProfile", new QueryError("child_profiles", "upsert", error));
+    } else if (upserted) {
+      const row = upserted as { id: string; updated_at: string };
+      // Replace the localStorage placeholder id with the real DB UUID so that
+      // SupabaseProgressRepository can use it as child_id on linked records.
+      const canonical: ChildProfileData = { ...profile, id: row.id, updatedAt: row.updated_at };
+      this._setCache(canonical);
+      localWrite(STORAGE_KEYS.PROFILE, JSON.stringify(canonical));
     }
   }
 

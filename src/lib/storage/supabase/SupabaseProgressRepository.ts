@@ -268,7 +268,17 @@ export class SupabaseProgressRepository implements IProgressRepository {
     this._selectedSoundId = id;
     this._notifySound();
 
-    // Persist to child_profiles.selected_sound_id
+    // If _childId is null (hydration ran before the profile was created), do a
+    // one-shot fetch — covers the first save-then-navigate-to-training scenario.
+    if (!this._childId) {
+      const { data } = await this.client
+        .from("child_profiles")
+        .select("id")
+        .limit(1)
+        .maybeSingle();
+      if (data?.id) this._childId = data.id;
+    }
+
     const childId = this._childId;
     if (!childId) {
       warnRepo("SupabaseProgressRepository.setSelectedSoundId", "no childId — sound updated in cache only");

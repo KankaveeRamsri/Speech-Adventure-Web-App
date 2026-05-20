@@ -52,9 +52,24 @@ export class NotFoundError extends RepositoryError {
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-/** Logs a repository error in development. No-op in production. */
+/** Logs a repository error in development. No-op in production.
+ *  For RepositoryError subclasses, also expands the Supabase cause object so
+ *  message/code/details/hint are visible without manually drilling into the object. */
 export function warnRepo(context: string, err: unknown): void {
   if (process.env.NODE_ENV !== "production") {
     console.warn(`[Repository:${context}]`, err);
+    if (err instanceof RepositoryError && err.cause != null) {
+      const c = err.cause as Record<string, unknown>;
+      if (c.message != null || c.code != null) {
+        console.warn(`  ↳ supabase error:`, {
+          message: c.message,
+          code: c.code,
+          details: c.details,
+          hint: c.hint,
+        });
+      } else {
+        console.warn(`  ↳ cause:`, err.cause);
+      }
+    }
   }
 }
