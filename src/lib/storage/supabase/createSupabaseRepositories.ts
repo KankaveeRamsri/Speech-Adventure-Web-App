@@ -53,9 +53,14 @@ export function createSupabaseRepositories(): Repositories | null {
 }
 
 /**
- * Returns true when the env var is set to "supabase".
- * Used to check whether the provider switch should be attempted.
+ * Returns true when the active storage provider is Supabase-backed.
+ *
+ * Checks NEXT_PUBLIC_STORAGE_PROVIDER first (new canonical var); falls back
+ * to legacy NEXT_PUBLIC_STORAGE_BACKEND for backward compatibility.
  */
 export function isSupabaseStorageBackend(): boolean {
+  const provider = process.env.NEXT_PUBLIC_STORAGE_PROVIDER;
+  if (provider === "supabase" || provider === "hybrid") return true;
+  // legacy alias
   return process.env.NEXT_PUBLIC_STORAGE_BACKEND === "supabase";
 }
