@@ -17,3 +17,17 @@ export type {
 } from "./syncPlan";
 
 export { buildSyncPlan } from "./syncPlan";
+
+export type {
+  MigrationDomain,
+  MigrationState,
+  MigrationProgress,
+  MigrationResult,
+  MigrationFlag,
+} from "./migrateToSupabase";
+
+export {
+  MIGRATION_FLAG_KEY,
+  getMigrationFlag,
+  migrateToSupabase,
+} from "./migrateToSupabase";
