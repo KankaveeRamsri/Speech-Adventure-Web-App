@@ -50,6 +50,17 @@ Guides children through a 7-stage speech training curriculum with audio recordin
 - Env vars: `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY` (see `.env.local.example`)
 - Activation path: set `NEXT_PUBLIC_STORAGE_BACKEND=supabase` + inject Supabase repos via `RepositoryProvider overrides`
 
+## Auth Foundation (Phase 24 — active, Supabase-gated)
+- `src/types/auth.ts` — `AuthUser`, `AuthSession`, `AuthResult`, `AuthContextValue` types
+- `src/lib/auth/supabaseAuth.ts` — Supabase Auth wrappers: `getInitialSession`, `subscribeToAuthChanges`, `signIn`, `signUp`, `signOut` — all return safe defaults when Supabase not configured
+- `src/providers/AuthProvider.tsx` — React context; `isLoading=true` until session restored; graceful fallback when Supabase unconfigured
+- `src/hooks/useAuth.ts` — `useAuth()` hook to read auth state from any component
+- `src/components/auth/AuthGuard.tsx` — minimal protected-route wrapper; pass-through when Supabase not configured (localStorage mode stays open)
+- Pages: `/auth/signin`, `/auth/signup` — standalone (no AppShell), Thai labels, show "Supabase not configured" notice in dev mode
+- Provider hierarchy: `AuthProvider` → `RepositoryProvider` → `ThemeProvider` (auth outermost for future repo switching by auth state)
+- localStorage stays fully active — auth does NOT affect repository layer yet
+- Session restore: `getInitialSession()` in `useEffect` + `onAuthStateChange` listener; no hydration mismatch (isLoading initial value derived from `isSupabaseConfigured()` which is consistent server/client)
+
 ## Future AI Direction
 - `evaluateSpeech.ts` has `ACTIVE_PROVIDER = "mock"` — swap to `"api"` to enable real evaluation
 - `app/api/speech/evaluate/route.ts` is the Next.js API route stub for AI backend
