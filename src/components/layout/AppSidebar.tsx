@@ -19,6 +19,7 @@ const NAV_ITEMS: { href: string; label: string; icon: NavIconName; exact?: boole
   { href: "/report", label: "รายงาน", icon: "report" },
   { href: "/demo", label: " Showcase", icon: "demo" },
   { href: "/onboarding", label: "โปรไฟล์", icon: "profile" },
+  { href: "/settings", label: "ตั้งค่า", icon: "settings" },
 ];
 
 function MicLogoIcon({ size = 16 }: { size?: number }) {
