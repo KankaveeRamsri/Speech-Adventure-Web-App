@@ -50,6 +50,13 @@ Guides children through a 7-stage speech training curriculum with audio recordin
 - Env vars: `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY` (see `.env.local.example`)
 - Activation path: set `NEXT_PUBLIC_STORAGE_BACKEND=supabase` + inject Supabase repos via `RepositoryProvider overrides`
 
+## Database Migration Foundation (Phase 25 — SQL only, no runtime connection)
+- Migration 004: `is_own_child(uuid) → boolean` helper (SECURITY DEFINER, STABLE) + `handle_updated_at()` trigger on `child_profiles` and `observation_notes`
+- Migration 005: Fixes Phase 23 security bug — `observation_notes` RLS now requires BOTH `is_own_child(child_id)` AND `author_id = auth.uid()` (old policy only checked author_id)
+- Migration 006: `audio-recordings` private bucket (10 MB limit, webm/ogg/mp4 allowed) + storage RLS (first path segment = own child_id)
+- Migration order: 001 → 002 → 003 → 004 → 005 → 006
+- `supabase/README.md` — fully updated with migration table, RLS summary, storage details, activation path
+
 ## Auth Foundation (Phase 24 — active, Supabase-gated)
 - `src/types/auth.ts` — `AuthUser`, `AuthSession`, `AuthResult`, `AuthContextValue` types
 - `src/lib/auth/supabaseAuth.ts` — Supabase Auth wrappers: `getInitialSession`, `subscribeToAuthChanges`, `signIn`, `signUp`, `signOut` — all return safe defaults when Supabase not configured

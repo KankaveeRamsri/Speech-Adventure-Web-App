@@ -5,8 +5,9 @@ Backend foundation for migrating from localStorage to Supabase PostgreSQL.
 ## Current Status
 
 **localStorage is the active storage provider.**  
-Supabase is wired up at the type and infrastructure level only — no data flows through it yet.  
-See Phase 3 in the migration plan to activate it.
+Supabase is wired up at the type, infrastructure, and database-schema level — no application data flows through it yet.  
+Auth foundation is in place (Phase 24). Storage schema is ready (Phase 25).  
+See the migration plan below to activate data sync (Phase 3 / Phase 26+).
 
 ---
 
@@ -15,13 +16,35 @@ See Phase 3 in the migration plan to activate it.
 ```
 supabase/
 ├── migrations/
-│   ├── 20260520_001_initial_schema.sql   — Tables + indexes + enums
-│   ├── 20260520_002_rls_policies.sql     — Row Level Security (owner-only)
-│   └── 20260520_003_views.sql            — Computed views (stage status, session summary)
+│   ├── 20260520_001_initial_schema.sql    — Enums, tables, indexes, constraints
+│   ├── 20260520_002_rls_policies.sql      — RLS enabled + owner-only policies
+│   ├── 20260520_003_views.sql             — child_stage_status, child_session_summary
+│   ├── 20260520_004_helper_functions.sql  — is_own_child(), handle_updated_at() trigger
+│   ├── 20260520_005_rls_observation_fix.sql — Fixes observation_notes RLS (child ownership)
+│   └── 20260520_006_storage.sql           — audio-recordings bucket + storage RLS
 ├── seed/
-│   └── seed.sql                          — Dev-only test data (all commented out by default)
-└── README.md                             — This file
+│   └── seed.sql                           — Dev-only test data (all commented out by default)
+└── README.md                              — This file
 ```
+
+---
+
+## Migration Order
+
+Migrations **must** be applied in numeric order:
+
+```
+001 → 002 → 003 → 004 → 005 → 006
+```
+
+| File | What it does | Depends on |
+|---|---|---|
+| `001_initial_schema` | Creates all 4 tables, enums, indexes | — |
+| `002_rls_policies` | Enables RLS + baseline owner-only policies | 001 |
+| `003_views` | `child_stage_status`, `child_session_summary` views | 001 |
+| `004_helper_functions` | `is_own_child()` function + `updated_at` triggers | 001, 002 |
+| `005_rls_observation_fix` | Patches observation_notes to verify child ownership | 002, 004 |
+| `006_storage` | Creates `audio-recordings` private bucket + storage RLS | 001, 004 |
 
 ---
 
@@ -35,72 +58,161 @@ Go to [https://supabase.com](https://supabase.com) and create a new project.
 
 ```bash
 cp .env.local.example .env.local
-# Then fill in NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY
-# from your project's Settings → API page
+# Fill in NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY
+# from your project: Settings → API
 ```
 
 ### 3. Run migrations
 
+**Option A — Supabase CLI (recommended)**
+
 ```bash
-# Option A — Supabase CLI (recommended)
+# Link to your project
 npx supabase link --project-ref <your-project-ref>
+
+# Apply all pending migrations
 npx supabase db push
 
-# Option B — Supabase dashboard SQL editor
-# Paste each migration file in order: 001 → 002 → 003
+# Or reset to a clean state (drops + re-applies everything + seed)
+npx supabase db reset
 ```
 
-### 4. Regenerate types (after schema changes)
+**Option B — Supabase Dashboard SQL Editor**
+
+Paste each file in order (001 → 002 → ... → 006) into the SQL editor at
+`https://supabase.com/dashboard/project/<ref>/sql`.
+
+### 4. Regenerate TypeScript types (after schema changes)
 
 ```bash
 npx supabase gen types typescript --project-id <your-project-ref> \
   > src/types/supabase.ts
 ```
 
----
-
-## Activating Supabase as the Storage Provider (Phase 3)
-
-1. Set env vars (step 2 above)
-2. Implement `SupabaseProgressRepository`, `SupabaseProfileRepository`,  
-   `SupabaseObservationRepository` in `src/lib/storage/supabase/`  
-   (stubs are already there — remove the `throw new Error(...)` statements)
-3. In `src/app/layout.tsx`, detect `NEXT_PUBLIC_STORAGE_BACKEND === "supabase"`  
-   and pass the Supabase repositories as `overrides` to `<RepositoryProvider>`
-4. Set `NEXT_PUBLIC_STORAGE_BACKEND=supabase` in `.env.local`
-5. The localStorage repositories remain untouched — just not injected
+The generated file replaces the hand-written placeholder in `src/types/supabase.ts`.
 
 ---
 
-## localStorage → Supabase Key Mapping
+## Schema Overview
 
-| localStorage key | Supabase table |
+### Tables
+
+| Table | localStorage key | Description |
+|---|---|---|
+| `child_profiles` | `speech-adventure-profile-v1` | One profile per authenticated user (MVP) |
+| `practice_sessions` | `speech-adventure-progress-v1` → sessions | Practice session lifecycle (active → completed/abandoned) |
+| `practice_attempts` | `speech-adventure-progress-v1` → attempts | Individual scored attempts |
+| `observation_notes` | `speech-adventure-observations-v1` | Therapist / parent notes |
+
+### Views
+
+| View | Purpose |
 |---|---|
-| `speech-adventure-profile-v1` | `child_profiles` |
-| `speech-adventure-progress-v1` | `practice_attempts` + `practice_sessions` |
-| `speech-adventure-observations-v1` | `observation_notes` |
-| `speech-adventure-selected-sound-v1` | `child_profiles.selected_sound_id` |
+| `child_stage_status` | Per-child, per-stage attempt aggregates (count, best score, is_passed) |
+| `child_session_summary` | Per-child session totals and average score |
 
-See `docs/architecture/database-schema.md` for full field mappings.
+### Helper Functions
+
+#### `is_own_child(p_child_id uuid) → boolean`
+
+Returns `true` when `p_child_id` is a child profile that belongs to `auth.uid()`.
+
+- `SECURITY DEFINER` — reads `child_profiles` bypassing RLS for the lookup
+- `STABLE` — evaluated once per row by the query planner
+- `set search_path = public` — prevents search_path injection
+- Used by RLS policies on `practice_sessions`, `practice_attempts`, and `observation_notes`
+
+```sql
+-- Example: "can the current user access this session?"
+select is_own_child('550e8400-e29b-41d4-a716-446655440000');
+```
 
 ---
 
 ## RLS Summary
 
-All tables use owner-only Row Level Security. A user can only access rows
-where `user_id` (or `author_id`) matches `auth.uid()`.  
-Therapist / shared-access roles are planned for a future phase.
+All tables have Row Level Security enabled. The core isolation rule:
+
+```
+auth.uid()  →  child_profiles.user_id  →  child_id (FK on all child tables)
+```
+
+| Table | SELECT | INSERT | UPDATE | DELETE |
+|---|---|---|---|---|
+| `child_profiles` | own `user_id` | own `user_id` | own `user_id` | own `user_id` |
+| `practice_sessions` | `is_own_child(child_id)` | `is_own_child(child_id)` | `is_own_child(child_id)` | `is_own_child(child_id)` |
+| `practice_attempts` | `is_own_child(child_id)` | `is_own_child(child_id)` | `is_own_child(child_id)` | `is_own_child(child_id)` |
+| `observation_notes` | `is_own_child(child_id)` | child + `author_id` | child + `author_id` | child + `author_id` |
+
+> **Note on observation_notes:** Migration 005 corrects the Phase 23 policy that only
+> checked `author_id`. Any user could previously create notes on any child — 005 fixes this.
 
 ---
 
-## Supabase Storage (Future)
+## Supabase Storage
 
-Audio recordings will be stored in:
-```
-audio-recordings/{child_id}/{attempt_id}.webm
-```
-- Private bucket, accessible via signed URLs only
-- 90-day retention (configurable)
-- Max 10 MB per file
+### `audio-recordings` (private bucket)
 
-Referenced by `practice_attempts.audio_path` column.
+Created by migration 006. Stays empty until Phase 5 (audio upload feature).
+
+```
+audio-recordings/
+└── {child_id}/          ← enforced by storage RLS (must be own child)
+    └── {attempt_id}.webm
+```
+
+| Setting | Value |
+|---|---|
+| Public | `false` (signed URLs only) |
+| Max file size | 10 MB |
+| Allowed types | `audio/webm`, `audio/ogg`, `audio/mp4`, `audio/mpeg`, `audio/wav` |
+| Owner download | Yes (RLS: first folder = own child_id) |
+| Owner upload | Yes (RLS: first folder = own child_id) |
+| Client delete | Yes (RLS: same constraint) |
+| Service-role delete | Always (bypass RLS — for retention cleanup jobs) |
+
+Referenced by `practice_attempts.audio_path` column (nullable until Phase 5).
+
+---
+
+## Activating Supabase as the Storage Provider (Phase 26+)
+
+1. Complete setup steps 1–4 above
+2. Implement the repository classes in `src/lib/storage/supabase/`:
+   - `SupabaseProgressRepository.ts` — remove the `throw new Error(...)` stub
+   - `SupabaseProfileRepository.ts` — remove the `throw new Error(...)` stub
+   - `SupabaseObservationRepository.ts` — remove the `throw new Error(...)` stub
+3. In `src/app/layout.tsx`, detect `NEXT_PUBLIC_STORAGE_BACKEND === "supabase"`
+   and pass the Supabase repositories as `overrides` to `<RepositoryProvider>`
+4. Set `NEXT_PUBLIC_STORAGE_BACKEND=supabase` in `.env.local`
+5. The localStorage repositories remain untouched — not injected when Supabase is active
+
+---
+
+## localStorage → Supabase Field Mapping
+
+| localStorage key | Supabase table | Notes |
+|---|---|---|
+| `speech-adventure-profile-v1` | `child_profiles` | Add `user_id` from auth |
+| `speech-adventure-progress-v1` → sessions | `practice_sessions` | Drop `attemptIds[]` — use JOIN |
+| `speech-adventure-progress-v1` → attempts | `practice_attempts` | `target_id` stays as text during migration |
+| `speech-adventure-observations-v1` | `observation_notes` | `target_id` migrates from string → uuid |
+| `speech-adventure-selected-sound-v1` | `child_profiles.selected_sound_id` | Merged into profile row |
+
+See `docs/architecture/database-schema.md` for full column-level mapping.
+
+---
+
+## RLS Testing
+
+RLS policies must be tested with the **anon key** (not service_role) to activate them.
+
+```bash
+# Run integration tests against local Supabase
+npx supabase start           # starts local Supabase stack
+npx supabase db reset        # clean slate with seed data
+# ... run your test suite ...
+npx supabase stop
+```
+
+See `docs/architecture/rls-strategy.md` for the full test checklist.
