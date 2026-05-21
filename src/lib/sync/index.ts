@@ -19,6 +19,14 @@ export type {
 export { buildSyncPlan } from "./syncPlan";
 
 export type {
+  ConflictRisk,
+  RecommendedUploadAction,
+  ConflictAssessment,
+} from "./conflictDetection";
+
+export { assessConflict } from "./conflictDetection";
+
+export type {
   MigrationDomain,
   MigrationState,
   MigrationProgress,

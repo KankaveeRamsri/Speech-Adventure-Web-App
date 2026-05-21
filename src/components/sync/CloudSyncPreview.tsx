@@ -312,15 +312,53 @@ function MigrationSteps({ currentDomain, completedDomains, uploadedRecords, tota
   );
 }
 
+// ── Conflict warning card ─────────────────────────────────────────────────────
+
+interface ConflictWarningCardProps {
+  conflictSummary: string;
+  acknowledged: boolean;
+  onAcknowledge: (checked: boolean) => void;
+}
+
+function ConflictWarningCard({ conflictSummary, acknowledged, onAcknowledge }: ConflictWarningCardProps) {
+  return (
+    <div className="bg-warning/8 border border-warning/30 rounded-xl p-4 space-y-3">
+      <div className="flex items-start gap-2.5">
+        <span className="text-warning mt-0.5 flex-shrink-0"><AlertTriangleIcon size={16} /></span>
+        <div className="space-y-1.5">
+          <p className="text-sm font-semibold text-text">ตรวจพบข้อมูลบน Cloud แล้ว</p>
+          <p className="text-xs text-text-muted leading-relaxed">{conflictSummary}</p>
+          <p className="text-xs text-text-muted leading-relaxed">
+            ข้อมูลบนอุปกรณ์นี้จะถูก <strong className="text-text">เพิ่มต่อ</strong> ไปยังข้อมูลที่มีอยู่บน Cloud — ไม่มีการลบหรือเขียนทับ
+          </p>
+        </div>
+      </div>
+      <label className="flex items-start gap-2.5 cursor-pointer group">
+        <input
+          type="checkbox"
+          checked={acknowledged}
+          onChange={(e) => onAcknowledge(e.target.checked)}
+          className="mt-0.5 w-4 h-4 rounded border-border accent-warning cursor-pointer flex-shrink-0"
+          aria-label="ยืนยันว่าเข้าใจความเสี่ยงของการอัปโหลดซ้ำ"
+        />
+        <span className="text-xs text-text-muted group-hover:text-text transition-colors leading-relaxed">
+          ฉันเข้าใจว่าการอัปโหลดอาจสร้างข้อมูลซ้ำ และต้องการดำเนินการต่อ
+        </span>
+      </label>
+    </div>
+  );
+}
+
 // ── Confirmation card ─────────────────────────────────────────────────────────
 
 interface ConfirmationCardProps {
   totalRecords: number;
+  hasConflict: boolean;
   onConfirm: () => void;
   onCancel: () => void;
 }
 
-function ConfirmationCard({ totalRecords, onConfirm, onCancel }: ConfirmationCardProps) {
+function ConfirmationCard({ totalRecords, hasConflict, onConfirm, onCancel }: ConfirmationCardProps) {
   return (
     <div className="bg-surface border border-primary/30 rounded-xl p-4 space-y-3">
       <div className="flex items-start gap-2.5">
@@ -331,9 +369,15 @@ function ConfirmationCard({ totalRecords, onConfirm, onCancel }: ConfirmationCar
             ระบบจะอัปโหลด <span className="font-semibold text-text">{totalRecords} รายการ</span> ไปยัง Supabase
             — ข้อมูลบนอุปกรณ์นี้จะไม่ถูกลบหรือเปลี่ยนแปลง
           </p>
-          <p className="text-xs text-warning mt-1">
-            ⚠️ อย่ากดอัปโหลดซ้ำ เนื่องจากจะสร้างข้อมูลซ้ำในฐานข้อมูล
-          </p>
+          {hasConflict ? (
+            <p className="text-xs text-warning mt-1 font-medium">
+              ⚠️ Cloud มีข้อมูลอยู่แล้ว — การอัปโหลดจะเพิ่มข้อมูลใหม่ต่อท้าย (ไม่เขียนทับ)
+            </p>
+          ) : (
+            <p className="text-xs text-warning mt-1">
+              ⚠️ อย่ากดอัปโหลดซ้ำ เนื่องจากจะสร้างข้อมูลซ้ำในฐานข้อมูล
+            </p>
+          )}
         </div>
       </div>
       <div className="flex gap-2">
@@ -374,6 +418,8 @@ export default function CloudSyncPreview() {
   const { migrationState, migrationProgress, previousMigration, startMigration } = useMigration();
 
   const [showConfirmation, setShowConfirmation] = useState(false);
+  // Conflict acknowledgement — required before upload when plan.hasConflict
+  const [conflictAcknowledged, setConflictAcknowledged] = useState(false);
 
   const allDomains: SyncDomainPlan["domain"][] = ["profile", "progress", "observations"];
 
@@ -404,7 +450,9 @@ export default function CloudSyncPreview() {
     provider !== "local" &&
     hasAnyData &&
     !hasMigrated &&
-    migrationState === "idle";
+    migrationState === "idle" &&
+    // When conflict exists, user must explicitly acknowledge before uploading
+    (!plan.hasConflict || conflictAcknowledged);
 
   // Blocked reasons — ordered by priority
   function getBlockedMessage(): string | null {
@@ -437,6 +485,12 @@ export default function CloudSyncPreview() {
 
   function handleCancel() {
     setShowConfirmation(false);
+  }
+
+  function handleAcknowledge(checked: boolean) {
+    setConflictAcknowledged(checked);
+    // Reset confirmation when acknowledgement is toggled
+    if (!checked) setShowConfirmation(false);
   }
 
   return (
@@ -606,6 +660,15 @@ export default function CloudSyncPreview() {
         </div>
       )}
 
+      {/* ── Conflict warning (shown before upload when cloud already has data) ── */}
+      {!isMigrating && !hasMigrated && plan.hasConflict && isAuthenticated && hasAnyData && (
+        <ConflictWarningCard
+          conflictSummary={plan.conflictSummary ?? "พบข้อมูลทั้งบน Cloud และบนอุปกรณ์นี้"}
+          acknowledged={conflictAcknowledged}
+          onAcknowledge={handleAcknowledge}
+        />
+      )}
+
       {/* ── Action area ── */}
       {!isMigrating && migrationState !== "success" && !hasMigrated && (
         <div className="space-y-3 pt-1">
@@ -613,6 +676,7 @@ export default function CloudSyncPreview() {
           {showConfirmation && canUpload && (
             <ConfirmationCard
               totalRecords={plan.totalRecords}
+              hasConflict={plan.hasConflict}
               onConfirm={handleConfirm}
               onCancel={handleCancel}
             />

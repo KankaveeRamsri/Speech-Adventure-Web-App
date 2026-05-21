@@ -8,6 +8,11 @@ import { useSpeechProgress } from "@/hooks/useSpeechProgress";
 import { useChildProfile } from "@/hooks/useChildProfile";
 import { useObservationNotes } from "@/hooks/useObservationNotes";
 import { useAuth } from "@/hooks/useAuth";
+// Direct localStorage reads for conflict detection — always reflect device-local
+// state regardless of which storage provider is currently active.
+import { getProfile as getLocalProfile } from "@/lib/child-profile/childProfileStorage";
+import { getProgress as getLocalProgress } from "@/lib/speechProgressStorage";
+import { getObservations as getLocalObservations } from "@/lib/observations/observationStorage";
 
 export interface SyncPlanPreview {
   plan: SyncPlan;
@@ -57,6 +62,39 @@ export function useSyncPlanPreview(): SyncPlanPreview {
     [progress.attempts.length, progress.sessions.length, notes.length, hasProfile],
   );
 
+  // ── Conflict detection ──────────────────────────────────────────────────────
+  //
+  // localHasData: always read from localStorage storage modules directly.
+  // These are the modules' in-memory caches — synchronous, device-local, and
+  // independent of the active storage provider.
+  //
+  // cloudHasData: when provider=supabase the active hooks return cloud state
+  // after hydration. We use the memoised counts rather than re-reading repos.
+  // When provider=local there is no Supabase connection, so cloud is always false.
+
+  const localHasData = useMemo(() => {
+    if (typeof window === "undefined") return false;
+    const localProfile = getLocalProfile();
+    const localProgress = getLocalProgress();
+    const localNotes = getLocalObservations();
+    return (
+      localProfile !== null ||
+      localProgress.attempts.length > 0 ||
+      localProgress.sessions.length > 0 ||
+      localNotes.length > 0
+    );
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // snapshot at mount — stable reference for the upload decision
+
+  const cloudHasData = useMemo(
+    () =>
+      provider !== "local" &&
+      isAuthenticated &&
+      isHydrated &&
+      (counts.hasProfile || counts.attempts > 0 || counts.sessions > 0 || counts.observations > 0),
+    [provider, isAuthenticated, isHydrated, counts],
+  );
+
   const plan = useMemo(
     () =>
       buildSyncPlan({
@@ -65,8 +103,10 @@ export function useSyncPlanPreview(): SyncPlanPreview {
         observationRecords: isHydrated ? counts.observations : 0,
         isAuthenticated,
         isSupabaseAvailable: isSupabaseEnvSet,
+        localHasData,
+        cloudHasData,
       }),
-    [isHydrated, counts, isAuthenticated, isSupabaseEnvSet],
+    [isHydrated, counts, isAuthenticated, isSupabaseEnvSet, localHasData, cloudHasData],
   );
 
   return {
