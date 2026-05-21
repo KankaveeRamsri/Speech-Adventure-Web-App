@@ -33,6 +33,8 @@ export class SupabaseProfileRepository implements IProfileRepository {
   private readonly _listeners = new Set<() => void>();
   private _hydrated = false;
   private _hydratePromise: Promise<void> | null = null;
+  // Incremented by rehydrate() to invalidate any in-flight _hydrate() call
+  private _hydrateGen = 0;
 
   constructor(private readonly client: SupabaseClient<Database>) {}
 
@@ -119,6 +121,22 @@ export class SupabaseProfileRepository implements IProfileRepository {
     }
   }
 
+  // ── Rehydration (called by RepositoryProvider after auth session is ready) ─
+
+  /**
+   * Resets hydration state and re-fetches from Supabase.
+   * Safe to call multiple times — generation counter prevents stale writes.
+   */
+  public rehydrate(): void {
+    if (process.env.NODE_ENV !== "production") {
+      console.debug("[SupabaseProfileRepository] rehydrate triggered");
+    }
+    this._hydrated = false;
+    this._hydratePromise = null;
+    this._hydrateGen++;
+    this._triggerHydrate();
+  }
+
   // ── Private helpers ───────────────────────────────────────────────────────
 
   private _setCache(value: ChildProfileData | null): void {
@@ -138,11 +156,16 @@ export class SupabaseProfileRepository implements IProfileRepository {
   }
 
   private async _hydrate(): Promise<void> {
+    const myGen = this._hydrateGen;
+
     const { data, error } = await this.client
       .from("child_profiles")
       .select("*")
       .limit(1)
       .maybeSingle();
+
+    // Bail if a newer rehydrate() superseded us
+    if (this._hydrateGen !== myGen) return;
 
     if (error) {
       warnRepo("SupabaseProfileRepository._hydrate", new QueryError("child_profiles", "select", error));

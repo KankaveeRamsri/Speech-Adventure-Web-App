@@ -4,6 +4,9 @@ import type { SupabaseClient } from "@/lib/supabase/client";
 import type { Database } from "@/types/supabase";
 import { dbToDomainNote, domainToDbNote } from "./mappers";
 import { QueryError, warnRepo } from "./errors";
+import { localRead } from "@/lib/storage/local/localStorageClient";
+import { STORAGE_KEYS } from "@/lib/storage/storageKeys";
+import { ObservationNotesArraySchema, parseOrNull } from "@/lib/validation";
 
 // ── Stable server snapshot ────────────────────────────────────────────────────
 const SERVER_NOTES: ObservationNote[] = [];
@@ -33,6 +36,8 @@ export class SupabaseObservationRepository implements IObservationRepository {
   private readonly _listeners = new Set<() => void>();
   private _hydrated = false;
   private _hydratePromise: Promise<void> | null = null;
+  // Incremented by rehydrate() to invalidate any in-flight _hydrate() call
+  private _hydrateGen = 0;
 
   constructor(private readonly client: SupabaseClient<Database>) {}
 
@@ -167,6 +172,22 @@ export class SupabaseObservationRepository implements IObservationRepository {
     }
   }
 
+  // ── Rehydration (called by RepositoryProvider after auth session is ready) ─
+
+  /**
+   * Resets hydration state and re-fetches from Supabase.
+   * Safe to call multiple times — generation counter prevents stale writes.
+   */
+  public rehydrate(): void {
+    if (process.env.NODE_ENV !== "production") {
+      console.debug("[SupabaseObservationRepository] rehydrate triggered");
+    }
+    this._hydrated = false;
+    this._hydratePromise = null;
+    this._hydrateGen++;
+    this._triggerHydrate();
+  }
+
   // ── Private helpers ───────────────────────────────────────────────────────
 
   private _setCache(notes: ObservationNote[]): void {
@@ -186,14 +207,28 @@ export class SupabaseObservationRepository implements IObservationRepository {
   }
 
   private async _hydrate(): Promise<void> {
+    const myGen = this._hydrateGen;
+
     // RLS on observation_notes uses is_own_child(child_id) — the DB filters for us.
     const { data, error } = await this.client
       .from("observation_notes")
       .select("*")
       .order("created_at", { ascending: false });
 
+    // Bail if a newer rehydrate() superseded us
+    if (this._hydrateGen !== myGen) return;
+
     if (error) {
       warnRepo("SupabaseObservationRepository._hydrate", new QueryError("observation_notes", "select", error));
+      // Fallback to localStorage so observation panel isn't blank when Supabase is unreachable
+      const local = this._readLocalNotes();
+      if (local && local.length > 0) {
+        if (process.env.NODE_ENV !== "production") {
+          console.debug("[SupabaseObservationRepository] cloud error — falling back to localStorage");
+        }
+        this._cache = local;
+        this._notify();
+      }
       this._hydrated = true;
       return;
     }
@@ -201,6 +236,16 @@ export class SupabaseObservationRepository implements IObservationRepository {
     this._cache = (data ?? []).map(dbToDomainNote);
     this._hydrated = true;
     this._notify();
+  }
+
+  private _readLocalNotes(): ObservationNote[] | null {
+    try {
+      const raw = localRead(STORAGE_KEYS.OBSERVATIONS);
+      if (!raw) return null;
+      return parseOrNull(ObservationNotesArraySchema, JSON.parse(raw), "observations") as ObservationNote[] | null;
+    } catch {
+      return null;
+    }
   }
 
   private async _getCurrentUserId(): Promise<string | null> {

@@ -16,6 +16,9 @@ import {
   domainToDbSession,
 } from "./mappers";
 import { QueryError, warnRepo } from "./errors";
+import { localRead } from "@/lib/storage/local/localStorageClient";
+import { STORAGE_KEYS } from "@/lib/storage/storageKeys";
+import { SpeechProgressSchema, parseOrNull } from "@/lib/validation";
 
 // ── Stable server snapshots (SSR has no Supabase session) ─────────────────────
 const DEFAULT_CHILD_ID = "";
@@ -67,6 +70,8 @@ export class SupabaseProgressRepository implements IProgressRepository {
   // Hydration state
   private _hydrated = false;
   private _hydratePromise: Promise<void> | null = null;
+  // Incremented by rehydrate() to invalidate any in-flight _hydrate() call
+  private _hydrateGen = 0;
 
   constructor(private readonly client: SupabaseClient<Database>) {}
 
@@ -295,6 +300,23 @@ export class SupabaseProgressRepository implements IProgressRepository {
     }
   }
 
+  // ── Rehydration (called by RepositoryProvider after auth session is ready) ─
+
+  /**
+   * Resets hydration state and re-fetches from Supabase.
+   * Safe to call multiple times — generation counter prevents stale writes.
+   */
+  public rehydrate(): void {
+    if (process.env.NODE_ENV !== "production") {
+      console.debug("[SupabaseProgressRepository] rehydrate triggered");
+    }
+    this._hydrated = false;
+    this._hydratePromise = null;
+    this._childId = null;
+    this._hydrateGen++;
+    this._triggerHydrate();
+  }
+
   // ── Private helpers ───────────────────────────────────────────────────────
 
   private _setProgress(progress: SpeechProgress): void {
@@ -318,6 +340,8 @@ export class SupabaseProgressRepository implements IProgressRepository {
   }
 
   private async _hydrate(): Promise<void> {
+    const myGen = this._hydrateGen;
+
     // Step 1: get child profile (needed for child_id + selected_sound_id + target_sound)
     const { data: profile, error: profileError } = await this.client
       .from("child_profiles")
@@ -325,14 +349,34 @@ export class SupabaseProgressRepository implements IProgressRepository {
       .limit(1)
       .maybeSingle();
 
+    // Bail if a newer rehydrate() superseded us
+    if (this._hydrateGen !== myGen) return;
+
     if (profileError) {
       warnRepo("SupabaseProgressRepository._hydrate (child_profiles)", new QueryError("child_profiles", "select", profileError));
+      // Fallback to localStorage so the training map isn't blank when Supabase is unreachable
+      const local = this._readLocalProgress();
+      if (local) {
+        if (process.env.NODE_ENV !== "production") {
+          console.debug("[SupabaseProgressRepository] cloud error — falling back to localStorage");
+        }
+        this._progress = local;
+        this._notifyProgress();
+      }
       this._hydrated = true;
       return;
     }
 
     if (!profile) {
-      // User has no child profile yet — return empty progress
+      // No Supabase profile yet (pre-migration) — fall back to localStorage data
+      const local = this._readLocalProgress();
+      if (local && (local.attempts.length > 0 || local.sessions.length > 0)) {
+        if (process.env.NODE_ENV !== "production") {
+          console.debug("[SupabaseProgressRepository] no cloud profile — falling back to localStorage");
+        }
+        this._progress = local;
+        this._notifyProgress();
+      }
       this._hydrated = true;
       return;
     }
@@ -353,6 +397,9 @@ export class SupabaseProgressRepository implements IProgressRepository {
         .eq("child_id", profile.id)
         .order("created_at", { ascending: false }),
     ]);
+
+    // Check again after the second async batch
+    if (this._hydrateGen !== myGen) return;
 
     if (sessionsResult.error) {
       warnRepo("SupabaseProgressRepository._hydrate (sessions)", new QueryError("practice_sessions", "select", sessionsResult.error));
@@ -375,6 +422,16 @@ export class SupabaseProgressRepository implements IProgressRepository {
     this._hydrated = true;
     this._notifyProgress();
     this._notifySound();
+  }
+
+  private _readLocalProgress(): SpeechProgress | null {
+    try {
+      const raw = localRead(STORAGE_KEYS.PROGRESS);
+      if (!raw) return null;
+      return parseOrNull(SpeechProgressSchema, JSON.parse(raw), "progress") as SpeechProgress | null;
+    } catch {
+      return null;
+    }
   }
 
   private async _updateSessionStatus(

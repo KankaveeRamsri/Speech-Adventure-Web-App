@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, useContext, useMemo } from "react";
+import { createContext, useContext, useEffect, useMemo, useRef } from "react";
 import type { ReactNode } from "react";
 import type { IProgressRepository } from "@/lib/repositories/IProgressRepository";
 import type { IProfileRepository } from "@/lib/repositories/IProfileRepository";
@@ -14,6 +14,7 @@ import {
 } from "@/lib/config/storageProvider";
 import { isSupabaseConfigured } from "@/lib/supabase/client";
 import { createSupabaseRepositories } from "@/lib/storage/supabase/createSupabaseRepositories";
+import { useAuth } from "@/hooks/useAuth";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -73,6 +74,20 @@ function _resolveRepositories(): Repositories {
 
 const defaultRepositories: Repositories = _resolveRepositories();
 
+// ── Rehydration helper ────────────────────────────────────────────────────────
+//
+// Supabase repositories expose a public rehydrate() method; local repositories
+// do not. This duck-type guard lets RepositoryProvider call rehydrate() only on
+// repos that support it — no changes to the IRepository interfaces required.
+
+interface Rehydratable {
+  rehydrate(): void;
+}
+
+function hasRehydrate(repo: unknown): repo is Rehydratable {
+  return typeof (repo as Rehydratable).rehydrate === "function";
+}
+
 // ── Context ───────────────────────────────────────────────────────────────────
 
 const RepositoryContext = createContext<Repositories>(defaultRepositories);
@@ -90,6 +105,8 @@ interface RepositoryProviderProps {
 }
 
 export function RepositoryProvider({ children, overrides }: RepositoryProviderProps) {
+  const { isLoading, user } = useAuth();
+
   // useMemo so the merged object only changes when overrides reference changes.
   const value = useMemo<Repositories>(
     () => ({ ...defaultRepositories, ...overrides }),
@@ -97,6 +114,28 @@ export function RepositoryProvider({ children, overrides }: RepositoryProviderPr
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [overrides?.progress, overrides?.profile, overrides?.observations],
   );
+
+  // Track the last userId we triggered rehydration for — prevents duplicate calls.
+  const prevUserIdRef = useRef<string | null>(null);
+
+  // After auth settles (session restored or signed in), rehydrate Supabase repos
+  // so they fetch real cloud data instead of the empty result from the pre-auth
+  // query that fired immediately on first subscribe().
+  useEffect(() => {
+    if (isLoading) return; // auth still initializing — wait
+
+    const userId = user?.id ?? null;
+    if (userId === prevUserIdRef.current) return; // no user change — skip
+    prevUserIdRef.current = userId;
+
+    if (!userId) return; // signed out — repos stay as-is (no cloud data to fetch)
+
+    // Only Supabase repos implement rehydrate(); local repos are unaffected.
+    if (hasRehydrate(value.profile)) value.profile.rehydrate();
+    if (hasRehydrate(value.progress)) value.progress.rehydrate();
+    if (hasRehydrate(value.observations)) value.observations.rehydrate();
+  // value is a stable useMemo result; safe to include — it rarely changes.
+  }, [isLoading, user?.id, value]);
 
   return (
     <RepositoryContext.Provider value={value}>
