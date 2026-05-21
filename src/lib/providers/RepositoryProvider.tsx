@@ -74,18 +74,26 @@ function _resolveRepositories(): Repositories {
 
 const defaultRepositories: Repositories = _resolveRepositories();
 
-// ── Rehydration helper ────────────────────────────────────────────────────────
+// ── Session boundary helpers ──────────────────────────────────────────────────
 //
-// Supabase repositories expose a public rehydrate() method; local repositories
-// do not. This duck-type guard lets RepositoryProvider call rehydrate() only on
-// repos that support it — no changes to the IRepository interfaces required.
+// Supabase repositories expose public rehydrate() and reset() methods.
+// Local repositories do not. Duck-type guards let RepositoryProvider call
+// these methods without changing the IRepository interfaces.
 
 interface Rehydratable {
   rehydrate(): void;
 }
 
+interface Resettable {
+  reset(): void;
+}
+
 function hasRehydrate(repo: unknown): repo is Rehydratable {
   return typeof (repo as Rehydratable).rehydrate === "function";
+}
+
+function hasReset(repo: unknown): repo is Resettable {
+  return typeof (repo as Resettable).reset === "function";
 }
 
 // ── Context ───────────────────────────────────────────────────────────────────
@@ -115,25 +123,57 @@ export function RepositoryProvider({ children, overrides }: RepositoryProviderPr
     [overrides?.progress, overrides?.profile, overrides?.observations],
   );
 
-  // Track the last userId we triggered rehydration for — prevents duplicate calls.
+  // Track the last userId we acted on — prevents duplicate calls and lets us
+  // detect the direction of the transition (sign-in, sign-out, account switch).
   const prevUserIdRef = useRef<string | null>(null);
 
-  // After auth settles (session restored or signed in), rehydrate Supabase repos
-  // so they fetch real cloud data instead of the empty result from the pre-auth
-  // query that fired immediately on first subscribe().
+  // Respond to every auth state change after the initial loading phase:
+  //
+  //  • null → userId  : first sign-in or session restore → rehydrate
+  //  • userId → null  : sign-out → reset (clear cache immediately)
+  //  • userA → userB  : account switch → reset then rehydrate
+  //
+  // Only Supabase repos implement reset()/rehydrate(); local repos are unaffected
+  // (duck-type guards return false, so those calls are skipped).
   useEffect(() => {
     if (isLoading) return; // auth still initializing — wait
 
     const userId = user?.id ?? null;
-    if (userId === prevUserIdRef.current) return; // no user change — skip
+    if (userId === prevUserIdRef.current) return; // no change — skip
+
+    const prevUserId = prevUserIdRef.current;
     prevUserIdRef.current = userId;
 
-    if (!userId) return; // signed out — repos stay as-is (no cloud data to fetch)
+    // ── Sign out: clear cloud cache immediately ───────────────────────────────
+    if (prevUserId !== null && userId === null) {
+      if (process.env.NODE_ENV !== "production") {
+        console.debug("[RepositoryProvider] sign out — resetting cloud repositories");
+      }
+      if (hasReset(value.profile)) value.profile.reset();
+      if (hasReset(value.progress)) value.progress.reset();
+      if (hasReset(value.observations)) value.observations.reset();
+      return;
+    }
 
-    // Only Supabase repos implement rehydrate(); local repos are unaffected.
-    if (hasRehydrate(value.profile)) value.profile.rehydrate();
-    if (hasRehydrate(value.progress)) value.progress.rehydrate();
-    if (hasRehydrate(value.observations)) value.observations.rehydrate();
+    // ── Account switch: reset previous user's data before loading the new user ─
+    if (prevUserId !== null && userId !== null) {
+      if (process.env.NODE_ENV !== "production") {
+        console.debug("[RepositoryProvider] user switch — resetting before rehydrate");
+      }
+      if (hasReset(value.profile)) value.profile.reset();
+      if (hasReset(value.progress)) value.progress.reset();
+      if (hasReset(value.observations)) value.observations.reset();
+    }
+
+    // ── Sign in / session restore / account switch: load cloud data ───────────
+    if (userId) {
+      if (process.env.NODE_ENV !== "production") {
+        console.debug(`[RepositoryProvider] user ${userId} — rehydrating cloud repositories`);
+      }
+      if (hasRehydrate(value.profile)) value.profile.rehydrate();
+      if (hasRehydrate(value.progress)) value.progress.rehydrate();
+      if (hasRehydrate(value.observations)) value.observations.rehydrate();
+    }
   // value is a stable useMemo result; safe to include — it rarely changes.
   }, [isLoading, user?.id, value]);
 

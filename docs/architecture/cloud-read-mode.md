@@ -123,26 +123,85 @@ Warnings are suppressed in `NODE_ENV=production`.
 
 ---
 
+## Session Boundary Safety (Phase 33)
+
+### Problem
+
+After sign-out, the in-memory cache still held the previous user's data.
+On account switch, there was a window where the new user could briefly see
+the previous user's profile/progress.
+
+### Solution: `reset()` + updated `RepositoryProvider` effect
+
+Each Supabase repository now exposes a public `reset()` method alongside `rehydrate()`:
+
+```typescript
+public reset(): void {
+  this._hydrateGen++;        // cancel any in-flight _hydrate()
+  this._hydrated = false;
+  this._hydratePromise = null;
+  this._cache = SERVER_VALUE; // immediately return to empty snapshot
+  this._notify();             // subscribers re-render with empty state at once
+}
+```
+
+`reset()` differs from `rehydrate()`:
+
+| | `reset()` | `rehydrate()` |
+|---|---|---|
+| Clears cache immediately | ✓ | ✗ (fetches first) |
+| Notifies subscribers | ✓ | ✓ (after fetch) |
+| Starts a new fetch | ✗ | ✓ |
+| Use case | sign-out, pre-switch | sign-in, session restore |
+
+### Auth transition matrix
+
+`RepositoryProvider.useEffect` handles every auth transition:
+
+```
+prevUserId  →  userId     Action
+──────────────────────────────────────────────────────
+null        →  "user-A"   rehydrate()              (first sign-in / session restore)
+"user-A"    →  null       reset()                  (sign-out)
+"user-A"    →  "user-B"   reset() then rehydrate() (account switch)
+null        →  null       (no-op — isLoading still settling)
+"user-A"    →  "user-A"   (no-op — same user, equality check exits early)
+```
+
+### Dev-mode log messages
+
+```
+[RepositoryProvider] sign out — resetting cloud repositories
+[RepositoryProvider] user switch — resetting before rehydrate
+[RepositoryProvider] user <id> — rehydrating cloud repositories
+[SupabaseProfileRepository] reset — clearing cache
+[SupabaseProgressRepository] reset — clearing cache
+[SupabaseObservationRepository] reset — clearing cache
+```
+
+---
+
 ## Affected Files
 
 | File | Change |
 |---|---|
-| `src/lib/storage/supabase/SupabaseProfileRepository.ts` | + `rehydrate()`, `_hydrateGen`, generation guard in `_hydrate()` |
-| `src/lib/storage/supabase/SupabaseProgressRepository.ts` | + `rehydrate()`, `_hydrateGen`, generation guard, localStorage fallback, `_readLocalProgress()` |
-| `src/lib/storage/supabase/SupabaseObservationRepository.ts` | + `rehydrate()`, `_hydrateGen`, generation guard, localStorage fallback, `_readLocalNotes()` |
-| `src/lib/providers/RepositoryProvider.tsx` | + `useAuth`, `useEffect`, `useRef`, `hasRehydrate`, rehydration effect |
+| `src/lib/storage/supabase/SupabaseProfileRepository.ts` | + `reset()`, `rehydrate()`, `_hydrateGen`, generation guard |
+| `src/lib/storage/supabase/SupabaseProgressRepository.ts` | + `reset()`, `rehydrate()`, `_hydrateGen`, generation guard, localStorage fallback |
+| `src/lib/storage/supabase/SupabaseObservationRepository.ts` | + `reset()`, `rehydrate()`, `_hydrateGen`, generation guard, localStorage fallback |
+| `src/lib/providers/RepositoryProvider.tsx` | + `hasReset()`, auth transition matrix in `useEffect` |
 | `docs/architecture/cloud-read-mode.md` | this document |
 
 ---
 
 ## Invariants Preserved
 
-- **No localStorage data deleted** — fallback reads only; writes are unchanged.
+- **No localStorage data deleted** — `reset()` only clears the in-memory cache;
+  localStorage is untouched. Fallback reads are also unchanged.
 - **No two-way sync** — cloud data is read-only in this phase; writes still go through
   the normal path (which handles auth internally via `_getCurrentUserId()`).
 - **Repository abstraction intact** — `IProfileRepository`, `IProgressRepository`,
-  `IObservationRepository` interfaces are unchanged. `rehydrate()` is a concrete method
-  on Supabase implementations only, accessed via duck-typing.
+  `IObservationRepository` interfaces are unchanged. `reset()` and `rehydrate()` are
+  concrete methods on Supabase implementations only, accessed via duck-typing.
 - **No UI changes** — components continue calling `useSpeechProgress()`,
   `useChildProfile()`, `useObservationNotes()` with no modifications.
 
@@ -150,11 +209,8 @@ Warnings are suppressed in `NODE_ENV=production`.
 
 ## Limitations
 
-- **Sign-out does not clear cloud state** — after sign-out, the cache still holds
-  the last-fetched data until the page is reloaded. Clearing on sign-out is a
-  Phase 33+ concern.
 - **No real-time updates** — Supabase Realtime is not wired; data is fetched once per
-  sign-in. Subsequent cloud writes from other devices won't appear until refresh.
+  sign-in event. Subsequent cloud writes from other devices won't appear until refresh.
 - **target_id string → UUID migration pending** — observation notes with string
   `target_id` values will fail the Supabase insert. Tracked in Phase 27.
 
@@ -162,12 +218,13 @@ Warnings are suppressed in `NODE_ENV=production`.
 
 ## Testing
 
-### Manual test checklist
+### Manual test checklist (full session boundary test)
 
 1. Set `NEXT_PUBLIC_STORAGE_PROVIDER=supabase` in `.env.local`
-2. Sign in → confirm profile/progress/observations load without refresh
-3. Upload local data to cloud (migration button)
-4. Refresh → confirm cloud data still loads
-5. Open incognito → sign in same account → confirm cloud data appears (no localStorage)
-6. Disable Supabase (set URL to invalid) → confirm app falls back to localStorage without crashing
-7. Sign out → sign back in → confirm rehydration fires again (prevUserIdRef resets)
+2. Sign in account A → confirm cloud data loads
+3. Sign out → confirm profile/progress disappear immediately (no refresh needed)
+4. Sign in account B → confirm only account B data appears (no data from A)
+5. Refresh page → confirm account B data still loads correctly
+6. Switch `NEXT_PUBLIC_STORAGE_PROVIDER=local` → confirm app works with localStorage
+7. Open DevTools console — confirm dev-mode logs appear on auth transitions
+8. Disable Supabase URL → confirm fallback to localStorage without crash

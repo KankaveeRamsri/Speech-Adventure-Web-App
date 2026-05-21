@@ -121,7 +121,24 @@ export class SupabaseProfileRepository implements IProfileRepository {
     }
   }
 
-  // ── Rehydration (called by RepositoryProvider after auth session is ready) ─
+  // ── Session boundary (called by RepositoryProvider on auth state change) ────
+
+  /**
+   * Clears the in-memory cache immediately and notifies subscribers.
+   * Called on sign-out or before rehydrating a different user.
+   * Does NOT trigger a new fetch — call rehydrate() after if needed.
+   */
+  public reset(): void {
+    if (process.env.NODE_ENV !== "production") {
+      console.debug("[SupabaseProfileRepository] reset — clearing cache");
+    }
+    // Invalidate any in-flight _hydrate() so it cannot overwrite the cleared state
+    this._hydrateGen++;
+    this._hydrated = false;
+    this._hydratePromise = null;
+    this._cache = null; // SERVER_PROFILE value — no profile visible
+    this._notify();
+  }
 
   /**
    * Resets hydration state and re-fetches from Supabase.

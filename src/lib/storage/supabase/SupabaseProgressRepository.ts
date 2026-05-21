@@ -300,7 +300,27 @@ export class SupabaseProgressRepository implements IProgressRepository {
     }
   }
 
-  // ── Rehydration (called by RepositoryProvider after auth session is ready) ─
+  // ── Session boundary (called by RepositoryProvider on auth state change) ────
+
+  /**
+   * Clears the in-memory cache immediately and notifies subscribers.
+   * Called on sign-out or before rehydrating a different user.
+   * Does NOT trigger a new fetch — call rehydrate() after if needed.
+   */
+  public reset(): void {
+    if (process.env.NODE_ENV !== "production") {
+      console.debug("[SupabaseProgressRepository] reset — clearing cache");
+    }
+    // Invalidate any in-flight _hydrate() so it cannot overwrite the cleared state
+    this._hydrateGen++;
+    this._hydrated = false;
+    this._hydratePromise = null;
+    this._childId = null;
+    this._progress = SERVER_PROGRESS; // stable empty snapshot
+    this._selectedSoundId = DEFAULT_SOUND_ID;
+    this._notifyProgress();
+    this._notifySound();
+  }
 
   /**
    * Resets hydration state and re-fetches from Supabase.
