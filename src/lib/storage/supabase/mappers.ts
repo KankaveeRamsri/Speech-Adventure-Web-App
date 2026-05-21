@@ -63,6 +63,7 @@ export function dbToDomainAttempt(db: DbPracticeAttempt): PracticeAttempt {
     starsEarned: db.stars_earned,
     sessionId: db.session_id ?? undefined,
     createdAt: db.created_at,
+    audioPath: db.audio_path ?? undefined,
   };
 }
 
@@ -133,8 +134,8 @@ export function domainToDbAttempt(
     feedback: attempt.feedback,
     recommendation: attempt.recommendation ?? null,
     stars_earned: attempt.starsEarned,
-    is_mock: true,   // TODO Phase 5: set false when real AI evaluation is active
-    audio_path: null, // TODO Phase 5: Supabase Storage upload path
+    is_mock: true,   // TODO: set false when real AI evaluation is active
+    audio_path: attempt.audioPath ?? null,
   };
 }
 

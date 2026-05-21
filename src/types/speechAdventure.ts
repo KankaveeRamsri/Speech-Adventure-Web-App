@@ -124,6 +124,8 @@ export interface PracticeAttempt {
   starsEarned: number;
   sessionId?: string;
   createdAt: string;
+  /** Supabase Storage path set after a successful audio upload (Phase 35+). */
+  audioPath?: string;
 }
 
 export interface SpeechProgress {

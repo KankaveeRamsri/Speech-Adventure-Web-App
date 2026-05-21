@@ -6,6 +6,10 @@ import type { RecordingState } from "@/types/speechAdventure";
 interface UseAudioRecorderReturn {
   state: RecordingState;
   audioUrl: string | null;
+  /** Raw Blob produced by the last recording. Available after stopRecording. */
+  blob: Blob | null;
+  /** MIME type of the last recording (e.g. "audio/webm", "audio/mp4"). */
+  mimeType: string;
   durationMs: number;
   errorMessage: string | null;
   startRecording: () => Promise<void>;
@@ -17,6 +21,8 @@ interface UseAudioRecorderReturn {
 export function useAudioRecorder(): UseAudioRecorderReturn {
   const [state, setState] = useState<RecordingState>("idle");
   const [audioUrl, setAudioUrl] = useState<string | null>(null);
+  const [blob, setBlob] = useState<Blob | null>(null);
+  const [mimeType, setMimeType] = useState<string>("audio/webm");
   const [durationMs, setDurationMs] = useState(0);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
@@ -54,6 +60,8 @@ export function useAudioRecorder(): UseAudioRecorderReturn {
       URL.revokeObjectURL(audioUrl);
     }
     setAudioUrl(null);
+    setBlob(null);
+    setMimeType("audio/webm");
     setDurationMs(0);
     setErrorMessage(null);
     setState("idle");
@@ -115,12 +123,15 @@ export function useAudioRecorder(): UseAudioRecorderReturn {
           timerRef.current = null;
         }
 
-        const blob = new Blob(chunksRef.current, { type: recorder.mimeType || "audio/webm" });
-        const url = URL.createObjectURL(blob);
+        const finalMimeType = recorder.mimeType || "audio/webm";
+        const finalBlob = new Blob(chunksRef.current, { type: finalMimeType });
+        const url = URL.createObjectURL(finalBlob);
 
         if (audioUrl) {
           URL.revokeObjectURL(audioUrl);
         }
+        setBlob(finalBlob);
+        setMimeType(finalMimeType);
         setAudioUrl(url);
 
         stream.getTracks().forEach((track) => track.stop());
@@ -187,6 +198,8 @@ export function useAudioRecorder(): UseAudioRecorderReturn {
   return {
     state,
     audioUrl,
+    blob,
+    mimeType,
     durationMs,
     errorMessage,
     startRecording,

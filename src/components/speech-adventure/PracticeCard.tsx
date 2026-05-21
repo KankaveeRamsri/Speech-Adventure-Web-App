@@ -5,6 +5,10 @@ import type { PracticeItem, EvaluationResult, PracticeAttempt } from "@/types/sp
 import type { SpeechEvaluationResult } from "@/lib/speech-evaluation/types";
 import { evaluateSpeechViaApi } from "@/lib/speech-evaluation/client";
 import { useAudioRecorder } from "@/hooks/useAudioRecorder";
+import { useAuth } from "@/hooks/useAuth";
+import { useChildProfile } from "@/hooks/useChildProfile";
+import { uploadPracticeAudio } from "@/lib/storage/supabase/audioStorage";
+import { isSupabaseConfigured } from "@/lib/supabase/client";
 import AudioRecorder from "./AudioRecorder";
 import EvaluationResultCard from "./EvaluationResultCard";
 import RewardBadge from "./RewardBadge";
@@ -78,6 +82,8 @@ export default function PracticeCard({
   onNext,
 }: Props) {
   const recorder = useAudioRecorder();
+  const { user, isAuthenticated } = useAuth();
+  const { profile } = useChildProfile();
   const [phase, setPhase] = useState<"idle" | "listening" | "recording" | "evaluated" | "saved" | "reward">("idle");
   const [result, setResult] = useState<EvaluationResult | null>(null);
   const [evalResult, setEvalResult] = useState<SpeechEvaluationResult | null>(null);
@@ -121,13 +127,35 @@ export default function PracticeCard({
     });
   }, [item, targetSound, recorder.durationMs]);
 
-  const handleAccept = useCallback(() => {
+  const handleAccept = useCallback(async () => {
     if (!evalResult) return;
     const attempt = buildAttempt(item, targetSound, evalResult, recorder.durationMs);
+
+    // Upload audio to Supabase Storage when all prerequisites are met.
+    // Falls back gracefully — attempt is saved regardless of upload outcome.
+    if (
+      recorder.blob &&
+      isAuthenticated &&
+      user?.id &&
+      profile?.id &&
+      isSupabaseConfigured()
+    ) {
+      const { path } = await uploadPracticeAudio(recorder.blob, {
+        userId: user.id,
+        childId: profile.id,
+        attemptId: attempt.id,
+        mimeType: recorder.mimeType,
+        durationMs: recorder.durationMs,
+      });
+      if (path) {
+        attempt.audioPath = path;
+      }
+    }
+
     setSavedAttempt(attempt);
     onSaveAttempt?.(attempt);
     setPhase("saved");
-  }, [evalResult, item, targetSound, recorder.durationMs, onSaveAttempt]);
+  }, [evalResult, item, targetSound, recorder, onSaveAttempt, isAuthenticated, user, profile]);
 
   const handleContinue = () => setPhase("reward");
 
