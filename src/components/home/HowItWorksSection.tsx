@@ -81,7 +81,7 @@ export default function HowItWorksSection() {
         <div className="hidden lg:block absolute top-10 left-[calc(12.5%+20px)] right-[calc(12.5%+20px)] h-px bg-gradient-to-r from-transparent via-border to-transparent" aria-hidden="true" />
 
         {steps.map((step) => (
-          <div key={step.num} className="relative bg-surface border border-border rounded-2xl p-6 hover:shadow-lg hover:-translate-y-0.5 transition-all group">
+          <div key={step.num} className="relative bg-surface border border-border rounded-2xl p-6 card-3d group">
             {/* Step number badge */}
             <div className="absolute -top-3 right-4 text-xs font-bold text-text-muted bg-bg border border-border rounded-full px-2 py-0.5">
               {step.num}

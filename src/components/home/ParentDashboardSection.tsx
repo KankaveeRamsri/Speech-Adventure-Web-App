@@ -160,7 +160,9 @@ const dashboardFeatures = [
 
 export default function ParentDashboardSection() {
   return (
-    <section className="mt-24" aria-labelledby="parent-dashboard-heading">
+    <section className="mt-24 relative" aria-labelledby="parent-dashboard-heading">
+      {/* Background depth blob */}
+      <div className="absolute top-1/4 -left-12 w-56 h-56 rounded-full bg-success/5 blur-[56px] pointer-events-none" aria-hidden="true" />
       {/* Header */}
       <div className="text-center mb-12">
         <div className="inline-flex items-center gap-2 bg-success/8 border border-success/20 rounded-full px-4 py-1.5 mb-4 text-sm font-medium text-success">
@@ -179,7 +181,11 @@ export default function ParentDashboardSection() {
       <div className="grid lg:grid-cols-2 gap-10 items-start">
         {/* Mock dashboard */}
         <div className="order-2 lg:order-1">
-          <MockDashboard />
+          <div className="dashboard-3d relative">
+            {/* Glow under dashboard */}
+            <div className="absolute inset-x-8 -bottom-4 h-12 bg-success/10 blur-2xl rounded-full -z-10" aria-hidden="true" />
+            <MockDashboard />
+          </div>
         </div>
 
         {/* Feature list */}
@@ -187,7 +193,7 @@ export default function ParentDashboardSection() {
           {dashboardFeatures.map((f) => (
             <div
               key={f.title}
-              className="flex items-start gap-4 bg-surface border border-border rounded-xl p-4 hover:shadow-sm hover:-translate-y-0.5 transition-all"
+              className="flex items-start gap-4 bg-surface border border-border rounded-xl p-4 feature-item-3d"
             >
               <div className="w-10 h-10 rounded-xl bg-success/8 border border-success/20 flex items-center justify-center text-success flex-shrink-0">
                 {f.icon}

@@ -137,7 +137,7 @@ export default function TrainingJourneySection() {
               <div key={stage.key} className="flex flex-col items-center group">
                 {/* Circle */}
                 <div
-                  className={`w-16 h-16 rounded-full flex items-center justify-center text-white mb-4 shadow-md group-hover:scale-110 transition-transform ${stage.color}`}
+                  className={`w-16 h-16 rounded-full flex items-center justify-center text-white mb-4 shadow-md stage-circle-3d ${stage.color}`}
                   aria-label={`ขั้นตอนที่ ${stage.num}: ${stage.name}`}
                 >
                   {stage.icon}
@@ -159,7 +159,7 @@ export default function TrainingJourneySection() {
           {stages.map((stage) => (
             <div
               key={`desc-${stage.key}`}
-              className={`rounded-xl border p-3 ${stage.bgLight} ${stage.borderColor} hover:shadow-sm transition-shadow`}
+              className={`rounded-xl border p-3 card-3d ${stage.bgLight} ${stage.borderColor}`}
             >
               <p className="text-[11px] text-text-muted leading-relaxed">{stage.desc}</p>
             </div>
@@ -172,7 +172,7 @@ export default function TrainingJourneySection() {
         {stages.map((stage) => (
           <div
             key={stage.key}
-            className={`flex items-start gap-4 bg-surface border ${stage.borderColor} rounded-2xl px-4 py-4 hover:shadow-sm transition-shadow`}
+            className={`flex items-start gap-4 bg-surface border ${stage.borderColor} rounded-2xl px-4 py-4 feature-item-3d`}
           >
             {/* Icon circle */}
             <div

@@ -6,7 +6,10 @@ import { useChildProfile } from "@/hooks/useChildProfile";
 /** Mini mock UI card — imitates the practice card in the actual app */
 function MockPracticeCard() {
   return (
-    <div className="bg-surface border border-border rounded-2xl shadow-xl overflow-hidden w-full max-w-xs">
+    <div
+      className="bg-surface/95 backdrop-blur-sm border border-white/15 rounded-2xl overflow-hidden w-full max-w-xs"
+      style={{ boxShadow: "0 24px 60px -8px rgba(108,99,255,0.4), 0 8px 24px -4px rgba(0,0,0,0.25), inset 0 1px 0 rgba(255,255,255,0.15)" }}
+    >
       {/* Top bar */}
       <div className="bg-primary/10 border-b border-border px-4 py-3 flex items-center justify-between">
         <div className="flex items-center gap-2">
@@ -76,7 +79,10 @@ function MockProgressWidget() {
   ];
 
   return (
-    <div className="bg-surface border border-border rounded-2xl shadow-lg overflow-hidden w-full max-w-[200px]">
+    <div
+      className="bg-surface/95 backdrop-blur-sm border border-white/12 rounded-2xl overflow-hidden w-full max-w-[200px]"
+      style={{ boxShadow: "0 16px 40px -8px rgba(79,70,229,0.35), 0 6px 16px -4px rgba(0,0,0,0.2), inset 0 1px 0 rgba(255,255,255,0.1)" }}
+    >
       <div className="px-4 py-3 border-b border-border">
         <p className="text-xs font-semibold text-text">ความก้าวหน้า</p>
         <p className="text-xs text-text-muted">น้องแพร · เสียง ก</p>
@@ -111,12 +117,14 @@ export default function HeroSectionV2() {
       className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-violet-600 via-indigo-600 to-violet-800 px-8 py-14 md:px-16 md:py-20 text-white"
       aria-labelledby="hero-heading"
     >
-      {/* Subtle background texture */}
+      {/* Gradient depth blobs */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none" aria-hidden="true">
-        <div className="absolute -top-32 -right-32 w-96 h-96 rounded-full bg-white/5" />
-        <div className="absolute -bottom-16 -left-16 w-64 h-64 rounded-full bg-white/5" />
+        <div className="absolute -top-28 -right-24 w-96 h-96 rounded-full bg-violet-400/25 blur-[80px]" />
+        <div className="absolute -bottom-20 -left-20 w-80 h-80 rounded-full bg-indigo-500/20 blur-[70px]" />
+        <div className="absolute top-1/4 right-1/3 w-52 h-52 rounded-full bg-emerald-400/10 blur-[50px]" />
         <div className="absolute top-1/3 right-1/4 w-3 h-3 rounded-full bg-white/30" />
         <div className="absolute bottom-1/3 right-12 w-2 h-2 rounded-full bg-violet-300/50" />
+        <div className="absolute top-1/5 left-1/3 w-1.5 h-1.5 rounded-full bg-emerald-300/60" />
         {/* Grid dot pattern */}
         <svg className="absolute inset-0 w-full h-full opacity-5" xmlns="http://www.w3.org/2000/svg">
           <defs>
@@ -202,11 +210,33 @@ export default function HeroSectionV2() {
         </div>
 
         {/* ── Right: product preview ── */}
-        <div className="flex-shrink-0 hidden lg:flex items-end gap-4 opacity-95">
-          <div className="transform rotate-[-2deg] hover:rotate-0 transition-transform duration-500">
+        <div className="flex-shrink-0 hidden lg:flex items-end gap-4 opacity-95 relative">
+          {/* Floating achievement badge */}
+          <div className="absolute -top-8 left-1/2 -translate-x-1/2 z-20 whitespace-nowrap pointer-events-none">
+            <div className="animate-float">
+              <div className="flex items-center gap-2 bg-emerald-900/55 backdrop-blur-md border border-emerald-400/30 rounded-xl px-3 py-1.5 shadow-lg shadow-black/25">
+                <div className="w-5 h-5 rounded-full bg-success flex items-center justify-center flex-shrink-0">
+                  <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                    <polyline points="20 6 9 17 4 12" />
+                  </svg>
+                </div>
+                <div>
+                  <p className="text-[10px] text-emerald-300/80 leading-none">พัฒนาการดีขึ้น</p>
+                  <p className="text-xs font-bold text-white leading-tight">+15% สัปดาห์นี้</p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Practice card — float A */}
+          <div className="animate-float-card-a relative">
+            <div className="absolute inset-x-4 -bottom-2 h-10 bg-violet-500/30 blur-2xl rounded-full -z-10" aria-hidden="true" />
             <MockPracticeCard />
           </div>
-          <div className="transform rotate-[3deg] hover:rotate-0 transition-transform duration-500 mb-8">
+
+          {/* Progress widget — float B, raised */}
+          <div className="animate-float-card-b mb-8 relative">
+            <div className="absolute inset-x-2 -bottom-2 h-7 bg-indigo-500/25 blur-xl rounded-full -z-10" aria-hidden="true" />
             <MockProgressWidget />
           </div>
         </div>

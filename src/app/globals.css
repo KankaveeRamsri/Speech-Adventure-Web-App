@@ -125,6 +125,67 @@ body {
 .animate-reveal-up { animation: reveal-up 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
 .animate-scale-in { animation: scale-in 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
 
+/* ── 3D Hero Card Floats ── */
+@keyframes float-card-a {
+  0%, 100% { transform: translateY(0px) rotate(-2deg); }
+  50% { transform: translateY(-14px) rotate(-1deg); }
+}
+
+@keyframes float-card-b {
+  0%, 100% { transform: translateY(-6px) rotate(3deg); }
+  50% { transform: translateY(8px) rotate(2deg); }
+}
+
+.animate-float-card-a {
+  animation: float-card-a 5s ease-in-out infinite;
+  will-change: transform;
+}
+
+.animate-float-card-b {
+  animation: float-card-b 4.5s ease-in-out infinite;
+  animation-delay: -1.5s;
+  will-change: transform;
+}
+
+/* ── 3D Hover Utilities ── */
+.card-3d {
+  transition: transform 0.3s cubic-bezier(0.2, 0, 0, 1), box-shadow 0.3s ease;
+}
+
+.stage-circle-3d {
+  transition: transform 0.25s ease, box-shadow 0.25s ease;
+}
+
+.dashboard-3d {
+  transition: transform 0.4s cubic-bezier(0.2, 0, 0, 1), box-shadow 0.4s ease;
+}
+
+.feature-item-3d {
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+@media (hover: hover) and (min-width: 768px) {
+  .card-3d:hover {
+    transform: perspective(700px) rotateX(-3deg) translateY(-6px);
+    box-shadow: 0 20px 50px -10px rgba(108, 99, 255, 0.15), 0 8px 20px -4px rgba(0, 0, 0, 0.08);
+  }
+
+  .stage-circle-3d:hover {
+    transform: perspective(300px) rotateY(-10deg) translateY(-5px) scale(1.1);
+    box-shadow: 0 14px 32px -6px rgba(0, 0, 0, 0.28);
+  }
+
+  .dashboard-3d:hover {
+    transform: perspective(1400px) rotateY(-2deg) rotateX(-1deg) translateY(-6px);
+    box-shadow: 0 32px 72px -16px rgba(0, 0, 0, 0.18);
+  }
+
+  .feature-item-3d:hover {
+    transform: translateX(6px) translateY(-2px);
+    box-shadow: 0 8px 24px -4px rgba(0, 0, 0, 0.08);
+  }
+}
+
 /* Reduced motion */
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {

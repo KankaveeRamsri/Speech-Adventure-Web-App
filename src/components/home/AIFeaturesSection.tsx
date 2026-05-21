@@ -113,7 +113,9 @@ function MockEvalCard() {
 
 export default function AIFeaturesSection() {
   return (
-    <section className="mt-24" aria-labelledby="ai-features-heading">
+    <section className="mt-24 relative" aria-labelledby="ai-features-heading">
+      {/* Background depth blob */}
+      <div className="absolute -top-12 right-0 w-64 h-64 rounded-full bg-primary/6 blur-[60px] pointer-events-none" aria-hidden="true" />
       {/* Header */}
       <div className="text-center mb-12">
         <div className="inline-flex items-center gap-2 bg-primary/8 border border-primary/15 rounded-full px-4 py-1.5 mb-4 text-sm font-medium text-primary">
@@ -134,7 +136,7 @@ export default function AIFeaturesSection() {
           {aiFeatures.map((f) => (
             <div
               key={f.key}
-              className="bg-surface border border-border rounded-2xl p-5 hover:shadow-md hover:-translate-y-0.5 transition-all group"
+              className="bg-surface border border-border rounded-2xl p-5 card-3d group"
             >
               <div className="w-12 h-12 rounded-xl bg-primary/8 border border-primary/15 flex items-center justify-center text-primary mb-4 group-hover:scale-110 transition-transform">
                 {f.icon}
@@ -151,7 +153,11 @@ export default function AIFeaturesSection() {
         {/* Mock evaluation card */}
         <div className="flex justify-center lg:justify-end">
           <div className="w-full max-w-sm">
-            <MockEvalCard />
+            <div className="dashboard-3d relative">
+              {/* Glow under card */}
+              <div className="absolute inset-x-6 -bottom-3 h-10 bg-primary/15 blur-2xl rounded-full -z-10" aria-hidden="true" />
+              <MockEvalCard />
+            </div>
             {/* Prototype notice */}
             <p className="text-xs text-text-muted text-center mt-4 leading-relaxed">
               * ปัจจุบันใช้ Mock Evaluation · Real AI Speech Analysis อยู่ในแผนพัฒนา
