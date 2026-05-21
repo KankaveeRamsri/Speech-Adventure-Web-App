@@ -38,6 +38,8 @@ export class SupabaseObservationRepository implements IObservationRepository {
   private _hydratePromise: Promise<void> | null = null;
   // Incremented by rehydrate() to invalidate any in-flight _hydrate() call
   private _hydrateGen = 0;
+  // Cached Supabase child_profiles UUID — populated lazily by _requireChildId()
+  private _childId: string | null = null;
 
   constructor(private readonly client: SupabaseClient<Database>) {}
 
@@ -66,15 +68,25 @@ export class SupabaseObservationRepository implements IObservationRepository {
     // Optimistic update — add to cache before the network round-trip
     this._setCache([...this._cache, note]);
 
-    const authorId = await this._getCurrentUserId();
+    const [authorId, childId] = await Promise.all([
+      this._getCurrentUserId(),
+      this._requireChildId(),
+    ]);
+
     if (!authorId) {
       warnRepo("SupabaseObservationRepository.addNote", "no auth user — note added to cache only");
       return;
     }
+    if (!childId) {
+      warnRepo("SupabaseObservationRepository.addNote", "no Supabase child_id — note added to cache only");
+      return;
+    }
 
+    // Override child_id with the Supabase UUID — note.childId may be a
+    // localStorage placeholder ("child-001") which is not a valid DB UUID.
     const { error } = await this.client
       .from("observation_notes")
-      .insert(domainToDbNote(note, authorId));
+      .insert({ ...domainToDbNote(note, authorId), child_id: childId });
 
     if (error) {
       warnRepo("SupabaseObservationRepository.addNote", new QueryError("observation_notes", "insert", error));
@@ -124,17 +136,20 @@ export class SupabaseObservationRepository implements IObservationRepository {
   async replaceNotes(notes: ObservationNote[]): Promise<void> {
     this._setCache(notes);
 
-    const authorId = await this._getCurrentUserId();
+    const [authorId, childId] = await Promise.all([
+      this._getCurrentUserId(),
+      this._requireChildId(),
+    ]);
+
     if (!authorId) {
       warnRepo("SupabaseObservationRepository.replaceNotes", "no auth user — cache only");
       return;
     }
+    if (!childId) {
+      warnRepo("SupabaseObservationRepository.replaceNotes", "no Supabase child_id — cache only");
+      return;
+    }
 
-    // Get child_id for the current user
-    const childId = await this._getChildId();
-    if (!childId) return;
-
-    // Delete existing and re-insert (upsert by id is also an option)
     const { error: delError } = await this.client
       .from("observation_notes")
       .delete()
@@ -147,9 +162,10 @@ export class SupabaseObservationRepository implements IObservationRepository {
 
     if (notes.length === 0) return;
 
+    // Override child_id with the Supabase UUID in each inserted row.
     const { error: insError } = await this.client
       .from("observation_notes")
-      .insert(notes.map((n) => domainToDbNote(n, authorId)));
+      .insert(notes.map((n) => ({ ...domainToDbNote(n, authorId), child_id: childId })));
 
     if (insError) {
       warnRepo("SupabaseObservationRepository.replaceNotes", new QueryError("observation_notes", "insert", insError));
@@ -159,7 +175,7 @@ export class SupabaseObservationRepository implements IObservationRepository {
   async clearNotes(): Promise<void> {
     this._setCache(SERVER_NOTES);
 
-    const childId = await this._getChildId();
+    const childId = await this._requireChildId();
     if (!childId) return;
 
     const { error } = await this.client
@@ -187,6 +203,7 @@ export class SupabaseObservationRepository implements IObservationRepository {
     this._hydrateGen++;
     this._hydrated = false;
     this._hydratePromise = null;
+    this._childId = null;
     this._cache = SERVER_NOTES; // stable empty snapshot
     this._notify();
   }
@@ -270,12 +287,21 @@ export class SupabaseObservationRepository implements IObservationRepository {
     return data.user?.id ?? null;
   }
 
-  private async _getChildId(): Promise<string | null> {
+  /**
+   * Returns the Supabase child_profiles UUID for DB writes.
+   * Caches the result so repeated calls within the same session are cheap.
+   * Never returns a localStorage placeholder like "child-001".
+   */
+  private async _requireChildId(): Promise<string | null> {
+    if (this._childId) return this._childId;
+
     const { data } = await this.client
       .from("child_profiles")
       .select("id")
       .limit(1)
       .maybeSingle();
-    return data?.id ?? null;
+
+    if (data?.id) this._childId = data.id;
+    return this._childId;
   }
 }

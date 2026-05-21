@@ -116,7 +116,7 @@ export class SupabaseProgressRepository implements IProgressRepository {
   // ── Write — attempts ──────────────────────────────────────────────────────
 
   async addAttempt(attempt: PracticeAttempt): Promise<SpeechProgress> {
-    // Optimistic update first
+    // Optimistic update first so the UI is responsive regardless of DB outcome.
     const next: SpeechProgress = {
       ...this._progress,
       attempts: [...this._progress.attempts, attempt],
@@ -124,9 +124,21 @@ export class SupabaseProgressRepository implements IProgressRepository {
     };
     this._setProgress(next);
 
+    // Resolve the Supabase UUID for child_profiles.id.
+    // attempt.childId may be a localStorage placeholder ("child-001") — never
+    // pass that to a UUID column.
+    const childId = await this._requireChildId();
+    if (!childId) {
+      warnRepo(
+        "SupabaseProgressRepository.addAttempt",
+        "no Supabase child_id — attempt saved to cache only",
+      );
+      return this._progress;
+    }
+
     const { error } = await this.client
       .from("practice_attempts")
-      .insert(domainToDbAttempt(attempt));
+      .insert({ ...domainToDbAttempt(attempt), child_id: childId });
 
     if (error) {
       warnRepo("SupabaseProgressRepository.addAttempt", new QueryError("practice_attempts", "insert", error));
@@ -144,9 +156,11 @@ export class SupabaseProgressRepository implements IProgressRepository {
   async replaceProgress(progress: SpeechProgress): Promise<void> {
     this._setProgress(progress);
 
-    const childId = progress.childId || this._childId;
+    // Always use the hydrated Supabase UUID — progress.childId may be a
+    // localStorage placeholder ("child-001") that is not a valid DB UUID.
+    const childId = await this._requireChildId();
     if (!childId) {
-      warnRepo("SupabaseProgressRepository.replaceProgress", "no childId — cache updated only");
+      warnRepo("SupabaseProgressRepository.replaceProgress", "no Supabase child_id — cache updated only");
       return;
     }
 
@@ -161,10 +175,14 @@ export class SupabaseProgressRepository implements IProgressRepository {
 
     const [insAttempts, insSessions] = await Promise.all([
       progress.attempts.length > 0
-        ? this.client.from("practice_attempts").insert(progress.attempts.map(domainToDbAttempt))
+        ? this.client
+            .from("practice_attempts")
+            .insert(progress.attempts.map((a) => ({ ...domainToDbAttempt(a), child_id: childId })))
         : Promise.resolve({ error: null }),
       progress.sessions.length > 0
-        ? this.client.from("practice_sessions").insert(progress.sessions.map(domainToDbSession))
+        ? this.client
+            .from("practice_sessions")
+            .insert(progress.sessions.map((s) => ({ ...domainToDbSession(s), child_id: childId })))
         : Promise.resolve({ error: null }),
     ]);
 
@@ -181,7 +199,7 @@ export class SupabaseProgressRepository implements IProgressRepository {
     };
     this._setProgress(cleared);
 
-    const childId = this._childId || this._progress.childId;
+    const childId = await this._requireChildId();
     if (!childId) return;
 
     const [delAttempts, delSessions] = await Promise.all([
@@ -220,9 +238,19 @@ export class SupabaseProgressRepository implements IProgressRepository {
     };
     this._setProgress(next);
 
+    // Resolve Supabase UUID — input.childId may be "child-001".
+    const childId = await this._requireChildId();
+    if (!childId) {
+      warnRepo(
+        "SupabaseProgressRepository.startSession",
+        "no Supabase child_id — session saved to cache only",
+      );
+      return newSession;
+    }
+
     const { data, error } = await this.client
       .from("practice_sessions")
-      .insert(domainToDbSession(newSession))
+      .insert({ ...domainToDbSession(newSession), child_id: childId })
       .select("id")
       .single();
 
@@ -444,6 +472,25 @@ export class SupabaseProgressRepository implements IProgressRepository {
     this._notifySound();
   }
 
+  /**
+   * Returns the hydrated Supabase child_profiles UUID for DB writes.
+   * Falls back to a one-shot fetch if hydration has not completed yet
+   * (covers the edge case where a user submits before _hydrate() resolves).
+   * Never returns a localStorage placeholder ID like "child-001".
+   */
+  private async _requireChildId(): Promise<string | null> {
+    if (this._childId) return this._childId;
+
+    const { data } = await this.client
+      .from("child_profiles")
+      .select("id")
+      .limit(1)
+      .maybeSingle();
+
+    if (data?.id) this._childId = data.id;
+    return this._childId;
+  }
+
   private _readLocalProgress(): SpeechProgress | null {
     try {
       const raw = localRead(STORAGE_KEYS.PROGRESS);
@@ -466,11 +513,34 @@ export class SupabaseProgressRepository implements IProgressRepository {
       ? Date.now() - new Date(session.startedAt).getTime()
       : undefined;
 
+    // Compute stats from cached attempts (mirrors completePracticeSession in speechProgressStorage)
+    const sessionAttempts = this._progress.attempts.filter(
+      (a) => a.sessionId === sessionId,
+    );
+    const completedMissions = new Set(
+      sessionAttempts.map((a) => a.practiceItemId),
+    ).size;
+    const averageScore =
+      sessionAttempts.length > 0
+        ? Math.round(
+            sessionAttempts.reduce((sum, a) => sum + a.score, 0) /
+              sessionAttempts.length,
+          )
+        : 0;
+    const starsEarned = sessionAttempts.reduce(
+      (sum, a) => sum + a.starsEarned,
+      0,
+    );
+
     const updated: PracticeSession = {
       ...session,
       status,
       endedAt: now,
       durationMs: durationMs ?? session.durationMs,
+      completedMissions,
+      averageScore,
+      starsEarned,
+      attemptIds: sessionAttempts.map((a) => a.id),
     };
 
     this._setProgress({
@@ -487,6 +557,9 @@ export class SupabaseProgressRepository implements IProgressRepository {
         status,
         ended_at: now,
         duration_ms: updated.durationMs ?? null,
+        completed_missions: completedMissions,
+        average_score: averageScore,
+        stars_earned: starsEarned,
       })
       .eq("id", sessionId);
 
