@@ -1,5 +1,6 @@
 import ThemeToggle from "@/components/ui/ThemeToggle";
 import Link from "next/link";
+import HomeBackground from "@/components/home/HomeBackground";
 import HeroSectionV2 from "@/components/home/HeroSectionV2";
 import HowItWorksSection from "@/components/home/HowItWorksSection";
 import TrainingJourneySection from "@/components/home/TrainingJourneySection";
@@ -103,7 +104,8 @@ function StatsStrip() {
 /** Landing page — standalone (no AppShell) */
 export default function LandingPage() {
   return (
-    <main className="min-h-screen">
+    <main className="min-h-screen relative isolate">
+      <HomeBackground />
       <LandingNav />
 
       <div className="max-w-5xl mx-auto px-6 pb-24">

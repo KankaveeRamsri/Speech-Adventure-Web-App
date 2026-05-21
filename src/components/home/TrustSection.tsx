@@ -73,7 +73,7 @@ export default function TrustSection() {
         {trustPoints.map((p) => (
           <div
             key={p.key}
-            className="bg-surface border border-border rounded-2xl p-6 hover:shadow-md hover:-translate-y-0.5 transition-all group"
+            className="bg-surface border border-border rounded-2xl p-6 card-3d group"
           >
             <div className="flex items-start gap-4">
               <div className="w-12 h-12 rounded-xl bg-primary/8 border border-primary/15 flex items-center justify-center text-primary flex-shrink-0 group-hover:scale-110 transition-transform">
