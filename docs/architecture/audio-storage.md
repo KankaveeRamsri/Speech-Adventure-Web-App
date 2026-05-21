@@ -156,18 +156,66 @@ The mapper `domainToDbAttempt` now writes `attempt.audioPath ?? null` to that co
 
 ---
 
-## Playback (Future)
+## Playback (Phase 36)
 
-Stored recordings can be played back via a signed URL:
+Stored recordings are played back via a short-lived signed URL. The playback UI
+lives in `AttemptDetailDrawer` and is rendered only when `attempt.audioPath` is set.
 
-```typescript
-const { url } = await getPracticeAudioUrl(attempt.audioPath, 3600);
-// url is valid for 1 hour — refresh before expiry
+### Playback Flow
+
+```
+AttemptDetailDrawer renders attempt.audioPath
+  │
+  └─ <AttemptAudioPlayer audioPath={attempt.audioPath} />
+       │
+       ├─ useEffect([audioPath]) fires
+       │     ├─ check module-level URL_CACHE (50-minute TTL)
+       │     │     hit  → use cached URL  →  playerState = "ready"
+       │     │     miss → getPracticeAudioUrl(path, 3600)
+       │     │               success → cache + setSignedUrl + "ready"
+       │     │               error   → playerState = "error"
+       │     └─ cleanup: pause audio on unmount
+       │
+       ├─ playerState = "loading"  →  spinner + "กำลังโหลดเสียง…"
+       ├─ playerState = "error"    →  info icon + "ไม่สามารถโหลดเสียงได้"
+       ├─ playerState = "ready"    →  ▶ play button + "กดเพื่อเล่น"
+       └─ playerState = "playing"  →  ⏸ pause button + "กำลังเล่น…"
 ```
 
-Playback UI integration is a future phase. The detail drawers
-(`SessionDetailDrawer`, `AttemptDetailDrawer`) are candidates for showing
-a playback button when `attempt.audioPath` is set.
+### Signed URL Cache
+
+`AttemptAudioPlayer` maintains a **module-level** `Map<path, { url, expiresAt }>` cache
+so that closing and re-opening the drawer does not trigger redundant network requests.
+
+| Property | Value |
+|---|---|
+| Cache scope | Module (page lifetime) |
+| TTL | 50 minutes (10-minute safety buffer before 1-hour Supabase expiry) |
+| Invalidation | Automatic on next render after `expiresAt` |
+
+### Audio Element
+
+- Native `<audio>` element — **hidden from UI**, controlled programmatically.
+- `preload="none"` — no network fetch until the user presses play.
+- No `autoplay` attribute — user interaction required.
+- No browser-native controls shown — fully custom styled, dark-mode compatible.
+
+### Error / Unavailable States
+
+| Condition | `playerState` | UI |
+|---|---|---|
+| Supabase not configured | `"error"` | "ไม่สามารถโหลดเสียงได้" |
+| Signed URL fetch fails | `"error"` | same |
+| Audio decode/network error during playback | `"error"` | same |
+| `attempt.audioPath` undefined / null | component not rendered | nothing shown |
+
+### Key Files
+
+| File | Role |
+|---|---|
+| `src/components/details/AttemptAudioPlayer.tsx` | Playback UI component + URL cache |
+| `src/lib/storage/supabase/audioStorage.ts` | `getPracticeAudioUrl()` — all Supabase calls stay here |
+| `src/components/details/AttemptDetailDrawer.tsx` | Renders `<AttemptAudioPlayer>` when `audioPath` set |
 
 ---
 
@@ -195,6 +243,8 @@ MediaRecorder  →  Blob (in-memory)
 | `src/lib/storage/supabase/audioStorage.ts` | Upload / signed URL / delete service |
 | `src/hooks/useAudioRecorder.ts` | Exposes `blob` and `mimeType` alongside `audioUrl` |
 | `src/components/speech-adventure/PracticeCard.tsx` | Calls `uploadPracticeAudio` in `handleAccept` |
+| `src/components/details/AttemptAudioPlayer.tsx` | Playback UI with signed URL cache |
+| `src/components/details/AttemptDetailDrawer.tsx` | Renders `<AttemptAudioPlayer>` when `audioPath` present |
 | `src/types/speechAdventure.ts` | `PracticeAttempt.audioPath?: string` |
 | `src/lib/storage/supabase/mappers.ts` | `audio_path` ↔ `audioPath` mapping |
 | `supabase/migrations/20260521000700_practice_audio_bucket.sql` | Bucket + RLS policies |
@@ -206,7 +256,7 @@ MediaRecorder  →  Blob (in-memory)
 | Feature | Phase |
 |---|---|
 | Real AI evaluation using stored audio | Future |
-| Playback UI in detail drawers | Future |
+| Playback UI in detail drawers | **Done (Phase 36)** |
 | Audio upload progress indicator | Future |
 | Automatic retry on upload failure | Future |
 | Storage cleanup for orphaned recordings | Future |

@@ -5,6 +5,7 @@ import { mockTrainingStages } from "@/data/speechAdventureMockData";
 import type { PracticeAttempt, PracticeSession, EvaluationStatus } from "@/types/speechAdventure";
 import DetailMetricCard from "./DetailMetricCard";
 import LinkedObservationNotes from "./LinkedObservationNotes";
+import AttemptAudioPlayer from "./AttemptAudioPlayer";
 
 interface Props {
   attempt: PracticeAttempt | null;
@@ -164,6 +165,14 @@ export default function AttemptDetailDrawer({ attempt, linkedSession, onClose, o
               <span className="font-medium text-text text-right">{stage?.name ?? attempt.stageId}</span>
             </div>
           </div>
+
+          {/* Audio playback — shown only when a recording was stored in Supabase Storage */}
+          {attempt.audioPath && (
+            <AttemptAudioPlayer
+              audioPath={attempt.audioPath}
+              accentColor={accentColor}
+            />
+          )}
 
           {/* Feedback */}
           {attempt.feedback && (
