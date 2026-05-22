@@ -88,12 +88,20 @@ interface Resettable {
   reset(): void;
 }
 
+interface Scopeable {
+  setScope(userId: string | null): void;
+}
+
 function hasRehydrate(repo: unknown): repo is Rehydratable {
   return typeof (repo as Rehydratable).rehydrate === "function";
 }
 
 function hasReset(repo: unknown): repo is Resettable {
   return typeof (repo as Resettable).reset === "function";
+}
+
+function hasScopeSet(repo: unknown): repo is Scopeable {
+  return typeof (repo as Scopeable).setScope === "function";
 }
 
 // ── Context ───────────────────────────────────────────────────────────────────
@@ -144,32 +152,41 @@ export function RepositoryProvider({ children, overrides }: RepositoryProviderPr
     const prevUserId = prevUserIdRef.current;
     prevUserIdRef.current = userId;
 
-    // ── Sign out: clear cloud cache immediately ───────────────────────────────
+    // ── Sign out: scope local repos to anonymous, clear cloud cache ──────────
     if (prevUserId !== null && userId === null) {
       if (process.env.NODE_ENV !== "production") {
-        console.debug("[RepositoryProvider] sign out — resetting cloud repositories");
+        console.debug("[RepositoryProvider] sign out — scoping to anonymous, resetting cloud repos");
       }
+      if (hasScopeSet(value.profile)) value.profile.setScope(null);
+      if (hasScopeSet(value.progress)) value.progress.setScope(null);
+      if (hasScopeSet(value.observations)) value.observations.setScope(null);
       if (hasReset(value.profile)) value.profile.reset();
       if (hasReset(value.progress)) value.progress.reset();
       if (hasReset(value.observations)) value.observations.reset();
       return;
     }
 
-    // ── Account switch: reset previous user's data before loading the new user ─
+    // ── Account switch: scope to new user, reset previous user's cloud data ───
     if (prevUserId !== null && userId !== null) {
       if (process.env.NODE_ENV !== "production") {
-        console.debug("[RepositoryProvider] user switch — resetting before rehydrate");
+        console.debug("[RepositoryProvider] user switch — scoping + resetting before rehydrate");
       }
+      if (hasScopeSet(value.profile)) value.profile.setScope(userId);
+      if (hasScopeSet(value.progress)) value.progress.setScope(userId);
+      if (hasScopeSet(value.observations)) value.observations.setScope(userId);
       if (hasReset(value.profile)) value.profile.reset();
       if (hasReset(value.progress)) value.progress.reset();
       if (hasReset(value.observations)) value.observations.reset();
     }
 
-    // ── Sign in / session restore / account switch: load cloud data ───────────
+    // ── Sign in / session restore / account switch: scope + load cloud data ───
     if (userId) {
       if (process.env.NODE_ENV !== "production") {
-        console.debug(`[RepositoryProvider] user ${userId} — rehydrating cloud repositories`);
+        console.debug(`[RepositoryProvider] user ${userId} — scoping local repos, rehydrating cloud`);
       }
+      if (hasScopeSet(value.profile)) value.profile.setScope(userId);
+      if (hasScopeSet(value.progress)) value.progress.setScope(userId);
+      if (hasScopeSet(value.observations)) value.observations.setScope(userId);
       if (hasRehydrate(value.profile)) value.profile.rehydrate();
       if (hasRehydrate(value.progress)) value.progress.rehydrate();
       if (hasRehydrate(value.observations)) value.observations.rehydrate();

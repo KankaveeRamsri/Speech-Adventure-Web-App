@@ -17,7 +17,7 @@ import {
 } from "./mappers";
 import { QueryError, warnRepo } from "./errors";
 import { localRead, localWrite, localRemove } from "@/lib/storage/local/localStorageClient";
-import { STORAGE_KEYS } from "@/lib/storage/storageKeys";
+import { STORAGE_KEYS, getScopedStorageKey } from "@/lib/storage/storageKeys";
 import { SpeechProgressSchema, parseOrNull } from "@/lib/validation";
 
 // ── Pending-clear marker ──────────────────────────────────────────────────────
@@ -84,13 +84,20 @@ export class SupabaseProgressRepository implements IProgressRepository {
   private readonly _progressListeners = new Set<() => void>();
   private readonly _soundListeners = new Set<() => void>();
 
-  // Hydration state
   private _hydrated = false;
   private _hydratePromise: Promise<void> | null = null;
-  // Incremented by rehydrate() to invalidate any in-flight _hydrate() call
   private _hydrateGen = 0;
+  private _localScopeUserId: string | null = null;
 
   constructor(private readonly client: SupabaseClient<Database>) {}
+
+  public setScope(userId: string | null): void {
+    this._localScopeUserId = userId;
+  }
+
+  private _localProgressKey(): string {
+    return getScopedStorageKey(STORAGE_KEYS.PROGRESS, this._localScopeUserId);
+  }
 
   // ── useSyncExternalStore — progress ──────────────────────────────────────
 
@@ -236,9 +243,9 @@ export class SupabaseProgressRepository implements IProgressRepository {
     };
     this._setProgress(cleared);
 
-    // (C) Remove localStorage fallback so the offline-fallback path in _hydrate()
-    //     cannot restore old data.
-    localRemove(STORAGE_KEYS.PROGRESS);
+    // (C) Remove localStorage fallback (scoped key) so the offline-fallback path
+    //     in _hydrate() cannot restore old data.
+    localRemove(this._localProgressKey());
 
     // Use the pre-captured UUID first; fall back to one-shot fetch only if null.
     const childId = capturedChildId ?? (await this._requireChildId());
@@ -441,12 +448,12 @@ export class SupabaseProgressRepository implements IProgressRepository {
     if (process.env.NODE_ENV !== "production") {
       console.debug("[SupabaseProgressRepository] reset — clearing cache");
     }
-    // Invalidate any in-flight _hydrate() so it cannot overwrite the cleared state
     this._hydrateGen++;
     this._hydrated = false;
     this._hydratePromise = null;
     this._childId = null;
-    this._progress = SERVER_PROGRESS; // stable empty snapshot
+    this._localScopeUserId = null;
+    this._progress = SERVER_PROGRESS;
     this._selectedSoundId = DEFAULT_SOUND_ID;
     this._notifyProgress();
     this._notifySound();
@@ -632,7 +639,7 @@ export class SupabaseProgressRepository implements IProgressRepository {
 
   private _readLocalProgress(): SpeechProgress | null {
     try {
-      const raw = localRead(STORAGE_KEYS.PROGRESS);
+      const raw = localRead(this._localProgressKey());
       if (!raw) return null;
       return parseOrNull(SpeechProgressSchema, JSON.parse(raw), "progress") as SpeechProgress | null;
     } catch {

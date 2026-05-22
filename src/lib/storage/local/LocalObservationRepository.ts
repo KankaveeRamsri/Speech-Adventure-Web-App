@@ -44,4 +44,8 @@ export class LocalObservationRepository implements IObservationRepository {
   async clearNotes(): Promise<void> {
     storage.clearObservations();
   }
+
+  setScope(userId: string | null): void {
+    storage.setScope(userId);
+  }
 }

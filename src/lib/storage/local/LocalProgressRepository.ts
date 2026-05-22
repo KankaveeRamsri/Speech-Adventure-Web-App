@@ -81,4 +81,8 @@ export class LocalProgressRepository implements IProgressRepository {
   subscribeToSelectedSound(callback: () => void): () => void {
     return storage.subscribeToSelectedSound(callback);
   }
+
+  setScope(userId: string | null): void {
+    storage.setScope(userId);
+  }
 }

@@ -5,7 +5,7 @@ import type { Database } from "@/types/supabase";
 import { dbToDomainNote, domainToDbNote } from "./mappers";
 import { QueryError, warnRepo } from "./errors";
 import { localRead } from "@/lib/storage/local/localStorageClient";
-import { STORAGE_KEYS } from "@/lib/storage/storageKeys";
+import { STORAGE_KEYS, getScopedStorageKey } from "@/lib/storage/storageKeys";
 import { ObservationNotesArraySchema, parseOrNull } from "@/lib/validation";
 
 // ── Stable server snapshot ────────────────────────────────────────────────────
@@ -36,12 +36,19 @@ export class SupabaseObservationRepository implements IObservationRepository {
   private readonly _listeners = new Set<() => void>();
   private _hydrated = false;
   private _hydratePromise: Promise<void> | null = null;
-  // Incremented by rehydrate() to invalidate any in-flight _hydrate() call
   private _hydrateGen = 0;
-  // Cached Supabase child_profiles UUID — populated lazily by _requireChildId()
   private _childId: string | null = null;
+  private _localScopeUserId: string | null = null;
 
   constructor(private readonly client: SupabaseClient<Database>) {}
+
+  public setScope(userId: string | null): void {
+    this._localScopeUserId = userId;
+  }
+
+  private _localNotesKey(): string {
+    return getScopedStorageKey(STORAGE_KEYS.OBSERVATIONS, this._localScopeUserId);
+  }
 
   // ── useSyncExternalStore plumbing ─────────────────────────────────────────
 
@@ -199,12 +206,12 @@ export class SupabaseObservationRepository implements IObservationRepository {
     if (process.env.NODE_ENV !== "production") {
       console.debug("[SupabaseObservationRepository] reset — clearing cache");
     }
-    // Invalidate any in-flight _hydrate() so it cannot overwrite the cleared state
     this._hydrateGen++;
     this._hydrated = false;
     this._hydratePromise = null;
     this._childId = null;
-    this._cache = SERVER_NOTES; // stable empty snapshot
+    this._localScopeUserId = null;
+    this._cache = SERVER_NOTES;
     this._notify();
   }
 
@@ -274,7 +281,7 @@ export class SupabaseObservationRepository implements IObservationRepository {
 
   private _readLocalNotes(): ObservationNote[] | null {
     try {
-      const raw = localRead(STORAGE_KEYS.OBSERVATIONS);
+      const raw = localRead(this._localNotesKey());
       if (!raw) return null;
       return parseOrNull(ObservationNotesArraySchema, JSON.parse(raw), "observations") as ObservationNote[] | null;
     } catch {

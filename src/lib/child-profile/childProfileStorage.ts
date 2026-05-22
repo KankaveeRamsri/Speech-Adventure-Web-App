@@ -1,8 +1,50 @@
-import { STORAGE_KEYS } from "@/lib/storage/storageKeys";
+import {
+  STORAGE_KEYS,
+  getScopedStorageKey,
+  getLegacyClaimedFlagKey,
+} from "@/lib/storage/storageKeys";
 import { localRead, localWrite, localRemove } from "@/lib/storage/local/localStorageClient";
 import { ChildProfileDataSchema, parseOrNull } from "@/lib/validation";
 
 const STORAGE_KEY = STORAGE_KEYS.PROFILE;
+
+// ── User scope ────────────────────────────────────────────────────────────────
+// null = anonymous scope (reads from STORAGE_KEY:anonymous)
+let _scopeUserId: string | null = null;
+
+function getCurrentKey(): string {
+  return getScopedStorageKey(STORAGE_KEY, _scopeUserId);
+}
+
+/**
+ * One-time migration: copy legacy unscoped data to the current user's scoped
+ * key. Only runs for authenticated users and only if the legacy key has data
+ * that hasn't yet been claimed by another user.
+ */
+function tryMigrateLegacy(): void {
+  if (_scopeUserId === null) return; // anonymous — no migration
+  const scopedKey = getCurrentKey();
+  if (localRead(scopedKey)) return; // scoped key already has data
+  const claimFlagKey = getLegacyClaimedFlagKey(STORAGE_KEY);
+  if (localRead(claimFlagKey)) return; // legacy already claimed
+  const legacyData = localRead(STORAGE_KEY);
+  if (!legacyData) return; // nothing to migrate
+  localWrite(scopedKey, legacyData);
+  localWrite(claimFlagKey, _scopeUserId);
+}
+
+/**
+ * Switch the active user scope and re-read from the correct localStorage key.
+ * Called by LocalProfileRepository.setScope() on every auth transition.
+ */
+export function setScope(userId: string | null): void {
+  if (userId === _scopeUserId && isClientInitialized) return;
+  _scopeUserId = userId;
+  isClientInitialized = false;
+  tryMigrateLegacy();
+  initializeIfNeeded();
+  notifyListeners();
+}
 
 export interface ChildProfileData {
   id: string;
@@ -33,7 +75,9 @@ function isBrowser(): boolean {
 
 function readFromLocalStorage(): ChildProfileData | null {
   try {
-    const raw = localRead(STORAGE_KEY);
+    // For anonymous scope fall back to the legacy unscoped key so existing
+    // anonymous users don't lose their data after the scoping upgrade.
+    const raw = localRead(getCurrentKey()) ?? (_scopeUserId === null ? localRead(STORAGE_KEY) : null);
     if (!raw) return null;
     return parseOrNull(
       ChildProfileDataSchema,
@@ -73,19 +117,19 @@ export function getServerProfile(): ChildProfileData | null {
 
 export function saveProfile(profile: ChildProfileData): void {
   currentProfile = profile;
-  localWrite(STORAGE_KEY, JSON.stringify(profile));
+  localWrite(getCurrentKey(), JSON.stringify(profile));
   notifyListeners();
 }
 
 export function clearProfile(): void {
   if (!isBrowser()) return;
-  localRemove(STORAGE_KEY);
+  localRemove(getCurrentKey());
   currentProfile = null;
   notifyListeners();
 }
 
 export function replaceProfile(profile: ChildProfileData): void {
   currentProfile = profile;
-  localWrite(STORAGE_KEY, JSON.stringify(profile));
+  localWrite(getCurrentKey(), JSON.stringify(profile));
   notifyListeners();
 }

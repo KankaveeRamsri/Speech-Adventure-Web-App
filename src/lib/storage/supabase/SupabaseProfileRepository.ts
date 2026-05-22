@@ -5,7 +5,7 @@ import type { Database } from "@/types/supabase";
 import { dbToDomainProfile, domainToDbProfile } from "./mappers";
 import { QueryError, warnRepo } from "./errors";
 import { localRead, localWrite, localRemove } from "@/lib/storage/local/localStorageClient";
-import { STORAGE_KEYS } from "@/lib/storage/storageKeys";
+import { STORAGE_KEYS, getScopedStorageKey } from "@/lib/storage/storageKeys";
 import { ChildProfileDataSchema, parseOrNull } from "@/lib/validation";
 
 // ── Stable server snapshot (no profile on the server — no auth context) ───────
@@ -33,10 +33,20 @@ export class SupabaseProfileRepository implements IProfileRepository {
   private readonly _listeners = new Set<() => void>();
   private _hydrated = false;
   private _hydratePromise: Promise<void> | null = null;
-  // Incremented by rehydrate() to invalidate any in-flight _hydrate() call
   private _hydrateGen = 0;
+  // Tracks the current authenticated userId for scoped localStorage ops.
+  private _localScopeUserId: string | null = null;
 
   constructor(private readonly client: SupabaseClient<Database>) {}
+
+  /** Called by RepositoryProvider on every auth transition to set the userId for localStorage scoping. */
+  public setScope(userId: string | null): void {
+    this._localScopeUserId = userId;
+  }
+
+  private _localKey(): string {
+    return getScopedStorageKey(STORAGE_KEYS.PROFILE, this._localScopeUserId);
+  }
 
   // ── useSyncExternalStore plumbing ─────────────────────────────────────────
 
@@ -62,9 +72,9 @@ export class SupabaseProfileRepository implements IProfileRepository {
   async saveProfile(profile: ChildProfileData): Promise<void> {
     // Optimistic: update cache immediately so UI is responsive
     this._setCache(profile);
-    // Write-through to localStorage so data survives a page reload when
-    // the user isn't authenticated yet (Supabase would return 0 rows).
-    localWrite(STORAGE_KEYS.PROFILE, JSON.stringify(profile));
+    // Write-through to localStorage (scoped by user) so data survives a page
+    // reload when Supabase is temporarily unreachable.
+    localWrite(this._localKey(), JSON.stringify(profile));
 
     const userId = await this._getCurrentUserId();
     if (!userId) {
@@ -94,7 +104,7 @@ export class SupabaseProfileRepository implements IProfileRepository {
       // SupabaseProgressRepository can use it as child_id on linked records.
       const canonical: ChildProfileData = { ...profile, id: row.id, updatedAt: row.updated_at };
       this._setCache(canonical);
-      localWrite(STORAGE_KEYS.PROFILE, JSON.stringify(canonical));
+      localWrite(this._localKey(), JSON.stringify(canonical));
     }
   }
 
@@ -106,7 +116,7 @@ export class SupabaseProfileRepository implements IProfileRepository {
 
   async clearProfile(): Promise<void> {
     this._setCache(null);
-    localRemove(STORAGE_KEYS.PROFILE);
+    localRemove(this._localKey());
 
     const userId = await this._getCurrentUserId();
     if (!userId) return;
@@ -132,11 +142,11 @@ export class SupabaseProfileRepository implements IProfileRepository {
     if (process.env.NODE_ENV !== "production") {
       console.debug("[SupabaseProfileRepository] reset — clearing cache");
     }
-    // Invalidate any in-flight _hydrate() so it cannot overwrite the cleared state
     this._hydrateGen++;
     this._hydrated = false;
     this._hydratePromise = null;
-    this._cache = null; // SERVER_PROFILE value — no profile visible
+    this._localScopeUserId = null;
+    this._cache = null;
     this._notify();
   }
 
@@ -202,7 +212,7 @@ export class SupabaseProfileRepository implements IProfileRepository {
 
   private _readLocalStorage(): ChildProfileData | null {
     try {
-      const raw = localRead(STORAGE_KEYS.PROFILE);
+      const raw = localRead(this._localKey());
       if (!raw) return null;
       return parseOrNull(ChildProfileDataSchema, JSON.parse(raw), "profile") as ChildProfileData | null;
     } catch {

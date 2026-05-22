@@ -1,5 +1,9 @@
 import type { ObservationNote } from "@/types/observations";
-import { STORAGE_KEYS } from "@/lib/storage/storageKeys";
+import {
+  STORAGE_KEYS,
+  getScopedStorageKey,
+  getLegacyClaimedFlagKey,
+} from "@/lib/storage/storageKeys";
 import { localRead, localWrite, localRemove } from "@/lib/storage/local/localStorageClient";
 import { ObservationNotesArraySchema, parseOrDefault } from "@/lib/validation";
 
@@ -11,6 +15,33 @@ const SERVER_OBSERVATIONS: ObservationNote[] = [];
 let currentObservations: ObservationNote[] = SERVER_OBSERVATIONS;
 let isClientInitialized = false;
 
+// ── User scope ────────────────────────────────────────────────────────────────
+let _scopeUserId: string | null = null;
+
+function getCurrentKey(): string {
+  return getScopedStorageKey(STORAGE_KEY, _scopeUserId);
+}
+
+function tryMigrateLegacy(): void {
+  if (_scopeUserId === null) return;
+  if (localRead(getCurrentKey())) return;
+  const claimFlag = getLegacyClaimedFlagKey(STORAGE_KEY);
+  if (localRead(claimFlag)) return;
+  const legacy = localRead(STORAGE_KEY);
+  if (!legacy) return;
+  localWrite(getCurrentKey(), legacy);
+  localWrite(claimFlag, _scopeUserId);
+}
+
+export function setScope(userId: string | null): void {
+  if (userId === _scopeUserId && isClientInitialized) return;
+  _scopeUserId = userId;
+  isClientInitialized = false;
+  tryMigrateLegacy();
+  initializeIfNeeded();
+  notifyListeners();
+}
+
 const listeners = new Set<() => void>();
 
 function isBrowser(): boolean {
@@ -19,7 +50,8 @@ function isBrowser(): boolean {
 
 function readFromLocalStorage(): ObservationNote[] {
   try {
-    const raw = localRead(STORAGE_KEY);
+    // For anonymous scope fall back to the legacy unscoped key.
+    const raw = localRead(getCurrentKey()) ?? (_scopeUserId === null ? localRead(STORAGE_KEY) : null);
     if (!raw) return SERVER_OBSERVATIONS;
     return parseOrDefault(
       ObservationNotesArraySchema,
@@ -39,7 +71,7 @@ function initializeIfNeeded(): void {
 }
 
 function writeToLocalStorage(notes: ObservationNote[]): void {
-  localWrite(STORAGE_KEY, JSON.stringify(notes));
+  localWrite(getCurrentKey(), JSON.stringify(notes));
 }
 
 function notifyListeners(): void {
@@ -97,7 +129,7 @@ export function replaceObservations(notes: ObservationNote[]): void {
 
 export function clearObservations(): void {
   if (!isBrowser()) return;
-  localRemove(STORAGE_KEY);
+  localRemove(getCurrentKey());
   currentObservations = SERVER_OBSERVATIONS;
   notifyListeners();
 }

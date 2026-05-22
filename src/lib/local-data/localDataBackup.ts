@@ -6,7 +6,12 @@
  * to avoid a jarring experience after resetting content data.
  */
 
-import { DATA_KEYS, PREFERENCE_KEYS, STORAGE_KEYS } from "@/lib/storage/storageKeys";
+import {
+  DATA_KEYS,
+  PREFERENCE_KEYS,
+  STORAGE_KEYS,
+  getScopedStorageKey,
+} from "@/lib/storage/storageKeys";
 
 // Re-export so existing callers (`onboarding/page.tsx` etc.) can still
 // access DATA_KEYS / PREFERENCE_KEYS from this module if needed.
@@ -55,18 +60,19 @@ function generateFilename(): string {
 
 // ── Export ─────────────────────────────────────────────────────────────────────
 
-export function exportData(): void {
+export function exportData(userId?: string | null): void {
   if (!isBrowser()) return;
 
   const data: Record<string, unknown> = {};
 
   for (const key of DATA_KEYS) {
-    const raw = localStorage.getItem(key);
+    // Prefer the scoped key, fall back to legacy unscoped for backward compat.
+    const scopedKey = getScopedStorageKey(key, userId ?? null);
+    const raw = localStorage.getItem(scopedKey) ?? localStorage.getItem(key);
     if (raw !== null) {
       try {
         data[key] = JSON.parse(raw);
       } catch {
-        // Store as raw string if not valid JSON
         data[key] = raw;
       }
     }
@@ -150,13 +156,15 @@ export function importData(file: BackupFile): ImportResult {
 
 // ── Clear ──────────────────────────────────────────────────────────────────────
 
-export function clearAllData(): string[] {
+export function clearAllData(userId?: string | null): string[] {
   if (!isBrowser()) return [];
 
   const cleared: string[] = [];
 
   for (const key of DATA_KEYS) {
     try {
+      // Remove both the scoped key and the legacy unscoped key.
+      localStorage.removeItem(getScopedStorageKey(key, userId ?? null));
       localStorage.removeItem(key);
       cleared.push(key);
     } catch {
@@ -192,7 +200,7 @@ export function readBackupFile(file: File): Promise<BackupFile> {
 
 // ── Storage info ───────────────────────────────────────────────────────────────
 
-export function getStorageSummary(): {
+export function getStorageSummary(userId?: string | null): {
   hasProfile: boolean;
   hasProgress: boolean;
   hasObservations: boolean;
@@ -202,13 +210,24 @@ export function getStorageSummary(): {
     return { hasProfile: false, hasProgress: false, hasObservations: false, totalKeys: 0 };
   }
 
-  const profile = localStorage.getItem(STORAGE_KEYS.PROFILE);
-  const progress = localStorage.getItem(STORAGE_KEYS.PROGRESS);
-  const observations = localStorage.getItem(STORAGE_KEYS.OBSERVATIONS);
+  const uid = userId ?? null;
+  // Check scoped key first, then fall back to legacy for backward compat.
+  const profile =
+    localStorage.getItem(getScopedStorageKey(STORAGE_KEYS.PROFILE, uid)) ??
+    localStorage.getItem(STORAGE_KEYS.PROFILE);
+  const progress =
+    localStorage.getItem(getScopedStorageKey(STORAGE_KEYS.PROGRESS, uid)) ??
+    localStorage.getItem(STORAGE_KEYS.PROGRESS);
+  const observations =
+    localStorage.getItem(getScopedStorageKey(STORAGE_KEYS.OBSERVATIONS, uid)) ??
+    localStorage.getItem(STORAGE_KEYS.OBSERVATIONS);
 
   let totalKeys = 0;
   for (const key of DATA_KEYS) {
-    if (localStorage.getItem(key) !== null) totalKeys++;
+    const has =
+      localStorage.getItem(getScopedStorageKey(key, uid)) !== null ||
+      localStorage.getItem(key) !== null;
+    if (has) totalKeys++;
   }
 
   return {

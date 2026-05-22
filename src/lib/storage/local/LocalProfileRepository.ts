@@ -36,4 +36,8 @@ export class LocalProfileRepository implements IProfileRepository {
   async clearProfile(): Promise<void> {
     storage.clearProfile();
   }
+
+  setScope(userId: string | null): void {
+    storage.setScope(userId);
+  }
 }

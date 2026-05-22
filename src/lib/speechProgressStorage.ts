@@ -4,12 +4,58 @@ import type {
   PracticeSession,
   ProgressSummary,
 } from "@/types/speechAdventure";
-import { STORAGE_KEYS } from "@/lib/storage/storageKeys";
+import {
+  STORAGE_KEYS,
+  getScopedStorageKey,
+  getLegacyClaimedFlagKey,
+} from "@/lib/storage/storageKeys";
 import { localRead, localWrite, localRemove } from "@/lib/storage/local/localStorageClient";
 import { SpeechProgressSchema, parseOrDefault } from "@/lib/validation";
 
 const STORAGE_KEY = STORAGE_KEYS.PROGRESS;
 const SOUND_STORAGE_KEY = STORAGE_KEYS.SELECTED_SOUND;
+
+// ── User scope ────────────────────────────────────────────────────────────────
+let _scopeUserId: string | null = null;
+
+function getProgressKey(): string {
+  return getScopedStorageKey(STORAGE_KEY, _scopeUserId);
+}
+function getSoundKey(): string {
+  return getScopedStorageKey(SOUND_STORAGE_KEY, _scopeUserId);
+}
+
+function tryMigrateLegacy(): void {
+  if (_scopeUserId === null) return;
+  // Migrate progress key
+  if (!localRead(getProgressKey())) {
+    const claimFlag = getLegacyClaimedFlagKey(STORAGE_KEY);
+    if (!localRead(claimFlag)) {
+      const legacy = localRead(STORAGE_KEY);
+      if (legacy) { localWrite(getProgressKey(), legacy); localWrite(claimFlag, _scopeUserId); }
+    }
+  }
+  // Migrate sound key
+  if (!localRead(getSoundKey())) {
+    const claimFlag = getLegacyClaimedFlagKey(SOUND_STORAGE_KEY);
+    if (!localRead(claimFlag)) {
+      const legacy = localRead(SOUND_STORAGE_KEY);
+      if (legacy) { localWrite(getSoundKey(), legacy); localWrite(claimFlag, _scopeUserId); }
+    }
+  }
+}
+
+export function setScope(userId: string | null): void {
+  if (userId === _scopeUserId && isClientInitialized && isSoundInitialized) return;
+  _scopeUserId = userId;
+  isClientInitialized = false;
+  isSoundInitialized = false;
+  tryMigrateLegacy();
+  initializeIfNeeded();
+  initializeSoundIfNeeded();
+  notifyListeners();
+  soundListeners.forEach((fn) => fn());
+}
 
 const DEFAULT_CHILD_ID = "";
 const DEFAULT_TARGET_SOUND = "ช";
@@ -58,7 +104,8 @@ function isBrowser(): boolean {
 
 function readFromLocalStorage(): SpeechProgress {
   try {
-    const raw = localRead(STORAGE_KEY);
+    // For anonymous scope fall back to the legacy unscoped key.
+    const raw = localRead(getProgressKey()) ?? (_scopeUserId === null ? localRead(STORAGE_KEY) : null);
     if (!raw) return SERVER_PROGRESS;
     return parseOrDefault(
       SpeechProgressSchema,
@@ -79,7 +126,7 @@ function initializeIfNeeded(): void {
 }
 
 function writeToLocalStorage(progress: SpeechProgress): void {
-  localWrite(STORAGE_KEY, JSON.stringify(progress));
+  localWrite(getProgressKey(), JSON.stringify(progress));
 }
 
 // ── Pub-sub for useSyncExternalStore ─────────────────────────────────────────
@@ -146,7 +193,7 @@ export function addAttempt(attempt: PracticeAttempt): SpeechProgress {
 /** Clear all progress from storage and reset the in-memory cache. */
 export function clearProgress(): void {
   if (!isBrowser()) return;
-  localRemove(STORAGE_KEY);
+  localRemove(getProgressKey());
   currentProgress = SERVER_PROGRESS;
   notifyListeners();
 }
@@ -209,8 +256,10 @@ const soundListeners = new Set<() => void>();
 function initializeSoundIfNeeded(): void {
   if (!isBrowser() || isSoundInitialized) return;
   isSoundInitialized = true;
-  const stored = localRead(SOUND_STORAGE_KEY);
+  // For anonymous scope fall back to the legacy unscoped key.
+  const stored = localRead(getSoundKey()) ?? (_scopeUserId === null ? localRead(SOUND_STORAGE_KEY) : null);
   if (stored) currentSoundId = stored;
+  else currentSoundId = DEFAULT_SOUND_ID;
 }
 
 export function subscribeToSelectedSound(callback: () => void): () => void {
@@ -229,7 +278,7 @@ export function getServerSoundId(): string {
 
 export function setSelectedSoundId(id: string): void {
   currentSoundId = id;
-  localWrite(SOUND_STORAGE_KEY, id);
+  localWrite(getSoundKey(), id);
   soundListeners.forEach((fn) => fn());
 }
 

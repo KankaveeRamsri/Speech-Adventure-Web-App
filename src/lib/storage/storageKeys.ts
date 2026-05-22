@@ -6,6 +6,27 @@
  * migrations (e.g., to a versioned schema) straightforward.
  */
 
+// ── Per-user scoping ──────────────────────────────────────────────────────────
+
+export const ANONYMOUS_SCOPE = "anonymous";
+
+/**
+ * Returns a scoped localStorage key for app data.
+ * Authenticated users get `baseKey:userId`; unauthenticated get `baseKey:anonymous`.
+ */
+export function getScopedStorageKey(baseKey: string, userId: string | null): string {
+  return `${baseKey}:${userId ?? ANONYMOUS_SCOPE}`;
+}
+
+/**
+ * Returns the migration claim-flag key for a given base key.
+ * The value stored at this flag is the scope id (userId or "anonymous") that
+ * first claimed the legacy unscoped data during a one-time migration.
+ */
+export function getLegacyClaimedFlagKey(baseKey: string): string {
+  return `${baseKey}:legacy-claimed`;
+}
+
 export const STORAGE_KEYS = {
   /** Speech progress: attempts, sessions, stage status */
   PROGRESS: "speech-adventure-progress-v1",

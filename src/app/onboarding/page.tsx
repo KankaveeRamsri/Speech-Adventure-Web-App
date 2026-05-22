@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useChildProfile } from "@/hooks/useChildProfile";
 import { useSpeechProgress } from "@/hooks/useSpeechProgress";
 import { useRepositories } from "@/lib/providers/RepositoryProvider";
+import { useAuth } from "@/hooks/useAuth";
 import { mockTargetSounds } from "@/data/speechAdventureMockData";
 import {
   exportData,
@@ -434,12 +435,15 @@ function DataManagerSection() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [confirmState, setConfirmState] = useState<ConfirmState>(null);
   const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
-  const [storageInfo, setStorageInfo] = useState(getStorageSummary());
+  const { user } = useAuth();
+  const userId = user?.id ?? null;
+  const [storageInfo, setStorageInfo] = useState(getStorageSummary(userId));
   const { progress: progressRepo, observations: obsRepo, profile: profileRepo } = useRepositories();
 
   useEffect(() => {
-    setStorageInfo(getStorageSummary());
-  }, []);
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setStorageInfo(getStorageSummary(userId));
+  }, [userId]);
 
   const flash = (type: "success" | "error", text: string) => {
     setMessage({ type, text });
@@ -449,7 +453,7 @@ function DataManagerSection() {
   // ── Export ──
   const handleExport = () => {
     try {
-      exportData();
+      exportData(userId);
       flash("success", "ส่งออกข้อมูลสำเร็จ — ไฟล์จะถูกดาวน์โหลดไปยังเครื่องของคุณ");
     } catch {
       flash("error", "เกิดข้อผิดพลาดในการส่งออกข้อมูล");
@@ -483,7 +487,7 @@ function DataManagerSection() {
           try { void profileRepo.replaceProfile(d[STORAGE_KEYS.PROFILE] as ChildProfileData); } catch { /* ignore */ }
         }
 
-        setStorageInfo(getStorageSummary());
+        setStorageInfo(getStorageSummary(userId));
         flash("success", "นำเข้าข้อมูลสำเร็จ — ข้อมูลถูกกู้คืนแล้ว");
       } else {
         flash("error", result.error);
@@ -504,8 +508,8 @@ function DataManagerSection() {
     void progressRepo.clearProgress();
     void obsRepo.clearNotes();
     void profileRepo.clearProfile();
-    clearAllData();
-    setStorageInfo(getStorageSummary());
+    clearAllData(userId);
+    setStorageInfo(getStorageSummary(userId));
     setConfirmState(null);
     flash("success", "ล้างข้อมูลทั้งหมดสำเร็จ — ยังคงตั้งค่าธีมและเมนูไว้");
   };
@@ -514,7 +518,7 @@ function DataManagerSection() {
   const handleLoadDemo = () => {
     void progressRepo.replaceProgress(DEMO_PROGRESS);
     void obsRepo.replaceNotes(DEMO_OBSERVATIONS);
-    setStorageInfo(getStorageSummary());
+    setStorageInfo(getStorageSummary(userId));
     flash("success", `โหลดข้อมูลสาธิตสำเร็จ (${DEMO_ATTEMPT_COUNT} ครั้ง)`);
   };
 
