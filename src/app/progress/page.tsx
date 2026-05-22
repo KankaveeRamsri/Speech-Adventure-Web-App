@@ -18,7 +18,6 @@ import {
   resetDemoProgress,
   DEMO_ATTEMPT_COUNT,
 } from "@/lib/demo/speechAdventureDemoData";
-import { clearObservations } from "@/lib/observations/observationStorage";
 import type { ProgressSummary, PracticeSession, PracticeAttempt } from "@/types/speechAdventure";
 import { calculateRewards } from "@/lib/rewards/calculateRewards";
 
@@ -83,10 +82,10 @@ type TabId = (typeof TABS)[number]["id"];
 // ─── Page ───────────────────────────────────────────────────────────────────────
 
 export default function ProgressDashboardPage() {
-  const { progress, summary, clearProgress, getStageStatus, getStageAttempts, isHydrated } =
+  const { progress, summary, clearProgressForChild, getStageStatus, getStageAttempts, isHydrated } =
     useSpeechProgress();
   const { profile, hasProfile } = useChildProfile();
-  const { notes, addNote, updateNote, deleteNote } = useObservationNotes();
+  const { notes, addNote, updateNote, deleteNote, clearNotes } = useObservationNotes();
 
   const [activeTab, setActiveTab] = useState<TabId>("overview");
   const [showResetConfirm, setShowResetConfirm] = useState(false);
@@ -137,8 +136,13 @@ export default function ProgressDashboardPage() {
   // ── Handlers ──────────────────────────────────────────────────────────────────
 
   const handleReset = () => {
-    clearProgress();
-    clearObservations();
+    if (!profile?.id) {
+      console.warn("[ProgressPage] handleReset: no active child profile — skipped");
+      setShowResetConfirm(false);
+      return;
+    }
+    clearProgressForChild(profile.id);
+    clearNotes();
     setShowResetConfirm(false);
   };
 

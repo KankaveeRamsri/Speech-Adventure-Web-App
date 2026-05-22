@@ -32,6 +32,12 @@ export interface IProgressRepository {
   addAttempt(attempt: PracticeAttempt): Promise<SpeechProgress>;
   replaceProgress(progress: SpeechProgress): Promise<void>;
   clearProgress(): Promise<void>;
+  /**
+   * Removes progress data for the given child only.
+   * Safe to call for development/testing resets — never deletes child profile.
+   * Guard: if childId is empty, logs a warning and returns without clearing.
+   */
+  clearProgressForChild(childId: string): Promise<void>;
 
   // ── Session management ─────────────────────────────────────────────────────
   startSession(input: StartSessionInput): Promise<PracticeSession>;

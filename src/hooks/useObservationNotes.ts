@@ -58,6 +58,10 @@ export function useObservationNotes(childId = "") {
     repo.deleteNote(id);
   }, [repo]);
 
+  const clearNotes = useCallback(() => {
+    repo.clearNotes();
+  }, [repo]);
+
   const getNotesForTarget = useCallback(
     (targetType: ObservationTargetType, targetId?: string) => {
       return notes.filter(
@@ -77,6 +81,7 @@ export function useObservationNotes(childId = "") {
     addNote,
     updateNote,
     deleteNote,
+    clearNotes,
     getNotesForTarget,
   };
 }

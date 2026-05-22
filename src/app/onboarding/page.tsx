@@ -10,8 +10,8 @@ import { useChildProfile } from "@/hooks/useChildProfile";
 import {
   setSelectedSoundId,
   replaceProgress,
-  clearProgress,
 } from "@/lib/speechProgressStorage";
+import { useRepositories } from "@/lib/providers/RepositoryProvider";
 import { mockTargetSounds } from "@/data/speechAdventureMockData";
 import {
   exportData,
@@ -23,7 +23,6 @@ import {
 import { loadDemoProgress } from "@/lib/demo/speechAdventureDemoData";
 import { DEMO_ATTEMPT_COUNT } from "@/lib/demo/speechAdventureDemoData";
 import {
-  clearObservations,
   replaceObservations,
 } from "@/lib/observations/observationStorage";
 import { STORAGE_KEYS } from "@/lib/storage/storageKeys";
@@ -443,6 +442,7 @@ function DataManagerSection() {
   const [confirmState, setConfirmState] = useState<ConfirmState>(null);
   const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
   const [storageInfo, setStorageInfo] = useState(getStorageSummary());
+  const { progress: progressRepo, observations: obsRepo } = useRepositories();
 
   useEffect(() => {
     setStorageInfo(getStorageSummary());
@@ -506,8 +506,10 @@ function DataManagerSection() {
 
   // ── Clear ──
   const handleClear = () => {
-    clearProgress();
-    clearObservations();
+    // Route through repositories so all provider caches (including Supabase)
+    // are cleared and localStorage fallback is invalidated.
+    progressRepo.clearProgress();
+    obsRepo.clearNotes();
     clearProfile();
     clearAllData();
     setStorageInfo(getStorageSummary());

@@ -16,9 +16,18 @@ import {
   domainToDbSession,
 } from "./mappers";
 import { QueryError, warnRepo } from "./errors";
-import { localRead } from "@/lib/storage/local/localStorageClient";
+import { localRead, localWrite, localRemove } from "@/lib/storage/local/localStorageClient";
 import { STORAGE_KEYS } from "@/lib/storage/storageKeys";
 import { SpeechProgressSchema, parseOrNull } from "@/lib/validation";
+
+// ── Pending-clear marker ──────────────────────────────────────────────────────
+// When clearProgress() is called, this key is written with the child's Supabase
+// UUID. _hydrate() on the next page load detects the marker and retries the
+// Supabase DELETE before using fetched data, so old progress never reappears even
+// if the page was refreshed before the original DELETE completed.
+// The key is NOT in storageKeys.STORAGE_KEYS / DATA_KEYS — it is an internal
+// implementation detail of this repository and must survive clearAllData().
+const PROGRESS_CLEAR_PENDING_KEY = "speech-adventure-progress-clear-pending";
 
 // ── UUID guard ────────────────────────────────────────────────────────────────
 // Local session ids (e.g. "session-1748...") must never reach Supabase UUID columns.
@@ -199,6 +208,26 @@ export class SupabaseProgressRepository implements IProgressRepository {
   }
 
   async clearProgress(): Promise<void> {
+    // (A) Capture childId BEFORE touching the generation counter.
+    //     _hydrateGen++ may abort an in-flight _hydrate() before it reaches
+    //     `this._childId = profile.id`, leaving _childId null.  Capturing here
+    //     ensures we always have the UUID even if hydration is mid-flight.
+    //     _progress.childId is also a Supabase UUID when set by _hydrate().
+    const capturedChildId =
+      this._childId ??
+      (isValidUuid(this._progress.childId) ? this._progress.childId : null);
+
+    if (process.env.NODE_ENV !== "production") {
+      console.debug("[SupabaseProgressRepository] clearProgress: capturedChildId =", capturedChildId);
+    }
+
+    // (B) Invalidate any in-flight _hydrate() so it cannot write stale Supabase
+    //     data back over the cleared state (race-condition guard).
+    //     _hydratePromise is intentionally NOT nulled here — keeping it non-null
+    //     prevents _triggerHydrate() (called on every re-subscribe) from starting
+    //     a NEW hydration during the async DELETEs below.
+    this._hydrateGen++;
+
     const cleared: SpeechProgress = {
       ...SERVER_PROGRESS,
       childId: this._progress.childId,
@@ -207,16 +236,81 @@ export class SupabaseProgressRepository implements IProgressRepository {
     };
     this._setProgress(cleared);
 
-    const childId = await this._requireChildId();
-    if (!childId) return;
+    // (C) Remove localStorage fallback so the offline-fallback path in _hydrate()
+    //     cannot restore old data.
+    localRemove(STORAGE_KEYS.PROGRESS);
+
+    // Use the pre-captured UUID first; fall back to one-shot fetch only if null.
+    const childId = capturedChildId ?? (await this._requireChildId());
+    if (!childId) {
+      warnRepo("clearProgress", "no child_id — Supabase DELETE skipped");
+      return;
+    }
+
+    // (D) Write marker BEFORE the DELETE so that if the page is refreshed before
+    //     the DELETE completes, _hydrate() on the next load detects the marker
+    //     and retries the DELETE itself, preventing old progress from reappearing.
+    localWrite(PROGRESS_CLEAR_PENDING_KEY, childId);
+
+    if (process.env.NODE_ENV !== "production") {
+      console.debug("[SupabaseProgressRepository] clearProgress: deleting rows for child_id =", childId);
+    }
 
     const [delAttempts, delSessions] = await Promise.all([
-      this.client.from("practice_attempts").delete().eq("child_id", childId),
-      this.client.from("practice_sessions").delete().eq("child_id", childId),
+      this.client.from("practice_attempts").delete({ count: "exact" }).eq("child_id", childId),
+      this.client.from("practice_sessions").delete({ count: "exact" }).eq("child_id", childId),
     ]);
 
-    if (delAttempts.error) warnRepo("clearProgress.deleteAttempts", delAttempts.error);
-    if (delSessions.error) warnRepo("clearProgress.deleteSessions", delSessions.error);
+    if (process.env.NODE_ENV !== "production") {
+      console.debug(
+        "[SupabaseProgressRepository] clearProgress: deleted",
+        delAttempts.count ?? 0, "attempt(s) and",
+        delSessions.count ?? 0, "session(s).",
+        "attempt error:", delAttempts.error,
+        "session error:", delSessions.error,
+      );
+    }
+
+    if (delAttempts.error) {
+      warnRepo("clearProgress.deleteAttempts", new QueryError("practice_attempts", "delete", delAttempts.error));
+      // Keep marker — _hydrate() on the next load will retry.
+      return;
+    }
+    if (delSessions.error) {
+      warnRepo("clearProgress.deleteSessions", new QueryError("practice_sessions", "delete", delSessions.error));
+      return;
+    }
+
+    // (E) Both DELETEs confirmed successful — remove the pending marker and
+    //     trigger a fresh rehydrate so the UI re-fetches and confirms empty state.
+    localRemove(PROGRESS_CLEAR_PENDING_KEY);
+
+    // Allow a new _hydrate() to start now that the DELETE is confirmed complete.
+    // This is safe: _hydratePromise is nulled here (not earlier) so no hydration
+    // could have snuck in during the async DELETEs above.
+    this._hydrated = false;
+    this._hydratePromise = null;
+    this._childId = null;
+    this._hydrateGen++;
+    this._triggerHydrate();
+  }
+
+  /**
+   * Clears progress for the active child scoped to the repository instance.
+   * The childId parameter is used as a non-empty guard only — Supabase operations
+   * always use the hydrated UUID from this._childId (never the localStorage
+   * placeholder that may arrive as childId from the UI layer).
+   */
+  async clearProgressForChild(childId: string): Promise<void> {
+    if (!childId) {
+      if (process.env.NODE_ENV !== "production") {
+        console.warn(
+          "[SupabaseProgressRepository] clearProgressForChild: childId is empty — skipped",
+        );
+      }
+      return;
+    }
+    await this.clearProgress();
   }
 
   // ── Session management ────────────────────────────────────────────────────
@@ -439,6 +533,43 @@ export class SupabaseProgressRepository implements IProgressRepository {
 
     this._childId = profile.id;
     this._selectedSoundId = profile.selected_sound_id;
+
+    // Check for a pending-clear marker written by clearProgress().
+    // This handles: clearProgress() called → page refreshed before DELETE
+    // completed (or DELETE failed). We retry the DELETE here and return empty
+    // progress so old data never reappears on page refresh.
+    const pendingClearFor = localRead(PROGRESS_CLEAR_PENDING_KEY);
+    if (pendingClearFor === profile.id) {
+      if (process.env.NODE_ENV !== "production") {
+        console.debug(
+          "[SupabaseProgressRepository] pending-clear marker detected — retrying Supabase DELETE",
+        );
+      }
+      const [delA, delS] = await Promise.all([
+        this.client.from("practice_attempts").delete().eq("child_id", profile.id),
+        this.client.from("practice_sessions").delete().eq("child_id", profile.id),
+      ]);
+      if (delA.error) warnRepo("_hydrate.pendingClear.deleteAttempts", new QueryError("practice_attempts", "delete", delA.error));
+      if (delS.error) warnRepo("_hydrate.pendingClear.deleteSessions", new QueryError("practice_sessions", "delete", delS.error));
+
+      if (!delA.error && !delS.error) {
+        localRemove(PROGRESS_CLEAR_PENDING_KEY);
+      }
+
+      if (this._hydrateGen !== myGen) return;
+
+      // Set empty progress (do not use the data Supabase returned)
+      this._progress = {
+        ...SERVER_PROGRESS,
+        childId: profile.id,
+        targetSound: profile.target_sound,
+        updatedAt: new Date().toISOString(),
+      };
+      this._hydrated = true;
+      this._notifyProgress();
+      this._notifySound();
+      return;
+    }
 
     // Step 2: fetch sessions and attempts in parallel
     const [sessionsResult, attemptsResult] = await Promise.all([

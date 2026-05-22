@@ -42,6 +42,10 @@ export class LocalProgressRepository implements IProgressRepository {
     storage.clearProgress();
   }
 
+  async clearProgressForChild(childId: string): Promise<void> {
+    storage.clearProgressForChild(childId);
+  }
+
   // ── Session management ───────────────────────────────────────────────────────
 
   async startSession(input: StartSessionInput): Promise<PracticeSession> {

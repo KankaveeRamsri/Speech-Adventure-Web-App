@@ -64,6 +64,13 @@ export function useSpeechProgress() {
     repo.clearProgress();
   }, [repo]);
 
+  const clearProgressForChild = useCallback(
+    (childId: string) => {
+      repo.clearProgressForChild(childId);
+    },
+    [repo],
+  );
+
   const refreshProgress = useCallback(() => {
     // With useSyncExternalStore the snapshot is re-read automatically
     // whenever notifyListeners fires. Kept for API compatibility.
@@ -128,6 +135,7 @@ export function useSpeechProgress() {
     setSelectedSound,
     addAttempt,
     clearProgress: clearAllProgress,
+    clearProgressForChild,
     refreshProgress,
     getStageStatus,
     getStageAttempts,

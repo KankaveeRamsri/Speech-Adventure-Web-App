@@ -147,10 +147,46 @@ export function addAttempt(attempt: PracticeAttempt): SpeechProgress {
 export function clearProgress(): void {
   if (!isBrowser()) return;
   localRemove(STORAGE_KEY);
-  // Reassign to SERVER_PROGRESS — this IS a new reference vs real data,
-  // so Object.is detects the change and React re-renders once.
   currentProgress = SERVER_PROGRESS;
-  // Keep isClientInitialized = true so we don't re-read a stale entry.
+  notifyListeners();
+}
+
+/**
+ * Remove progress records belonging to childId only.
+ * If no other children's data exists, performs a full clear.
+ * Guard: no-ops when childId is empty (logs dev warning).
+ */
+export function clearProgressForChild(childId: string): void {
+  if (!childId) {
+    if (process.env.NODE_ENV !== "production") {
+      console.warn("[speechProgressStorage] clearProgressForChild: childId is empty — skipped");
+    }
+    return;
+  }
+
+  initializeIfNeeded();
+
+  const remainingAttempts = currentProgress.attempts.filter(
+    (a) => a.childId !== childId,
+  );
+  const remainingSessions = currentProgress.sessions.filter(
+    (s) => s.childId !== childId,
+  );
+
+  if (remainingAttempts.length === 0 && remainingSessions.length === 0) {
+    clearProgress();
+    return;
+  }
+
+  // Edge case: multiple children's data coexists — preserve the rest.
+  const next: SpeechProgress = {
+    ...currentProgress,
+    attempts: remainingAttempts,
+    sessions: remainingSessions,
+    updatedAt: new Date().toISOString(),
+  };
+  currentProgress = next;
+  writeToLocalStorage(currentProgress);
   notifyListeners();
 }
 
