@@ -14,10 +14,11 @@ import { useChildProfile } from "@/hooks/useChildProfile";
 import { useObservationNotes } from "@/hooks/useObservationNotes";
 import { mockChildProfile, mockTrainingStages } from "@/data/speechAdventureMockData";
 import {
-  loadDemoProgress,
-  resetDemoProgress,
+  DEMO_PROGRESS,
+  DEMO_OBSERVATIONS,
   DEMO_ATTEMPT_COUNT,
 } from "@/lib/demo/speechAdventureDemoData";
+import { useRepositories } from "@/lib/providers/RepositoryProvider";
 import type { ProgressSummary, PracticeSession, PracticeAttempt } from "@/types/speechAdventure";
 import { calculateRewards } from "@/lib/rewards/calculateRewards";
 
@@ -82,6 +83,7 @@ type TabId = (typeof TABS)[number]["id"];
 // ─── Page ───────────────────────────────────────────────────────────────────────
 
 export default function ProgressDashboardPage() {
+  const { progress: progressRepo, observations: obsRepo } = useRepositories();
   const { progress, summary, clearProgressForChild, getStageStatus, getStageAttempts, isHydrated } =
     useSpeechProgress();
   const { profile, hasProfile } = useChildProfile();
@@ -150,12 +152,14 @@ export default function ProgressDashboardPage() {
     if (summary.totalAttempts > 0) {
       setShowDemoConfirm(true);
     } else {
-      loadDemoProgress();
+      void progressRepo.replaceProgress(DEMO_PROGRESS);
+      void obsRepo.replaceNotes(DEMO_OBSERVATIONS);
     }
   };
 
   const handleConfirmLoadDemo = () => {
-    loadDemoProgress();
+    void progressRepo.replaceProgress(DEMO_PROGRESS);
+    void obsRepo.replaceNotes(DEMO_OBSERVATIONS);
     setShowDemoConfirm(false);
   };
 

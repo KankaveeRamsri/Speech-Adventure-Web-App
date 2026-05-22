@@ -2,15 +2,8 @@
 
 import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
-import {
-  clearProfile,
-  replaceProfile,
-} from "@/lib/child-profile/childProfileStorage";
 import { useChildProfile } from "@/hooks/useChildProfile";
-import {
-  setSelectedSoundId,
-  replaceProgress,
-} from "@/lib/speechProgressStorage";
+import { useSpeechProgress } from "@/hooks/useSpeechProgress";
 import { useRepositories } from "@/lib/providers/RepositoryProvider";
 import { mockTargetSounds } from "@/data/speechAdventureMockData";
 import {
@@ -20,12 +13,11 @@ import {
   readBackupFile,
   getStorageSummary,
 } from "@/lib/local-data/localDataBackup";
-import { loadDemoProgress } from "@/lib/demo/speechAdventureDemoData";
-import { DEMO_ATTEMPT_COUNT } from "@/lib/demo/speechAdventureDemoData";
-import {
-  replaceObservations,
-} from "@/lib/observations/observationStorage";
+import { DEMO_ATTEMPT_COUNT, DEMO_PROGRESS, DEMO_OBSERVATIONS } from "@/lib/demo/speechAdventureDemoData";
 import { STORAGE_KEYS } from "@/lib/storage/storageKeys";
+import type { SpeechProgress } from "@/types/speechAdventure";
+import type { ObservationNote } from "@/types/observations";
+import type { ChildProfileData } from "@/lib/child-profile/childProfileStorage";
 
 type Step = 1 | 2 | 3 | 4 | 5;
 
@@ -70,6 +62,7 @@ export default function OnboardingPage() {
   // Direct childProfileStorage imports only reached localStorage, not
   // SupabaseProfileRepository, causing /training to always see a null profile.
   const { saveProfile: repoSaveProfile, profile: existingProfile } = useChildProfile();
+  const { setSelectedSound } = useSpeechProgress();
   const editDetectedRef = useRef(false);
 
   useEffect(() => {
@@ -94,7 +87,7 @@ export default function OnboardingPage() {
       createdAt: existingProfile?.createdAt ?? now,
       updatedAt: now,
     });
-    setSelectedSoundId(targetSound);
+    setSelectedSound(targetSound);
     router.push(isEdit ? "/training" : "/training/pretest");
   };
 
@@ -413,7 +406,7 @@ export default function OnboardingPage() {
                       createdAt: existingProfile?.createdAt ?? now,
                       updatedAt: now,
                     });
-                    setSelectedSoundId(targetSound);
+                    setSelectedSound(targetSound);
                     router.push("/training");
                   }}
                   className="w-full border border-border text-text-muted hover:text-text hover:border-primary/40 font-medium px-8 py-3 rounded-xl text-sm transition-all active:scale-[0.99]"
@@ -442,7 +435,7 @@ function DataManagerSection() {
   const [confirmState, setConfirmState] = useState<ConfirmState>(null);
   const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
   const [storageInfo, setStorageInfo] = useState(getStorageSummary());
-  const { progress: progressRepo, observations: obsRepo } = useRepositories();
+  const { progress: progressRepo, observations: obsRepo, profile: profileRepo } = useRepositories();
 
   useEffect(() => {
     setStorageInfo(getStorageSummary());
@@ -481,13 +474,13 @@ function DataManagerSection() {
         // subscribers are notified with the correct new data.
         const d = backup.data;
         if (d[STORAGE_KEYS.PROGRESS]) {
-          try { replaceProgress(d[STORAGE_KEYS.PROGRESS] as Parameters<typeof replaceProgress>[0]); } catch { /* ignore */ }
+          try { void progressRepo.replaceProgress(d[STORAGE_KEYS.PROGRESS] as SpeechProgress); } catch { /* ignore */ }
         }
         if (d[STORAGE_KEYS.OBSERVATIONS]) {
-          try { replaceObservations(d[STORAGE_KEYS.OBSERVATIONS] as Parameters<typeof replaceObservations>[0]); } catch { /* ignore */ }
+          try { void obsRepo.replaceNotes(d[STORAGE_KEYS.OBSERVATIONS] as ObservationNote[]); } catch { /* ignore */ }
         }
         if (d[STORAGE_KEYS.PROFILE]) {
-          try { replaceProfile(d[STORAGE_KEYS.PROFILE] as Parameters<typeof replaceProfile>[0]); } catch { /* ignore */ }
+          try { void profileRepo.replaceProfile(d[STORAGE_KEYS.PROFILE] as ChildProfileData); } catch { /* ignore */ }
         }
 
         setStorageInfo(getStorageSummary());
@@ -508,9 +501,9 @@ function DataManagerSection() {
   const handleClear = () => {
     // Route through repositories so all provider caches (including Supabase)
     // are cleared and localStorage fallback is invalidated.
-    progressRepo.clearProgress();
-    obsRepo.clearNotes();
-    clearProfile();
+    void progressRepo.clearProgress();
+    void obsRepo.clearNotes();
+    void profileRepo.clearProfile();
     clearAllData();
     setStorageInfo(getStorageSummary());
     setConfirmState(null);
@@ -519,7 +512,8 @@ function DataManagerSection() {
 
   // ── Demo ──
   const handleLoadDemo = () => {
-    loadDemoProgress();
+    void progressRepo.replaceProgress(DEMO_PROGRESS);
+    void obsRepo.replaceNotes(DEMO_OBSERVATIONS);
     setStorageInfo(getStorageSummary());
     flash("success", `โหลดข้อมูลสาธิตสำเร็จ (${DEMO_ATTEMPT_COUNT} ครั้ง)`);
   };
