@@ -11,7 +11,7 @@ import { SpeechProgressSchema, parseOrDefault } from "@/lib/validation";
 const STORAGE_KEY = STORAGE_KEYS.PROGRESS;
 const SOUND_STORAGE_KEY = STORAGE_KEYS.SELECTED_SOUND;
 
-const DEFAULT_CHILD_ID = "child-001";
+const DEFAULT_CHILD_ID = "";
 const DEFAULT_TARGET_SOUND = "ช";
 const DEFAULT_SOUND_ID = "ก";
 

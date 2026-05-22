@@ -8,6 +8,7 @@ import PracticeCard from "@/components/speech-adventure/PracticeCard";
 import LevelCompletionSummary from "@/components/speech-adventure/LevelCompletionSummary";
 import PracticeSessionSummary from "@/components/speech-adventure/PracticeSessionSummary";
 import { useSpeechProgress } from "@/hooks/useSpeechProgress";
+import { useChildProfile } from "@/hooks/useChildProfile";
 import {
   mockPracticeItemsBySound,
   mockTrainingStages,
@@ -27,6 +28,7 @@ export default function PracticePage() {
   const stageSlug = params.stage as string;
   const stage = mockTrainingStages.find((s) => s.slug === stageSlug);
   const { addAttempt, selectedSoundId, isHydrated, startSession, completeSession } = useSpeechProgress();
+  const { profile } = useChildProfile();
 
   const soundContent =
     mockPracticeItemsBySound[selectedSoundId] ??
@@ -47,14 +49,14 @@ export default function PracticePage() {
     sessionStarted.current = true;
     void (async () => {
       const session = await startSession({
-        childId: "child-001",
+        childId: profile?.id ?? "",
         targetSound: selectedSoundId,
         stageId: stageSlug,
         totalMissions: items.length,
       });
       setActiveSession(session);
     })();
-  }, [isHydrated, stage, stageSlug, items.length, selectedSoundId, startSession]);
+  }, [isHydrated, stage, stageSlug, items.length, selectedSoundId, startSession, profile?.id]);
 
   const handleSaveAttempt = useCallback(
     (attempt: PracticeAttempt) => {
@@ -96,14 +98,14 @@ export default function PracticePage() {
     sessionStarted.current = true;
     void (async () => {
       const session = await startSession({
-        childId: "child-001",
+        childId: profile?.id ?? "",
         targetSound: selectedSoundId,
         stageId: stageSlug,
         totalMissions: items.length,
       });
       setActiveSession(session);
     })();
-  }, [stageSlug, selectedSoundId, items.length, startSession]);
+  }, [stageSlug, selectedSoundId, items.length, startSession, profile?.id]);
 
   /* ── Not found ── */
   if (!stage) {

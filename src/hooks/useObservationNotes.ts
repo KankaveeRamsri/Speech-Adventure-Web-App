@@ -8,7 +8,7 @@ function generateId(): string {
   return `obs-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
 }
 
-export function useObservationNotes(childId = "child-001") {
+export function useObservationNotes(childId = "") {
   const { observations: repo } = useRepositories();
 
   const allNotes = useSyncExternalStore<ObservationNote[]>(

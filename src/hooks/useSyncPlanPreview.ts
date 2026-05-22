@@ -44,7 +44,7 @@ export interface SyncPlanPreview {
 export function useSyncPlanPreview(): SyncPlanPreview {
   const { progress, isHydrated: progressHydrated } = useSpeechProgress();
   const { profile, hasProfile, isHydrated: profileHydrated } = useChildProfile();
-  const childId = profile?.id ?? "child-001";
+  const childId = profile?.id ?? "";
   const { notes } = useObservationNotes(childId);
   const { isAuthenticated, user, isLoading: isAuthLoading } = useAuth();
 
@@ -83,7 +83,6 @@ export function useSyncPlanPreview(): SyncPlanPreview {
       localProgress.sessions.length > 0 ||
       localNotes.length > 0
     );
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []); // snapshot at mount — stable reference for the upload decision
 
   const cloudHasData = useMemo(

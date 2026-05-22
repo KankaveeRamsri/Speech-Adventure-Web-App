@@ -48,10 +48,11 @@ function buildAttempt(
   targetSound: string,
   evalResult: SpeechEvaluationResult,
   durationMs: number,
+  childId: string,
 ): PracticeAttempt {
   return {
     id: `attempt-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
-    childId: "child-001",
+    childId,
     stageId: item.stageSlug,
     practiceItemId: item.id,
     targetSound,
@@ -129,7 +130,7 @@ export default function PracticeCard({
 
   const handleAccept = useCallback(async () => {
     if (!evalResult) return;
-    const attempt = buildAttempt(item, targetSound, evalResult, recorder.durationMs);
+    const attempt = buildAttempt(item, targetSound, evalResult, recorder.durationMs, profile?.id ?? "");
 
     // Upload audio to Supabase Storage when all prerequisites are met.
     // Falls back gracefully — attempt is saved regardless of upload outcome.
@@ -168,13 +169,13 @@ export default function PracticeCard({
       itemType: "oral_motor",
       durationMs: 0,
     }).then((ev) => {
-      const attempt = buildAttempt(item, targetSound, ev, 0);
+      const attempt = buildAttempt(item, targetSound, ev, 0, profile?.id ?? "");
       setSavedAttempt(attempt);
       setResult(toUIResult(ev));
       onSaveAttempt?.(attempt);
       setPhase("reward");
     });
-  }, [item, targetSound, onSaveAttempt]);
+  }, [item, targetSound, onSaveAttempt, profile]);
 
   const handleSoundChoice = useCallback((choice: string) => {
     evaluateSpeechViaApi({
