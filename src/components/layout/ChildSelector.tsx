@@ -1,0 +1,158 @@
+"use client";
+
+import { useState, useRef, useEffect } from "react";
+import Link from "next/link";
+import { useChildProfile } from "@/hooks/useChildProfile";
+import { useSpeechProgress } from "@/hooks/useSpeechProgress";
+import type { ChildProfileData } from "@/lib/child-profile/childProfileStorage";
+
+function ChevronDownIcon() {
+  return (
+    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M6 9l6 6 6-6" />
+    </svg>
+  );
+}
+
+function PlusIcon() {
+  return (
+    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <line x1="12" y1="5" x2="12" y2="19" />
+      <line x1="5" y1="12" x2="19" y2="12" />
+    </svg>
+  );
+}
+
+function CheckIcon() {
+  return (
+    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <polyline points="20 6 9 17 4 12" />
+    </svg>
+  );
+}
+
+interface ChildSelectorProps {
+  collapsed?: boolean;
+}
+
+export default function ChildSelector({ collapsed = false }: ChildSelectorProps) {
+  const { profile, profiles, selectedChildId, isHydrated, selectChild } = useChildProfile();
+  const { setSelectedSound } = useSpeechProgress();
+  const [open, setOpen] = useState(false);
+  const wrapperRef = useRef<HTMLDivElement>(null);
+
+  // Close dropdown on outside click
+  useEffect(() => {
+    function handleClick(e: MouseEvent) {
+      if (wrapperRef.current && !wrapperRef.current.contains(e.target as Node)) {
+        setOpen(false);
+      }
+    }
+    if (open) document.addEventListener("mousedown", handleClick);
+    return () => document.removeEventListener("mousedown", handleClick);
+  }, [open]);
+
+  // Don't render until hydrated (prevents SSR mismatch)
+  if (!isHydrated || !profile) return null;
+
+  const childName = profile.name;
+  const initial = childName.charAt(0);
+  const hasMultiple = profiles.length > 1;
+
+  function handleSelect(child: ChildProfileData) {
+    selectChild(child.id);
+    setSelectedSound(child.targetSound);
+    setOpen(false);
+  }
+
+  if (collapsed) {
+    return (
+      <div
+        className="w-8 h-8 rounded-full bg-primary/12 flex items-center justify-center text-xs font-bold text-primary flex-shrink-0 cursor-default"
+        title={childName}
+      >
+        {initial}
+      </div>
+    );
+  }
+
+  return (
+    <div ref={wrapperRef} className="relative">
+      <button
+        onClick={() => hasMultiple && setOpen((v) => !v)}
+        className={`w-full flex items-center gap-2 min-w-0 rounded-xl px-2 py-1.5 transition-all ${
+          hasMultiple
+            ? "hover:bg-gray-100 dark:hover:bg-white/8 cursor-pointer"
+            : "cursor-default"
+        }`}
+        aria-haspopup={hasMultiple ? "listbox" : undefined}
+        aria-expanded={hasMultiple ? open : undefined}
+        aria-label={hasMultiple ? `เปลี่ยนเด็ก — กำลังเลือก ${childName}` : childName}
+      >
+        <div className="w-7 h-7 rounded-full bg-primary/12 flex items-center justify-center text-xs font-bold text-primary flex-shrink-0">
+          {initial}
+        </div>
+        <span className="text-sm font-semibold text-text truncate flex-1 text-left">
+          {childName}
+        </span>
+        {hasMultiple && (
+          <span className={`text-text-muted flex-shrink-0 transition-transform duration-150 ${open ? "rotate-180" : ""}`}>
+            <ChevronDownIcon />
+          </span>
+        )}
+      </button>
+
+      {/* Dropdown */}
+      {open && (
+        <div
+          role="listbox"
+          aria-label="เลือกเด็ก"
+          className="absolute top-full left-0 right-0 mt-1 z-50 bg-surface border border-border rounded-xl shadow-lg overflow-hidden"
+        >
+          {profiles.map((child) => {
+            const isSelected = child.id === selectedChildId;
+            return (
+              <button
+                key={child.id}
+                role="option"
+                aria-selected={isSelected}
+                onClick={() => handleSelect(child)}
+                className={`w-full flex items-center gap-2.5 px-3 py-2.5 text-sm transition-colors text-left ${
+                  isSelected
+                    ? "bg-primary/8 text-primary font-semibold"
+                    : "text-text hover:bg-gray-50 dark:hover:bg-white/5"
+                }`}
+              >
+                <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0 ${
+                  isSelected ? "bg-primary/20 text-primary" : "bg-primary/10 text-primary"
+                }`}>
+                  {child.name.charAt(0)}
+                </div>
+                <span className="truncate flex-1">{child.name}</span>
+                {isSelected && (
+                  <span className="flex-shrink-0 text-primary">
+                    <CheckIcon />
+                  </span>
+                )}
+              </button>
+            );
+          })}
+
+          {/* Add Child */}
+          <div className="border-t border-border">
+            <Link
+              href="/onboarding"
+              onClick={() => setOpen(false)}
+              className="flex items-center gap-2.5 px-3 py-2.5 text-sm text-text-muted hover:text-primary hover:bg-primary/5 transition-colors"
+            >
+              <span className="w-6 h-6 rounded-full border-2 border-dashed border-current flex items-center justify-center flex-shrink-0">
+                <PlusIcon />
+              </span>
+              <span>เพิ่มเด็ก</span>
+            </Link>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}

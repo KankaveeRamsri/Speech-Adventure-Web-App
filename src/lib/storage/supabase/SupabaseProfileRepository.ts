@@ -28,8 +28,14 @@ const SERVER_PROFILE: ChildProfileData | null = null;
  * TODO (activation): verify that `getSupabaseClient()` is called only after
  * the browser auth session is ready (AuthProvider.isLoading = false).
  */
+// Stable empty-profiles constant so listProfiles() never returns a new [] reference.
+const SUPABASE_EMPTY_PROFILES: ChildProfileData[] = [];
+
 export class SupabaseProfileRepository implements IProfileRepository {
   private _cache: ChildProfileData | null = null;
+  // Cached single-element list kept in sync with _cache inside _setCache().
+  // Returning the same reference on every call keeps useSyncExternalStore stable.
+  private _profilesList: ChildProfileData[] = SUPABASE_EMPTY_PROFILES;
   private readonly _listeners = new Set<() => void>();
   private _hydrated = false;
   private _hydratePromise: Promise<void> | null = null;
@@ -147,6 +153,7 @@ export class SupabaseProfileRepository implements IProfileRepository {
     this._hydratePromise = null;
     this._localScopeUserId = null;
     this._cache = null;
+    this._profilesList = SUPABASE_EMPTY_PROFILES;
     this._notify();
   }
 
@@ -168,6 +175,9 @@ export class SupabaseProfileRepository implements IProfileRepository {
 
   private _setCache(value: ChildProfileData | null): void {
     this._cache = value;
+    // Keep _profilesList in sync so listProfiles() returns the same reference
+    // between writes — required for useSyncExternalStore snapshot stability.
+    this._profilesList = value !== null ? [value] : SUPABASE_EMPTY_PROFILES;
     this._notify();
   }
 
@@ -223,5 +233,23 @@ export class SupabaseProfileRepository implements IProfileRepository {
   private async _getCurrentUserId(): Promise<string | null> {
     const { data } = await this.client.auth.getUser();
     return data.user?.id ?? null;
+  }
+
+  // ── Multi-child support stubs (Phase 7) ─────────────────────────────────────
+  // Supabase currently enforces one child_profile per user_id (upsert onConflict).
+  // These stubs preserve the IProfileRepository contract without schema changes.
+  // Full multi-child support for Supabase requires a DB migration in Phase 8+.
+
+  listProfiles(): ChildProfileData[] {
+    return this._profilesList;
+  }
+
+  getSelectedChildId(): string | null {
+    return this._cache?.id ?? null;
+  }
+
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  setSelectedChildId(_id: string): void {
+    // No-op: Supabase single-profile mode — only one child is always "selected".
   }
 }

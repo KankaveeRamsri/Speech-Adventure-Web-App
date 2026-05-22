@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useSyncExternalStore } from "react";
+import { useCallback, useMemo, useSyncExternalStore } from "react";
 import type {
   SpeechProgress,
   PracticeAttempt,
@@ -15,6 +15,7 @@ import {
   getSessionSummary as storageGetSessionSummary,
 } from "@/lib/speechProgressStorage";
 import { useRepositories } from "@/lib/providers/RepositoryProvider";
+import { useChildProfile } from "@/hooks/useChildProfile";
 
 // ── isHydrated detection ──────────────────────────────────────────────────────
 // useSyncExternalStore with different server/client snapshots:
@@ -29,6 +30,7 @@ const serverSnapshot = () => false as const;
 
 export function useSpeechProgress() {
   const { progress: repo } = useRepositories();
+  const { profiles, profile } = useChildProfile();
 
   // progress is synchronized via the repository's pub-sub.
   // getServerProgress() is used on the server AND during client hydration so
@@ -52,7 +54,32 @@ export function useSpeechProgress() {
     repo.getServerSoundId.bind(repo),
   );
 
-  const summary: ProgressSummary = calculateProgressSummary(progress);
+  // When multiple children exist, filter attempts/sessions to the selected child
+  // so Child A's progress is never shown in Child B's training map.
+  // Single-child users (legacy): show all data unfiltered for backward compat.
+  const activeChildId = profiles.length > 1 ? (profile?.id ?? null) : null;
+
+  const filteredAttempts = useMemo(
+    () =>
+      activeChildId
+        ? progress.attempts.filter((a) => a.childId === activeChildId)
+        : progress.attempts,
+    [progress.attempts, activeChildId],
+  );
+
+  const filteredSessions = useMemo(
+    () =>
+      activeChildId
+        ? progress.sessions.filter((s) => s.childId === activeChildId)
+        : progress.sessions,
+    [progress.sessions, activeChildId],
+  );
+
+  const summary: ProgressSummary = calculateProgressSummary({
+    ...progress,
+    attempts: filteredAttempts,
+    sessions: filteredSessions,
+  });
 
   const addAttempt = useCallback((attempt: PracticeAttempt) => {
     // repo.addAttempt persists and notifies listeners, which triggers
@@ -82,16 +109,16 @@ export function useSpeechProgress() {
 
   const getStageStatus = useCallback(
     (stageId: string, targetSoundId?: string): StageStatus => {
-      return computeStageStatus(progress.attempts, stageId, targetSoundId);
+      return computeStageStatus(filteredAttempts, stageId, targetSoundId);
     },
-    [progress.attempts],
+    [filteredAttempts],
   );
 
   const getStageAttempts = useCallback(
     (stageId: string, targetSoundId?: string): PracticeAttempt[] => {
-      return computeStageAttempts(progress.attempts, stageId, targetSoundId);
+      return computeStageAttempts(filteredAttempts, stageId, targetSoundId);
     },
-    [progress.attempts],
+    [filteredAttempts],
   );
 
   const startSession = useCallback(
@@ -128,8 +155,8 @@ export function useSpeechProgress() {
   return {
     progress,
     summary,
-    attempts: progress.attempts,
-    sessions: progress.sessions,
+    attempts: filteredAttempts,
+    sessions: filteredSessions,
     isHydrated,
     selectedSoundId,
     setSelectedSound,

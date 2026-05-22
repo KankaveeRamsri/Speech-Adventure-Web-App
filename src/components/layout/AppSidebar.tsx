@@ -5,9 +5,9 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import NavIcon, { type NavIconName } from "./NavIcon";
 import { useSidebar } from "./SidebarContext";
+import ChildSelector from "./ChildSelector";
 import ThemeToggle from "@/components/ui/ThemeToggle";
 import { useSpeechProgress } from "@/hooks/useSpeechProgress";
-import { useChildProfile } from "@/hooks/useChildProfile";
 import { mockTrainingStages } from "@/data/speechAdventureMockData";
 
 const NAV_ITEMS: { href: string; label: string; icon: NavIconName; exact?: boolean }[] = [
@@ -61,12 +61,10 @@ export default function AppSidebar() {
   const pathname = usePathname();
   const { collapsed, toggle, mounted, mobileOpen, setMobileOpen } = useSidebar();
   const { summary, isHydrated, selectedSoundId } = useSpeechProgress();
-  const { profile } = useChildProfile();
 
   const isActive = (item: (typeof NAV_ITEMS)[0]) =>
     item.exact ? pathname === item.href : (pathname?.startsWith(item.href) ?? false);
 
-  const childName = profile?.name ?? null;
   const stars = isHydrated ? summary.starsEarned : 0;
   const currentStageId = isHydrated ? summary.currentStageId : null;
   const currentStage = mockTrainingStages.find((s) => s.id === currentStageId);
@@ -94,23 +92,12 @@ export default function AppSidebar() {
   // ── Context section (child info + actions) ──
   const contextSection = (
     <div className={`px-3 py-3 border-b border-border flex-shrink-0 ${isCollapsed ? "flex items-center justify-center" : "space-y-2.5"}`}>
-      {/* Child name */}
+      {/* Child selector */}
       {isCollapsed ? (
-        childName && isHydrated ? (
-          <div className="w-8 h-8 rounded-full bg-primary/12 flex items-center justify-center text-xs font-bold text-primary flex-shrink-0" title={childName}>
-            {childName.charAt(0)}
-          </div>
-        ) : null
+        <ChildSelector collapsed />
       ) : (
         <>
-          {childName && isHydrated && (
-            <div className="flex items-center gap-2 min-w-0">
-              <div className="w-7 h-7 rounded-full bg-primary/12 flex items-center justify-center text-xs font-bold text-primary flex-shrink-0">
-                {childName.charAt(0)}
-              </div>
-              <span className="text-sm font-semibold text-text truncate">{childName}</span>
-            </div>
-          )}
+          <ChildSelector />
 
           {/* Target sound + Stars row */}
           <div className="flex items-center gap-2 flex-wrap">
@@ -274,14 +261,7 @@ export default function AppSidebar() {
 
         {/* Mobile context */}
         <div className="px-4 py-3 border-b border-border flex-shrink-0 space-y-2.5">
-          {childName && isHydrated && (
-            <div className="flex items-center gap-2 min-w-0">
-              <div className="w-7 h-7 rounded-full bg-primary/12 flex items-center justify-center text-xs font-bold text-primary flex-shrink-0">
-                {childName.charAt(0)}
-              </div>
-              <span className="text-sm font-semibold text-text truncate">{childName}</span>
-            </div>
-          )}
+          <ChildSelector />
           <div className="flex items-center gap-2 flex-wrap">
             {isHydrated && selectedSoundId && (
               <span className="inline-flex items-center px-2 py-0.5 rounded-full bg-primary/10 text-primary text-xs font-bold">

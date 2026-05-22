@@ -34,8 +34,14 @@ export const STORAGE_KEYS = {
   /** Selected target sound (e.g., "ก", "ข") */
   SELECTED_SOUND: "speech-adventure-selected-sound-v1",
 
-  /** Child profile: name, age, targetSound, trainingGoal */
+  /** Child profile: name, age, targetSound, trainingGoal (single-profile, legacy) */
   PROFILE: "speech-adventure-profile-v1",
+
+  /** All child profiles for this user account (multi-child list) */
+  PROFILES_LIST: "speech-adventure-profiles-v1",
+
+  /** ID of the currently selected child profile */
+  SELECTED_CHILD_ID: "speech-adventure-selected-child-v1",
 
   /** Therapist / parent observation notes */
   OBSERVATIONS: "speech-adventure-observations-v1",
@@ -54,6 +60,8 @@ export const DATA_KEYS = [
   STORAGE_KEYS.PROGRESS,
   STORAGE_KEYS.SELECTED_SOUND,
   STORAGE_KEYS.PROFILE,
+  STORAGE_KEYS.PROFILES_LIST,
+  STORAGE_KEYS.SELECTED_CHILD_ID,
   STORAGE_KEYS.OBSERVATIONS,
 ] as const;
 

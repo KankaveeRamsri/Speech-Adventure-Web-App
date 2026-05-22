@@ -5,6 +5,19 @@ metadata:
   type: project
 ---
 
+Phase 7-reboot (Child Selector + Multi-child Foundation) complete as of 2026-05-22.
+- childProfileListStorage.ts — manages ChildProfileData[] + selectedChildId, migrates from legacy single-profile key on first init
+- IProfileRepository extended: listProfiles(), getSelectedChildId(), setSelectedChildId()
+- LocalProfileRepository: delegates getProfile/subscribe to childProfileListStorage; write-through to legacy childProfileStorage for compat
+- SupabaseProfileRepository: stubs (listProfiles returns [cache], setSelectedChildId is no-op — DB schema still single-profile)
+- useChildProfile: exposes profiles[], selectedChildId, selectChild(id)
+- useSpeechProgress: filters attempts/sessions by profile.id when profiles.length > 1 (backward compat: single-child shows all)
+- ChildSelector component: dropdown to switch between children, "เพิ่มเด็ก" links to /onboarding
+- AppSidebar: replaced hardcoded child name with ChildSelector in both desktop + mobile sections
+- INVARIANT: single-child users see no change — all their data still visible
+- NOTE: Supabase child_profiles table still limited to 1 row per user_id (onConflict user_id). Multi-child in Supabase needs Phase 8 migration.
+- KEY: When switching child, caller must also call setSelectedSound(child.targetSound) — ChildSelector handles this automatically
+
 Phase 26 (Supabase Repository Adapter Drafts) complete as of 2026-05-20. TypeScript fix: `Db*` row types must be `type` aliases (not `interface`) so they get implicit index signatures and satisfy `Record<string, unknown>` required by supabase-js v2 `GenericTable` constraint. Also `InsertChildProfile` needs optional `id?: string` for upsert-with-id calls.
 
 Phase 25 (Supabase Database Migration Foundation) complete as of 2026-05-20. SQL migrations 001–006 in `supabase/migrations/`.
