@@ -3,14 +3,19 @@
 // so the rest of the app never needs to check isSupabaseConfigured() directly.
 
 import { getSupabaseClient, isSupabaseConfigured } from "@/lib/supabase/client";
-import type { AuthResult, AuthSession, AuthUser } from "@/types/auth";
+import type { AuthResult, AuthSession, AuthUser, UserRole } from "@/types/auth";
 import type { User, Session } from "@supabase/supabase-js";
+
+// Keep a local reference to the constant without importing the value
+// (avoids a circular-style import oddity with `as const` re-exports).
+const FALLBACK_ROLE: UserRole = "parent";
 
 function mapUser(u: User): AuthUser {
   return {
     id: u.id,
     email: u.email ?? "",
     createdAt: u.created_at,
+    role: (u.user_metadata?.role as UserRole) ?? FALLBACK_ROLE,
   };
 }
 
@@ -65,7 +70,11 @@ export async function signIn(email: string, password: string): Promise<AuthResul
   }
 }
 
-export async function signUp(email: string, password: string): Promise<AuthResult> {
+export async function signUp(
+  email: string,
+  password: string,
+  role: UserRole = "parent",
+): Promise<AuthResult> {
   if (!isSupabaseConfigured()) {
     return { success: false, error: "ยังไม่ได้ตั้งค่า Authentication" };
   }
@@ -73,7 +82,11 @@ export async function signUp(email: string, password: string): Promise<AuthResul
   if (!client) return { success: false, error: "ยังไม่ได้ตั้งค่า Authentication" };
 
   try {
-    const { error } = await client.auth.signUp({ email, password });
+    const { error } = await client.auth.signUp({
+      email,
+      password,
+      options: { data: { role } },
+    });
     if (error) return { success: false, error: error.message };
     return { success: true };
   } catch {

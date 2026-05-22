@@ -8,7 +8,7 @@ import {
   useState,
 } from "react";
 import type { ReactNode } from "react";
-import type { AuthContextValue, AuthSession } from "@/types/auth";
+import type { AuthContextValue, AuthSession, UserRole } from "@/types/auth";
 import * as supabaseAuth from "@/lib/auth/supabaseAuth";
 import { isSupabaseConfigured } from "@/lib/supabase/client";
 
@@ -69,7 +69,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   );
 
   const signUp = useCallback(
-    (email: string, password: string) => supabaseAuth.signUp(email, password),
+    (email: string, password: string, role?: UserRole) => supabaseAuth.signUp(email, password, role),
     [],
   );
 

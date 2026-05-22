@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { useAuth } from "@/hooks/useAuth";
 import { isSupabaseConfigured } from "@/lib/supabase/client";
 import ThemeToggle from "@/components/ui/ThemeToggle";
+import type { UserRole } from "@/types/auth";
 
 function MicIcon() {
   return (
@@ -45,6 +46,13 @@ const PASSWORD_RULES = [
   { label: "มีตัวเลข", test: (p: string) => /\d/.test(p) },
 ];
 
+const ROLE_OPTIONS: { value: UserRole; label: string; desc: string; available: boolean }[] = [
+  { value: "parent", label: "ผู้ปกครอง", desc: "ติดตามพัฒนาการบุตรหลาน", available: true },
+  { value: "teacher", label: "ครู", desc: "จัดการนักเรียนในชั้นเรียน", available: false },
+  { value: "therapist", label: "นักบำบัด", desc: "ดูแลผู้ใช้หลายคน", available: false },
+  { value: "school_admin", label: "ผู้ดูแลโรงเรียน", desc: "บริหารจัดการทั้งโรงเรียน", available: false },
+];
+
 export default function SignUpPage() {
   const { signUp, isAuthenticated, isLoading } = useAuth();
   const router = useRouter();
@@ -52,6 +60,7 @@ export default function SignUpPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
+  const [selectedRole, setSelectedRole] = useState<UserRole>("parent");
   const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [success, setSuccess] = useState(false);
@@ -74,7 +83,7 @@ export default function SignUpPage() {
     setError("");
     setSubmitting(true);
 
-    const result = await signUp(email.trim(), password);
+    const result = await signUp(email.trim(), password, selectedRole);
 
     if (result.success) {
       setSuccess(true);
@@ -211,6 +220,40 @@ export default function SignUpPage() {
                       })}
                     </ul>
                   )}
+                </div>
+
+                {/* Role */}
+                <div className="space-y-2">
+                  <p className="text-sm font-semibold text-text">ฉันเป็น…</p>
+                  <div className="grid grid-cols-2 gap-2">
+                    {ROLE_OPTIONS.map((opt) => {
+                      const active = selectedRole === opt.value;
+                      return (
+                        <button
+                          key={opt.value}
+                          type="button"
+                          disabled={!opt.available}
+                          onClick={() => opt.available && setSelectedRole(opt.value)}
+                          className={[
+                            "relative rounded-xl border px-3 py-2.5 text-left transition-all",
+                            opt.available
+                              ? active
+                                ? "border-primary bg-primary/8 ring-1 ring-primary/30"
+                                : "border-border bg-bg hover:border-primary/40"
+                              : "border-border bg-bg opacity-50 cursor-not-allowed",
+                          ].join(" ")}
+                        >
+                          <span className="block text-xs font-semibold text-text">{opt.label}</span>
+                          <span className="block text-[10px] text-text-muted leading-tight mt-0.5">{opt.desc}</span>
+                          {!opt.available && (
+                            <span className="absolute top-1.5 right-1.5 bg-surface border border-border text-[9px] text-text-muted font-medium px-1 py-0.5 rounded-md leading-none">
+                              เร็วๆ นี้
+                            </span>
+                          )}
+                        </button>
+                      );
+                    })}
+                  </div>
                 </div>
 
                 {/* Error */}
