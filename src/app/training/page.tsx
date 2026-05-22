@@ -27,9 +27,11 @@ export default function TrainingMapPage() {
   } = useSpeechProgress();
   const { profile, hasProfile } = useChildProfile();
 
+  const activeSoundId = isHydrated ? (selectedSoundId || undefined) : undefined;
+
   const liveStages: TrainingStage[] = mockTrainingStages.map((stage) => {
-    const status = getStageStatus(stage.id);
-    const stageAttempts = getStageAttempts(stage.id);
+    const status = getStageStatus(stage.id, activeSoundId);
+    const stageAttempts = getStageAttempts(stage.id, activeSoundId);
     const starsEarned = stageAttempts.reduce((sum, a) => sum + a.starsEarned, 0);
     return { ...stage, status, starsEarned };
   });

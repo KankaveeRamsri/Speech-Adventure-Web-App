@@ -377,16 +377,21 @@ function findCurrentStageId(attempts: PracticeAttempt[]): string {
 
 export function getStageStatus(
   attempts: PracticeAttempt[],
-  stageId: string
+  stageId: string,
+  targetSoundId?: string,
 ): "locked" | "current" | "completed" | "review" {
   const stageIndex = STAGE_ORDER.indexOf(stageId);
   if (stageIndex === -1) return "locked";
 
-  if (isStageCompleted(attempts, stageId)) {
+  const scoped = targetSoundId
+    ? attempts.filter((a) => a.targetSound === targetSoundId)
+    : attempts;
+
+  if (isStageCompleted(scoped, stageId)) {
     return "completed";
   }
 
-  const currentStageId = findCurrentStageId(attempts);
+  const currentStageId = findCurrentStageId(scoped);
 
   if (stageId === currentStageId) {
     return stageId === "review" ? "review" : "current";
@@ -397,9 +402,14 @@ export function getStageStatus(
 
 export function getStageAttempts(
   attempts: PracticeAttempt[],
-  stageId: string
+  stageId: string,
+  targetSoundId?: string,
 ): PracticeAttempt[] {
-  return attempts.filter((a) => a.stageId === stageId);
+  return attempts.filter(
+    (a) =>
+      a.stageId === stageId &&
+      (targetSoundId == null || a.targetSound === targetSoundId),
+  );
 }
 
 // ── Progress summary ──────────────────────────────────────────────────────────

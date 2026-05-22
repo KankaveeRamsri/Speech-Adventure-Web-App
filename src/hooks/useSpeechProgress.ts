@@ -74,15 +74,15 @@ export function useSpeechProgress() {
   }, [repo]);
 
   const getStageStatus = useCallback(
-    (stageId: string): StageStatus => {
-      return computeStageStatus(progress.attempts, stageId);
+    (stageId: string, targetSoundId?: string): StageStatus => {
+      return computeStageStatus(progress.attempts, stageId, targetSoundId);
     },
     [progress.attempts],
   );
 
   const getStageAttempts = useCallback(
-    (stageId: string): PracticeAttempt[] => {
-      return computeStageAttempts(progress.attempts, stageId);
+    (stageId: string, targetSoundId?: string): PracticeAttempt[] => {
+      return computeStageAttempts(progress.attempts, stageId, targetSoundId);
     },
     [progress.attempts],
   );
