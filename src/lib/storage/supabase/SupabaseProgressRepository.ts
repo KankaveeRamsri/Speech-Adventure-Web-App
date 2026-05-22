@@ -20,6 +20,14 @@ import { localRead } from "@/lib/storage/local/localStorageClient";
 import { STORAGE_KEYS } from "@/lib/storage/storageKeys";
 import { SpeechProgressSchema, parseOrNull } from "@/lib/validation";
 
+// ── UUID guard ────────────────────────────────────────────────────────────────
+// Local session ids (e.g. "session-1748...") must never reach Supabase UUID columns.
+const UUID_RE =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+function isValidUuid(value: string): boolean {
+  return UUID_RE.test(value);
+}
+
 // ── Stable server snapshots (SSR has no Supabase session) ─────────────────────
 const DEFAULT_CHILD_ID = "";
 const DEFAULT_TARGET_SOUND = "ก";
@@ -550,6 +558,17 @@ export class SupabaseProgressRepository implements IProgressRepository {
       ),
       updatedAt: now,
     });
+
+    // Cache-only sessions (created when no Supabase child_id was available) carry
+    // a local id like "session-<timestamp>-<random>" that is not a valid UUID.
+    // Sending that id to a UUID column causes "invalid input syntax for type uuid".
+    if (!isValidUuid(sessionId)) {
+      warnRepo(
+        `SupabaseProgressRepository.${status}Session`,
+        "sessionId is not a UUID — session was cache-only, Supabase update skipped",
+      );
+      return updated;
+    }
 
     const { error } = await this.client
       .from("practice_sessions")
