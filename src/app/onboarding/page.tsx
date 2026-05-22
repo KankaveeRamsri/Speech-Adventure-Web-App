@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { useChildProfile } from "@/hooks/useChildProfile";
 import { useSpeechProgress } from "@/hooks/useSpeechProgress";
 import { useRepositories } from "@/lib/providers/RepositoryProvider";
-import { useAuth } from "@/hooks/useAuth";
+import { useAuth, getUserRole } from "@/hooks/useAuth";
 import { mockTargetSounds } from "@/data/speechAdventureMockData";
 import {
   exportData,
@@ -20,7 +20,7 @@ import type { SpeechProgress } from "@/types/speechAdventure";
 import type { ObservationNote } from "@/types/observations";
 import type { ChildProfileData } from "@/lib/child-profile/childProfileStorage";
 
-type Step = 1 | 2 | 3 | 4 | 5;
+type Step = 1 | 2 | 3 | 4;
 
 const GOALS = [
   { id: "daily", label: "ทุกวัน", desc: "วันละ 10–15 นาที สม่ำเสมอ" },
@@ -32,6 +32,13 @@ const GOAL_LABELS: Record<string, string> = {
   daily: "ทุกวัน",
   "3x-week": "3 วัน/สัปดาห์",
   casual: "เมื่อมีเวลา",
+};
+
+const ROLE_LABELS: Record<string, string> = {
+  parent: "ผู้ปกครอง",
+  teacher: "ครู",
+  therapist: "นักบำบัด",
+  school_admin: "ผู้ดูแลโรงเรียน",
 };
 
 function BackIcon() {
@@ -64,6 +71,8 @@ export default function OnboardingPage() {
   // SupabaseProfileRepository, causing /training to always see a null profile.
   const { saveProfile: repoSaveProfile, profile: existingProfile } = useChildProfile();
   const { setSelectedSound } = useSpeechProgress();
+  const { user } = useAuth();
+  const role = getUserRole(user);
   const editDetectedRef = useRef(false);
 
   useEffect(() => {
@@ -92,8 +101,8 @@ export default function OnboardingPage() {
     router.push(isEdit ? "/training" : "/training/pretest");
   };
 
-  const totalSteps = 4; // steps 2–5
-  const progressStep = (step as number) - 1; // 1..4 for steps 2..5
+  const totalSteps = 3; // steps 2–4
+  const progressStep = (step as number) - 1; // 1..3 for steps 2..4
 
   return (
     <main className="min-h-screen bg-bg flex flex-col">
@@ -110,7 +119,7 @@ export default function OnboardingPage() {
             </button>
 
             <div className="flex items-center gap-1.5">
-              {[2, 3, 4, 5].map((s) => (
+              {[2, 3, 4].map((s) => (
                 <div
                   key={s}
                   className={`h-1.5 rounded-full transition-all ${
@@ -168,6 +177,17 @@ export default function OnboardingPage() {
                   </div>
                 ))}
               </div>
+
+              {user ? (
+                <div className="flex items-center justify-center gap-2 text-sm">
+                  <span className="px-2.5 py-1 bg-primary/10 text-primary rounded-full text-xs font-semibold">
+                    {ROLE_LABELS[role] ?? "ผู้ปกครอง"}
+                  </span>
+                  <span className="text-text-muted truncate max-w-[200px]">{user.email}</span>
+                </div>
+              ) : (
+                <p className="text-xs text-text-muted">ไม่ต้องล็อกอินก็ใช้งานได้</p>
+              )}
 
               <button
                 onClick={() => setStep(2)}
@@ -241,6 +261,38 @@ export default function OnboardingPage() {
                     </button>
                   </div>
                 </div>
+
+                <div>
+                  <label className="block text-sm font-semibold text-text mb-2">
+                    เป้าหมายการฝึก
+                  </label>
+                  <div className="space-y-2">
+                    {GOALS.map((goal) => (
+                      <button
+                        key={goal.id}
+                        type="button"
+                        onClick={() => setTrainingGoal(goal.id)}
+                        className={`w-full flex items-center justify-between px-4 py-3 rounded-xl border-2 transition-all text-left active:scale-[0.99] ${
+                          trainingGoal === goal.id
+                            ? "border-primary bg-primary/8"
+                            : "border-border bg-surface hover:border-primary/40"
+                        }`}
+                      >
+                        <div>
+                          <p className={`font-semibold text-sm ${trainingGoal === goal.id ? "text-primary" : "text-text"}`}>
+                            {goal.label}
+                          </p>
+                          <p className="text-xs text-text-muted mt-0.5">{goal.desc}</p>
+                        </div>
+                        {trainingGoal === goal.id && (
+                          <span className="text-primary flex-shrink-0 ml-3">
+                            <CheckIcon />
+                          </span>
+                        )}
+                      </button>
+                    ))}
+                  </div>
+                </div>
               </div>
 
               <button
@@ -300,51 +352,8 @@ export default function OnboardingPage() {
             </div>
           )}
 
-          {/* ── Step 4: Training Goal ── */}
+          {/* ── Step 4: Confirmation ── */}
           {step === 4 && (
-            <div className="space-y-6">
-              <div>
-                <h2 className="text-2xl font-bold text-text mb-1">เป้าหมายการฝึก</h2>
-                <p className="text-text-muted">จะฝึกบ่อยแค่ไหนในแต่ละสัปดาห์?</p>
-              </div>
-
-              <div className="space-y-3">
-                {GOALS.map((goal) => (
-                  <button
-                    key={goal.id}
-                    onClick={() => setTrainingGoal(goal.id)}
-                    className={`w-full flex items-center justify-between px-5 py-4 rounded-xl border-2 transition-all text-left active:scale-[0.99] ${
-                      trainingGoal === goal.id
-                        ? "border-primary bg-primary/8"
-                        : "border-border bg-surface hover:border-primary/40"
-                    }`}
-                  >
-                    <div>
-                      <p className={`font-semibold ${trainingGoal === goal.id ? "text-primary" : "text-text"}`}>
-                        {goal.label}
-                      </p>
-                      <p className="text-sm text-text-muted mt-0.5">{goal.desc}</p>
-                    </div>
-                    {trainingGoal === goal.id && (
-                      <span className="text-primary flex-shrink-0 ml-3">
-                        <CheckIcon />
-                      </span>
-                    )}
-                  </button>
-                ))}
-              </div>
-
-              <button
-                onClick={() => setStep(5)}
-                className="w-full bg-primary text-white font-semibold px-8 py-3.5 rounded-xl text-base hover:bg-primary/90 transition-all active:scale-[0.99]"
-              >
-                ถัดไป →
-              </button>
-            </div>
-          )}
-
-          {/* ── Step 5: Confirmation ── */}
-          {step === 5 && (
             <div className="space-y-6">
               <div>
                 <h2 className="text-2xl font-bold text-text mb-1">
