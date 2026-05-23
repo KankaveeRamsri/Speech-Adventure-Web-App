@@ -4,6 +4,7 @@ import { useState, useRef, useEffect } from "react";
 import { useChildProfile } from "@/hooks/useChildProfile";
 import { useSpeechProgress } from "@/hooks/useSpeechProgress";
 import type { ChildProfileData } from "@/lib/child-profile/childProfileStorage";
+import AddChildModal from "./AddChildModal";
 
 function ChevronDownIcon() {
   return (
@@ -38,6 +39,7 @@ export default function ChildSelector({ collapsed = false }: ChildSelectorProps)
   const { profile, profiles, selectedChildId, isHydrated, selectChild } = useChildProfile();
   const { setSelectedSound } = useSpeechProgress();
   const [open, setOpen] = useState(false);
+  const [addingChild, setAddingChild] = useState(false);
   const wrapperRef = useRef<HTMLDivElement>(null);
 
   // Close dropdown on outside click
@@ -65,92 +67,96 @@ export default function ChildSelector({ collapsed = false }: ChildSelectorProps)
 
   if (collapsed) {
     return (
-      <button
-        onClick={() => setOpen((v) => !v)}
-        className="w-8 h-8 rounded-full bg-primary/12 flex items-center justify-center text-xs font-bold text-primary flex-shrink-0 hover:bg-primary/20 transition-colors cursor-pointer"
-        title={childName}
-        aria-haspopup="listbox"
-        aria-expanded={open}
-        aria-label={`เปลี่ยนเด็ก — กำลังเลือก ${childName}`}
-      >
-        {initial}
-      </button>
+      <>
+        <button
+          onClick={() => setOpen((v) => !v)}
+          className="w-8 h-8 rounded-full bg-primary/12 flex items-center justify-center text-xs font-bold text-primary flex-shrink-0 hover:bg-primary/20 transition-colors cursor-pointer"
+          title={childName}
+          aria-haspopup="listbox"
+          aria-expanded={open}
+          aria-label={`เปลี่ยนเด็ก — กำลังเลือก ${childName}`}
+        >
+          {initial}
+        </button>
+        <AddChildModal open={addingChild} onClose={() => setAddingChild(false)} />
+      </>
     );
   }
 
   return (
-    <div ref={wrapperRef} className="relative">
-      <button
-        onClick={() => setOpen((v) => !v)}
-        className="w-full flex items-center gap-2 min-w-0 rounded-xl px-2 py-1.5 transition-all hover:bg-gray-100 dark:hover:bg-white/8 cursor-pointer"
-        aria-haspopup="listbox"
-        aria-expanded={open}
-        aria-label={`เปลี่ยนเด็ก — กำลังเลือก ${childName}`}
-      >
-        <div className="w-7 h-7 rounded-full bg-primary/12 flex items-center justify-center text-xs font-bold text-primary flex-shrink-0">
-          {initial}
-        </div>
-        <span className="text-sm font-semibold text-text truncate flex-1 text-left">
-          {childName}
-        </span>
-        <span className={`text-text-muted flex-shrink-0 transition-transform duration-150 ${open ? "rotate-180" : ""}`}>
-          <ChevronDownIcon />
-        </span>
-      </button>
-
-      {/* Dropdown */}
-      {open && (
-        <div
-          role="listbox"
-          aria-label="เลือกเด็ก"
-          className="absolute top-full left-0 right-0 mt-1 z-50 bg-surface border border-border rounded-xl shadow-lg overflow-hidden"
+    <>
+      <div ref={wrapperRef} className="relative">
+        <button
+          onClick={() => setOpen((v) => !v)}
+          className="w-full flex items-center gap-2 min-w-0 rounded-xl px-2 py-1.5 transition-all hover:bg-gray-100 dark:hover:bg-white/8 cursor-pointer"
+          aria-haspopup="listbox"
+          aria-expanded={open}
+          aria-label={`เปลี่ยนเด็ก — กำลังเลือก ${childName}`}
         >
-          {profiles.map((child) => {
-            const isSelected = child.id === selectedChildId;
-            return (
-              <button
-                key={child.id}
-                role="option"
-                aria-selected={isSelected}
-                onClick={() => handleSelect(child)}
-                className={`w-full flex items-center gap-2.5 px-3 py-2.5 text-sm transition-colors text-left ${
-                  isSelected
-                    ? "bg-primary/8 text-primary font-semibold"
-                    : "text-text hover:bg-gray-50 dark:hover:bg-white/5"
-                }`}
-              >
-                <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0 ${
-                  isSelected ? "bg-primary/20 text-primary" : "bg-primary/10 text-primary"
-                }`}>
-                  {child.name.charAt(0)}
-                </div>
-                <span className="truncate flex-1">{child.name}</span>
-                {isSelected && (
-                  <span className="flex-shrink-0 text-primary">
-                    <CheckIcon />
-                  </span>
-                )}
-              </button>
-            );
-          })}
+          <div className="w-7 h-7 rounded-full bg-primary/12 flex items-center justify-center text-xs font-bold text-primary flex-shrink-0">
+            {initial}
+          </div>
+          <span className="text-sm font-semibold text-text truncate flex-1 text-left">
+            {childName}
+          </span>
+          <span className={`text-text-muted flex-shrink-0 transition-transform duration-150 ${open ? "rotate-180" : ""}`}>
+            <ChevronDownIcon />
+          </span>
+        </button>
 
-          {/* Add Child — coming soon, multi-child creation not yet available */}
-          <div className="border-t border-border">
-            <div
-              aria-disabled="true"
-              className="flex items-center gap-2.5 px-3 py-2.5 text-sm cursor-not-allowed opacity-50"
-            >
-              <span className="w-6 h-6 rounded-full border-2 border-dashed border-text-muted flex items-center justify-center flex-shrink-0 text-text-muted">
-                <PlusIcon />
-              </span>
-              <span className="text-text-muted flex-1">เพิ่มเด็ก</span>
-              <span className="text-[10px] font-semibold text-text-muted bg-gray-100 dark:bg-white/10 px-1.5 py-0.5 rounded-full flex-shrink-0">
-                เร็วๆ นี้
-              </span>
+        {/* Dropdown */}
+        {open && (
+          <div
+            role="listbox"
+            aria-label="เลือกเด็ก"
+            className="absolute top-full left-0 right-0 mt-1 z-50 bg-surface border border-border rounded-xl shadow-lg overflow-hidden"
+          >
+            {profiles.map((child) => {
+              const isSelected = child.id === selectedChildId;
+              return (
+                <button
+                  key={child.id}
+                  role="option"
+                  aria-selected={isSelected}
+                  onClick={() => handleSelect(child)}
+                  className={`w-full flex items-center gap-2.5 px-3 py-2.5 text-sm transition-colors text-left ${
+                    isSelected
+                      ? "bg-primary/8 text-primary font-semibold"
+                      : "text-text hover:bg-gray-50 dark:hover:bg-white/5"
+                  }`}
+                >
+                  <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0 ${
+                    isSelected ? "bg-primary/20 text-primary" : "bg-primary/10 text-primary"
+                  }`}>
+                    {child.name.charAt(0)}
+                  </div>
+                  <span className="truncate flex-1">{child.name}</span>
+                  {isSelected && (
+                    <span className="flex-shrink-0 text-primary">
+                      <CheckIcon />
+                    </span>
+                  )}
+                </button>
+              );
+            })}
+
+            {/* Add Child */}
+            <div className="border-t border-border">
+              <button
+                onClick={() => { setOpen(false); setAddingChild(true); }}
+                className="w-full flex items-center gap-2.5 px-3 py-2.5 text-sm text-text-muted hover:text-primary hover:bg-primary/5 transition-colors"
+              >
+                <span className="w-6 h-6 rounded-full border-2 border-dashed border-current flex items-center justify-center flex-shrink-0">
+                  <PlusIcon />
+                </span>
+                <span className="flex-1 text-left">เพิ่มเด็ก</span>
+              </button>
             </div>
           </div>
-        </div>
-      )}
-    </div>
+        )}
+      </div>
+
+      <AddChildModal open={addingChild} onClose={() => setAddingChild(false)} />
+    </>
   );
 }
