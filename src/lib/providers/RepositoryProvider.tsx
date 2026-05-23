@@ -5,9 +5,11 @@ import type { ReactNode } from "react";
 import type { IProgressRepository } from "@/lib/repositories/IProgressRepository";
 import type { IProfileRepository } from "@/lib/repositories/IProfileRepository";
 import type { IObservationRepository } from "@/lib/repositories/IObservationRepository";
+import type { IInvitationRepository } from "@/lib/repositories/IInvitationRepository";
 import { LocalProgressRepository } from "@/lib/storage/local/LocalProgressRepository";
 import { LocalProfileRepository } from "@/lib/storage/local/LocalProfileRepository";
 import { LocalObservationRepository } from "@/lib/storage/local/LocalObservationRepository";
+import { LocalInvitationRepository } from "@/lib/storage/local/LocalInvitationRepository";
 import {
   getConfiguredProvider,
   isSupabaseProviderRequested,
@@ -22,6 +24,7 @@ export interface Repositories {
   progress: IProgressRepository;
   profile: IProfileRepository;
   observations: IObservationRepository;
+  invitations: IInvitationRepository;
 }
 
 // ── Repository resolution ─────────────────────────────────────────────────────
@@ -41,6 +44,7 @@ const _localRepositories: Repositories = {
   progress: new LocalProgressRepository(),
   profile: new LocalProfileRepository(),
   observations: new LocalObservationRepository(),
+  invitations: new LocalInvitationRepository(),
 };
 
 function _resolveRepositories(): Repositories {
@@ -128,7 +132,7 @@ export function RepositoryProvider({ children, overrides }: RepositoryProviderPr
     () => ({ ...defaultRepositories, ...overrides }),
     // Spread of overrides intentionally not deep-compared; callers must stabilize.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [overrides?.progress, overrides?.profile, overrides?.observations],
+    [overrides?.progress, overrides?.profile, overrides?.observations, overrides?.invitations],
   );
 
   // Track the last userId we acted on — prevents duplicate calls and lets us
@@ -160,9 +164,11 @@ export function RepositoryProvider({ children, overrides }: RepositoryProviderPr
       if (hasScopeSet(value.profile)) value.profile.setScope(null);
       if (hasScopeSet(value.progress)) value.progress.setScope(null);
       if (hasScopeSet(value.observations)) value.observations.setScope(null);
+      if (hasScopeSet(value.invitations)) value.invitations.setScope(null);
       if (hasReset(value.profile)) value.profile.reset();
       if (hasReset(value.progress)) value.progress.reset();
       if (hasReset(value.observations)) value.observations.reset();
+      if (hasReset(value.invitations)) value.invitations.reset();
       return;
     }
 
@@ -174,9 +180,11 @@ export function RepositoryProvider({ children, overrides }: RepositoryProviderPr
       if (hasScopeSet(value.profile)) value.profile.setScope(userId);
       if (hasScopeSet(value.progress)) value.progress.setScope(userId);
       if (hasScopeSet(value.observations)) value.observations.setScope(userId);
+      if (hasScopeSet(value.invitations)) value.invitations.setScope(userId);
       if (hasReset(value.profile)) value.profile.reset();
       if (hasReset(value.progress)) value.progress.reset();
       if (hasReset(value.observations)) value.observations.reset();
+      if (hasReset(value.invitations)) value.invitations.reset();
     }
 
     // ── Sign in / session restore / account switch: scope + load cloud data ───
@@ -187,9 +195,11 @@ export function RepositoryProvider({ children, overrides }: RepositoryProviderPr
       if (hasScopeSet(value.profile)) value.profile.setScope(userId);
       if (hasScopeSet(value.progress)) value.progress.setScope(userId);
       if (hasScopeSet(value.observations)) value.observations.setScope(userId);
+      if (hasScopeSet(value.invitations)) value.invitations.setScope(userId);
       if (hasRehydrate(value.profile)) value.profile.rehydrate();
       if (hasRehydrate(value.progress)) value.progress.rehydrate();
       if (hasRehydrate(value.observations)) value.observations.rehydrate();
+      if (hasRehydrate(value.invitations)) value.invitations.rehydrate();
     }
   // value is a stable useMemo result; safe to include — it rarely changes.
   }, [isLoading, user?.id, value]);

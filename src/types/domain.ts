@@ -37,6 +37,14 @@ export type {
   ObservationTargetType,
 } from "@/types/observations";
 
+// ── Invitation domain ─────────────────────────────────────────────────────────
+export type {
+  Invitation,
+  InvitationRole,
+  InvitationStatus,
+  CreateInvitationInput,
+} from "@/types/invitations";
+
 // ── Speech evaluation domain ──────────────────────────────────────────────────
 export type {
   SpeechEvaluationInput,

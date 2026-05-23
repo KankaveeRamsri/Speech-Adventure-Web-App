@@ -46,6 +46,9 @@ export const STORAGE_KEYS = {
   /** Therapist / parent observation notes */
   OBSERVATIONS: "speech-adventure-observations-v1",
 
+  /** Invitations created by this user */
+  INVITATIONS: "speech-adventure-invitations-v1",
+
   // ── UI preferences — not cleared on data reset ──────────────────────────────
 
   /** Desktop sidebar collapsed state */
@@ -63,6 +66,7 @@ export const DATA_KEYS = [
   STORAGE_KEYS.PROFILES_LIST,
   STORAGE_KEYS.SELECTED_CHILD_ID,
   STORAGE_KEYS.OBSERVATIONS,
+  STORAGE_KEYS.INVITATIONS,
 ] as const;
 
 /** UI preference keys — preserved on data reset for smoother UX. */

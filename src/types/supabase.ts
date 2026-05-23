@@ -17,10 +17,13 @@ import type {
   DbPracticeSession,
   DbPracticeAttempt,
   DbObservationNote,
+  DbInvitation,
   DbSessionStatus,
   DbEvaluationStatus,
   DbObservationTargetType,
   DbObservationCategory,
+  DbInvitationRole,
+  DbInvitationStatus,
 } from "@/types/database";
 
 // ── Insert types (server-generated fields become optional) ────────────────────
@@ -29,6 +32,7 @@ export type InsertChildProfile = Omit<DbChildProfile, "id" | "created_at" | "upd
 export type InsertPracticeSession = Omit<DbPracticeSession, "id" | "created_at">;
 export type InsertPracticeAttempt = Omit<DbPracticeAttempt, "id" | "created_at">;
 export type InsertObservationNote = Omit<DbObservationNote, "id" | "created_at" | "updated_at">;
+export type InsertInvitation = Omit<DbInvitation, "id" | "created_at" | "accepted_at"> & { id?: string };
 
 // ── Update types (all mutable fields optional, PK and created_at immutable) ───
 
@@ -36,6 +40,7 @@ export type UpdateChildProfile = Partial<Omit<DbChildProfile, "id" | "created_at
 export type UpdatePracticeSession = Partial<Omit<DbPracticeSession, "id" | "created_at">>;
 export type UpdatePracticeAttempt = Partial<Omit<DbPracticeAttempt, "id" | "created_at">>;
 export type UpdateObservationNote = Partial<Omit<DbObservationNote, "id" | "created_at">>;
+export type UpdateInvitation = Partial<Omit<DbInvitation, "id" | "created_at">>;
 
 // ── Database type (passed to createClient<Database>) ─────────────────────────
 //
@@ -69,14 +74,31 @@ export interface Database {
         Update: UpdateObservationNote;
         Relationships: [];
       };
+      invitations: {
+        Row: DbInvitation;
+        Insert: InsertInvitation;
+        Update: UpdateInvitation;
+        Relationships: [];
+      };
     };
     Views: { [_ in never]: never };
-    Functions: { [_ in never]: never };
+    Functions: {
+      get_invitation_by_token: {
+        Args: { p_token: string };
+        Returns: DbInvitation[];
+      };
+      accept_invitation_by_token: {
+        Args: { p_token: string };
+        Returns: void;
+      };
+    };
     Enums: {
       session_status: DbSessionStatus;
       evaluation_status: DbEvaluationStatus;
       observation_target_type: DbObservationTargetType;
       observation_category: DbObservationCategory;
+      invitation_role: DbInvitationRole;
+      invitation_status: DbInvitationStatus;
     };
     CompositeTypes: { [_ in never]: never };
   };

@@ -72,6 +72,24 @@ export type DbPracticeAttempt = {
   created_at: string;
 };
 
+// ── invitations ───────────────────────────────────────────────────────────────
+
+export type DbInvitationRole = "parent" | "teacher" | "therapist" | "school_admin" | "viewer";
+export type DbInvitationStatus = "pending" | "accepted" | "expired" | "revoked";
+
+export type DbInvitation = {
+  id: string;
+  email: string;
+  role: DbInvitationRole;
+  child_id: string | null;
+  invited_by: string;
+  status: DbInvitationStatus;
+  token: string;
+  expires_at: string;
+  created_at: string;
+  accepted_at: string | null;
+};
+
 // ── observation_notes ─────────────────────────────────────────────────────────
 
 export type DbObservationTargetType = "session" | "attempt" | "general";

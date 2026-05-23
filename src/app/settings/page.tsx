@@ -4,6 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import AppShell from "@/components/layout/AppShell";
 import CloudSyncPreview from "@/components/sync/CloudSyncPreview";
+import InviteSection from "@/components/layout/InviteSection";
 import { useAuth } from "@/hooks/useAuth";
 
 // ── Icons ─────────────────────────────────────────────────────────────────────
@@ -168,6 +169,17 @@ export default function SettingsPage() {
           />
           <div className="bg-surface border border-border rounded-xl p-5">
             <CloudSyncPreview />
+          </div>
+        </section>
+
+        {/* Invitations section */}
+        <section>
+          <SectionHeader
+            title="คำเชิญ"
+            description="เชิญผู้ปกครอง ครู หรือนักบำบัดเข้ามาดูพัฒนาการของเด็ก"
+          />
+          <div className="bg-surface border border-border rounded-xl p-5">
+            <InviteSection />
           </div>
         </section>
 
