@@ -139,6 +139,12 @@ export default function AcceptInvitePage() {
 
         {/* Invite details card */}
         <div className="bg-surface border border-border rounded-xl divide-y divide-border overflow-hidden">
+          {invitation.childSnapshot && (
+            <div className="flex items-center justify-between px-5 py-3.5">
+              <span className="text-sm text-text-muted">เด็ก</span>
+              <span className="font-semibold text-text">{invitation.childSnapshot.name}</span>
+            </div>
+          )}
           <div className="flex items-center justify-between px-5 py-3.5">
             <span className="text-sm text-text-muted">บทบาท</span>
             <span className="font-semibold text-text">{INVITATION_ROLE_LABELS[invitation.role]}</span>

@@ -24,6 +24,15 @@ const InvitationSchema = z.object({
   expiresAt: z.string(),
   createdAt: z.string(),
   acceptedAt: z.string().optional(),
+  childSnapshot: z.object({
+    id: z.string(),
+    name: z.string(),
+    age: z.number(),
+    targetSound: z.string().default(""),
+    trainingGoal: z.string().default(""),
+    createdAt: z.string().default(""),
+    updatedAt: z.string().default(""),
+  }).optional(),
 });
 
 const InvitationsArraySchema = z.array(InvitationSchema);

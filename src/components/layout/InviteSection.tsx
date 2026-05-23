@@ -2,9 +2,12 @@
 
 import { useState, useCallback } from "react";
 import { useInvitations } from "@/hooks/useInvitations";
+import { useChildAccess } from "@/hooks/useChildAccess";
+import { useChildProfile } from "@/hooks/useChildProfile";
 import { useAuth } from "@/hooks/useAuth";
 import type { InvitationRole, InvitationStatus } from "@/types/invitations";
 import { INVITATION_ROLE_LABELS, INVITATION_STATUS_LABELS } from "@/types/invitations";
+import { ACCESS_ROLE_LABELS } from "@/types/childAccess";
 
 // ── Icons ─────────────────────────────────────────────────────────────────────
 
@@ -62,8 +65,10 @@ interface CreateFormProps {
 
 function CreateInviteForm({ onClose }: CreateFormProps) {
   const { createInvitation } = useInvitations();
+  const { profiles } = useChildProfile();
   const [email, setEmail] = useState("");
   const [role, setRole] = useState<InvitationRole>("parent");
+  const [childId, setChildId] = useState<string>(profiles[0]?.id ?? "");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -73,7 +78,7 @@ function CreateInviteForm({ onClose }: CreateFormProps) {
     setLoading(true);
     setError(null);
     try {
-      await createInvitation({ email: email.trim(), role });
+      await createInvitation({ email: email.trim(), role, childId: childId || undefined });
       onClose();
     } catch (err) {
       setError(err instanceof Error ? err.message : "เกิดข้อผิดพลาด");
@@ -95,6 +100,22 @@ function CreateInviteForm({ onClose }: CreateFormProps) {
           className="w-full bg-bg border border-border rounded-lg px-3 py-2 text-sm text-text placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary/60 transition-all"
         />
       </div>
+
+      {profiles.length > 0 && (
+        <div>
+          <label className="block text-sm font-semibold text-text mb-1.5">เด็กที่แชร์</label>
+          <select
+            value={childId}
+            onChange={(e) => setChildId(e.target.value)}
+            className="w-full bg-bg border border-border rounded-lg px-3 py-2 text-sm text-text focus:outline-none focus:ring-2 focus:ring-primary/40 transition-all"
+          >
+            <option value="">— ไม่ระบุ —</option>
+            {profiles.map((p) => (
+              <option key={p.id} value={p.id}>{p.name}</option>
+            ))}
+          </select>
+        </div>
+      )}
 
       <div>
         <label className="block text-sm font-semibold text-text mb-1.5">บทบาท</label>
@@ -137,6 +158,7 @@ function CreateInviteForm({ onClose }: CreateFormProps) {
 
 export default function InviteSection() {
   const { invitations, revokeInvitation } = useInvitations();
+  const { issuedGrants, revokeChildAccess } = useChildAccess();
   const { isAuthenticated } = useAuth();
   const [showForm, setShowForm] = useState(false);
   const [copiedToken, setCopiedToken] = useState<string | null>(null);
@@ -155,6 +177,15 @@ export default function InviteSection() {
     },
     [revokeInvitation],
   );
+
+  const handleRevokeAccess = useCallback(
+    async (grantId: string) => {
+      await revokeChildAccess(grantId);
+    },
+    [revokeChildAccess],
+  );
+
+  const activeGrants = issuedGrants.filter((g) => !g.revokedAt);
 
   const pending = invitations.filter((i) => i.status === "pending");
   const others = invitations.filter((i) => i.status !== "pending");
@@ -247,6 +278,35 @@ export default function InviteSection() {
                 <span className="text-xs text-text-muted">{INVITATION_ROLE_LABELS[inv.role]}</span>
                 <StatusBadge status={inv.status} />
               </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Active access grants issued by current user */}
+      {activeGrants.length > 0 && (
+        <div className="space-y-2">
+          <p className="text-xs font-semibold text-text-muted uppercase tracking-wide">สิทธิ์เข้าถึงที่ให้ไว้</p>
+          {activeGrants.map((grant) => (
+            <div
+              key={grant.id}
+              className="bg-surface border border-border rounded-xl px-4 py-3 flex items-start justify-between gap-3"
+            >
+              <div className="flex-1 min-w-0 space-y-0.5">
+                <p className="text-sm font-semibold text-text truncate">
+                  {grant.childSnapshot?.name ?? grant.childId}
+                </p>
+                <p className="text-xs text-text-muted">
+                  {ACCESS_ROLE_LABELS[grant.role]} · {grant.userId.slice(0, 8)}…
+                </p>
+              </div>
+              <button
+                onClick={() => void handleRevokeAccess(grant.id)}
+                title="เพิกถอนสิทธิ์"
+                className="p-1.5 rounded-lg border border-transparent text-text-muted hover:text-error hover:border-error/30 transition-all flex-shrink-0"
+              >
+                <XIcon />
+              </button>
             </div>
           ))}
         </div>

@@ -4,12 +4,13 @@ import { useSyncExternalStore, useCallback } from "react";
 import { useRepositories } from "@/lib/providers/RepositoryProvider";
 import type { Invitation, CreateInvitationInput } from "@/types/invitations";
 import { useAuth } from "@/hooks/useAuth";
+import { invitationRoleToAccessRole } from "@/types/childAccess";
 
 const EMPTY_INVITATIONS: Invitation[] = [];
 const getEmptyInvitations = (): Invitation[] => EMPTY_INVITATIONS;
 
 export function useInvitations() {
-  const { invitations: repo } = useRepositories();
+  const { invitations: repo, childAccess: accessRepo } = useRepositories();
   const { user } = useAuth();
 
   const invitations = useSyncExternalStore(
@@ -28,9 +29,20 @@ export function useInvitations() {
 
   const acceptInvitation = useCallback(
     async (token: string): Promise<void> => {
-      return repo.acceptInvitation(token);
+      const inv = repo.getInvitationByToken(token);
+      await repo.acceptInvitation(token);
+      // If the invitation was tied to a child and we know who accepted, create a grant.
+      if (inv && inv.childId && inv.childSnapshot && user?.id) {
+        await accessRepo.grantChildAccess({
+          childId: inv.childId,
+          userId: user.id,
+          role: invitationRoleToAccessRole(inv.role),
+          grantedBy: inv.invitedBy,
+          childSnapshot: inv.childSnapshot,
+        });
+      }
     },
-    [repo],
+    [repo, accessRepo, user],
   );
 
   const revokeInvitation = useCallback(

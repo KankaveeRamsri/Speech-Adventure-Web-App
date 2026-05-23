@@ -49,6 +49,9 @@ export const STORAGE_KEYS = {
   /** Invitations created by this user */
   INVITATIONS: "speech-adventure-invitations-v1",
 
+  /** Child access grants — unscoped shared key (visible to both grantor and grantee on device) */
+  CHILD_GRANTS: "speech-adventure-child-grants-v1",
+
   // ── UI preferences — not cleared on data reset ──────────────────────────────
 
   /** Desktop sidebar collapsed state */

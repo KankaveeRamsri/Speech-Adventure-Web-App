@@ -90,6 +90,25 @@ export type DbInvitation = {
   accepted_at: string | null;
 };
 
+// ── child_access ──────────────────────────────────────────────────────────────
+
+export type DbAccessRole = "guardian" | "teacher" | "therapist" | "viewer";
+
+export type DbChildAccess = {
+  id: string;
+  child_id: string;
+  user_id: string;
+  role: DbAccessRole;
+  can_view_progress: boolean;
+  can_view_audio: boolean;
+  can_assign_practice: boolean;
+  can_edit_child: boolean;
+  can_export_report: boolean;
+  granted_by: string;
+  created_at: string;
+  revoked_at: string | null;
+};
+
 // ── observation_notes ─────────────────────────────────────────────────────────
 
 export type DbObservationTargetType = "session" | "attempt" | "general";

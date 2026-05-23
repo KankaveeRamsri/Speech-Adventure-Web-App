@@ -45,6 +45,14 @@ export type {
   CreateInvitationInput,
 } from "@/types/invitations";
 
+// ── Child access domain ───────────────────────────────────────────────────────
+export type {
+  AccessRole,
+  ChildPermissions,
+  ChildAccess,
+  GrantChildAccessInput,
+} from "@/types/childAccess";
+
 // ── Speech evaluation domain ──────────────────────────────────────────────────
 export type {
   SpeechEvaluationInput,

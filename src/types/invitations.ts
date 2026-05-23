@@ -2,6 +2,8 @@
 // Foundation for future multi-role collaboration (parent, teacher, therapist, etc.)
 // Full organization/school system is Phase 10+.
 
+import type { ChildProfileData } from "@/lib/child-profile/childProfileStorage";
+
 export type InvitationRole =
   | "parent"
   | "teacher"
@@ -25,6 +27,8 @@ export interface Invitation {
   expiresAt: string;
   createdAt: string;
   acceptedAt?: string;
+  /** Snapshot of the child profile at invite time — used to show child name and seed local access grants. */
+  childSnapshot?: ChildProfileData;
 }
 
 export interface CreateInvitationInput {

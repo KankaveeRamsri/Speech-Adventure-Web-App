@@ -6,10 +6,12 @@ import type { IProgressRepository } from "@/lib/repositories/IProgressRepository
 import type { IProfileRepository } from "@/lib/repositories/IProfileRepository";
 import type { IObservationRepository } from "@/lib/repositories/IObservationRepository";
 import type { IInvitationRepository } from "@/lib/repositories/IInvitationRepository";
+import type { IChildAccessRepository } from "@/lib/repositories/IChildAccessRepository";
 import { LocalProgressRepository } from "@/lib/storage/local/LocalProgressRepository";
 import { LocalProfileRepository } from "@/lib/storage/local/LocalProfileRepository";
 import { LocalObservationRepository } from "@/lib/storage/local/LocalObservationRepository";
 import { LocalInvitationRepository } from "@/lib/storage/local/LocalInvitationRepository";
+import { LocalChildAccessRepository } from "@/lib/storage/local/LocalChildAccessRepository";
 import {
   getConfiguredProvider,
   isSupabaseProviderRequested,
@@ -25,6 +27,7 @@ export interface Repositories {
   profile: IProfileRepository;
   observations: IObservationRepository;
   invitations: IInvitationRepository;
+  childAccess: IChildAccessRepository;
 }
 
 // ── Repository resolution ─────────────────────────────────────────────────────
@@ -45,6 +48,7 @@ const _localRepositories: Repositories = {
   profile: new LocalProfileRepository(),
   observations: new LocalObservationRepository(),
   invitations: new LocalInvitationRepository(),
+  childAccess: new LocalChildAccessRepository(),
 };
 
 function _resolveRepositories(): Repositories {
@@ -132,7 +136,7 @@ export function RepositoryProvider({ children, overrides }: RepositoryProviderPr
     () => ({ ...defaultRepositories, ...overrides }),
     // Spread of overrides intentionally not deep-compared; callers must stabilize.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [overrides?.progress, overrides?.profile, overrides?.observations, overrides?.invitations],
+    [overrides?.progress, overrides?.profile, overrides?.observations, overrides?.invitations, overrides?.childAccess],
   );
 
   // Track the last userId we acted on — prevents duplicate calls and lets us
@@ -165,6 +169,7 @@ export function RepositoryProvider({ children, overrides }: RepositoryProviderPr
       if (hasScopeSet(value.progress)) value.progress.setScope(null);
       if (hasScopeSet(value.observations)) value.observations.setScope(null);
       if (hasScopeSet(value.invitations)) value.invitations.setScope(null);
+      if (hasScopeSet(value.childAccess)) value.childAccess.setScope(null);
       if (hasReset(value.profile)) value.profile.reset();
       if (hasReset(value.progress)) value.progress.reset();
       if (hasReset(value.observations)) value.observations.reset();
@@ -181,6 +186,7 @@ export function RepositoryProvider({ children, overrides }: RepositoryProviderPr
       if (hasScopeSet(value.progress)) value.progress.setScope(userId);
       if (hasScopeSet(value.observations)) value.observations.setScope(userId);
       if (hasScopeSet(value.invitations)) value.invitations.setScope(userId);
+      if (hasScopeSet(value.childAccess)) value.childAccess.setScope(userId);
       if (hasReset(value.profile)) value.profile.reset();
       if (hasReset(value.progress)) value.progress.reset();
       if (hasReset(value.observations)) value.observations.reset();
@@ -196,6 +202,7 @@ export function RepositoryProvider({ children, overrides }: RepositoryProviderPr
       if (hasScopeSet(value.progress)) value.progress.setScope(userId);
       if (hasScopeSet(value.observations)) value.observations.setScope(userId);
       if (hasScopeSet(value.invitations)) value.invitations.setScope(userId);
+      if (hasScopeSet(value.childAccess)) value.childAccess.setScope(userId);
       if (hasRehydrate(value.profile)) value.profile.rehydrate();
       if (hasRehydrate(value.progress)) value.progress.rehydrate();
       if (hasRehydrate(value.observations)) value.observations.rehydrate();

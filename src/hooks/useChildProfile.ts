@@ -1,6 +1,6 @@
 "use client";
 
-import { useSyncExternalStore } from "react";
+import { useSyncExternalStore, useMemo } from "react";
 import { useRepositories } from "@/lib/providers/RepositoryProvider";
 import type { ChildProfileData } from "@/lib/child-profile/childProfileStorage";
 
@@ -18,9 +18,9 @@ const getEmptyProfiles = (): ChildProfileData[] => EMPTY_PROFILES;
 const serverNullId = (): string | null => null;
 
 export function useChildProfile() {
-  const { profile: repo } = useRepositories();
+  const { profile: repo, childAccess: accessRepo } = useRepositories();
 
-  const profile = useSyncExternalStore(
+  const ownedProfile = useSyncExternalStore(
     repo.subscribe.bind(repo),
     repo.getProfile.bind(repo),
     repo.getServerProfile.bind(repo),
@@ -40,14 +40,38 @@ export function useChildProfile() {
     serverNullId,
   );
 
+  // Active child access grants received by the current user
+  const receivedGrants = useSyncExternalStore(
+    accessRepo.subscribe.bind(accessRepo),
+    accessRepo.listReceivedGrants.bind(accessRepo),
+    accessRepo.getServerReceivedGrants.bind(accessRepo),
+  );
+
+  // Shared child profiles derived from active received grants
+  const sharedProfiles = useMemo<ChildProfileData[]>(
+    () => receivedGrants.flatMap((g) => (g.childSnapshot ? [g.childSnapshot] : [])),
+    [receivedGrants],
+  );
+
+  // Effective profile: owned child takes precedence, then look in shared profiles
+  const profile = ownedProfile
+    ?? sharedProfiles.find((p) => p.id === selectedChildId)
+    ?? sharedProfiles[0]
+    ?? null;
+
   // false during SSR + hydration, true right after
   const isHydrated = useSyncExternalStore(noopSubscribe, clientTrue, serverFalse);
+
+  // true when the active profile belongs to this user's owned list
+  const isOwner = profile ? profiles.some((p) => p.id === profile.id) : false;
 
   return {
     profile,
     profiles,
+    sharedProfiles,
     selectedChildId,
     hasProfile: profile !== null,
+    isOwner,
     isHydrated,
     saveProfile: (data: ChildProfileData) => repo.saveProfile(data),
     clearProfile: () => repo.clearProfile(),

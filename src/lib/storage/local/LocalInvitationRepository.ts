@@ -1,6 +1,7 @@
 import * as storage from "@/lib/storage/invitationStorage";
 import type { IInvitationRepository } from "@/lib/repositories/IInvitationRepository";
 import type { Invitation, CreateInvitationInput } from "@/types/invitations";
+import { getProfiles } from "@/lib/child-profile/childProfileListStorage";
 
 /**
  * localStorage-backed implementation of IInvitationRepository.
@@ -36,6 +37,9 @@ export class LocalInvitationRepository implements IInvitationRepository {
     invitedBy: string,
   ): Promise<Invitation> {
     const now = new Date().toISOString();
+    const childSnapshot = input.childId
+      ? getProfiles().find((p) => p.id === input.childId)
+      : undefined;
     const invitation: Invitation = {
       id: storage.generateToken(),
       email: input.email.trim().toLowerCase(),
@@ -46,6 +50,7 @@ export class LocalInvitationRepository implements IInvitationRepository {
       token: storage.generateToken(),
       expiresAt: storage.makeExpiresAt(),
       createdAt: now,
+      childSnapshot,
     };
     storage.addInvitation(invitation);
     return invitation;

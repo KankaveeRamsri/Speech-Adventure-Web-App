@@ -36,7 +36,7 @@ interface ChildSelectorProps {
 }
 
 export default function ChildSelector({ collapsed = false }: ChildSelectorProps) {
-  const { profile, profiles, selectedChildId, isHydrated, selectChild } = useChildProfile();
+  const { profile, profiles, sharedProfiles, selectedChildId, isHydrated, selectChild } = useChildProfile();
   const { setSelectedSound } = useSpeechProgress();
   const [open, setOpen] = useState(false);
   const [addingChild, setAddingChild] = useState(false);
@@ -139,6 +139,44 @@ export default function ChildSelector({ collapsed = false }: ChildSelectorProps)
                 </button>
               );
             })}
+
+            {/* Shared children section */}
+            {sharedProfiles.length > 0 && (
+              <>
+                <div className="px-3 py-1.5 border-t border-border">
+                  <span className="text-[10px] font-semibold text-text-muted uppercase tracking-wider">แชร์ให้ฉัน</span>
+                </div>
+                {sharedProfiles.map((child) => {
+                  const isSelected = child.id === selectedChildId;
+                  return (
+                    <button
+                      key={child.id}
+                      role="option"
+                      aria-selected={isSelected}
+                      onClick={() => handleSelect(child)}
+                      className={`w-full flex items-center gap-2.5 px-3 py-2.5 text-sm transition-colors text-left ${
+                        isSelected
+                          ? "bg-primary/8 text-primary font-semibold"
+                          : "text-text hover:bg-gray-50 dark:hover:bg-white/5"
+                      }`}
+                    >
+                      <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0 ${
+                        isSelected ? "bg-primary/20 text-primary" : "bg-border/80 text-text-muted"
+                      }`}>
+                        {child.name.charAt(0)}
+                      </div>
+                      <span className="truncate flex-1">{child.name}</span>
+                      <span className="text-[10px] text-text-muted flex-shrink-0">แชร์</span>
+                      {isSelected && (
+                        <span className="flex-shrink-0 text-primary">
+                          <CheckIcon />
+                        </span>
+                      )}
+                    </button>
+                  );
+                })}
+              </>
+            )}
 
             {/* Add Child */}
             <div className="border-t border-border">

@@ -18,12 +18,14 @@ import type {
   DbPracticeAttempt,
   DbObservationNote,
   DbInvitation,
+  DbChildAccess,
   DbSessionStatus,
   DbEvaluationStatus,
   DbObservationTargetType,
   DbObservationCategory,
   DbInvitationRole,
   DbInvitationStatus,
+  DbAccessRole,
 } from "@/types/database";
 
 // ── Insert types (server-generated fields become optional) ────────────────────
@@ -33,6 +35,8 @@ export type InsertPracticeSession = Omit<DbPracticeSession, "id" | "created_at">
 export type InsertPracticeAttempt = Omit<DbPracticeAttempt, "id" | "created_at">;
 export type InsertObservationNote = Omit<DbObservationNote, "id" | "created_at" | "updated_at">;
 export type InsertInvitation = Omit<DbInvitation, "id" | "created_at" | "accepted_at"> & { id?: string };
+export type InsertChildAccess = Omit<DbChildAccess, "id" | "created_at" | "revoked_at"> & { id?: string };
+export type UpdateChildAccess = Partial<Omit<DbChildAccess, "id" | "created_at">>;
 
 // ── Update types (all mutable fields optional, PK and created_at immutable) ───
 
@@ -80,6 +84,12 @@ export interface Database {
         Update: UpdateInvitation;
         Relationships: [];
       };
+      child_access: {
+        Row: DbChildAccess;
+        Insert: InsertChildAccess;
+        Update: UpdateChildAccess;
+        Relationships: [];
+      };
     };
     Views: { [_ in never]: never };
     Functions: {
@@ -91,6 +101,10 @@ export interface Database {
         Args: { p_token: string };
         Returns: void;
       };
+      accept_invitation_with_access: {
+        Args: { p_token: string; p_user_id: string };
+        Returns: void;
+      };
     };
     Enums: {
       session_status: DbSessionStatus;
@@ -99,6 +113,7 @@ export interface Database {
       observation_category: DbObservationCategory;
       invitation_role: DbInvitationRole;
       invitation_status: DbInvitationStatus;
+      access_role: DbAccessRole;
     };
     CompositeTypes: { [_ in never]: never };
   };
