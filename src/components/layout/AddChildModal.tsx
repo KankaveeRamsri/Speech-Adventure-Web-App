@@ -4,7 +4,6 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import { useChildProfile } from "@/hooks/useChildProfile";
 import { useSpeechProgress } from "@/hooks/useSpeechProgress";
 import { mockTargetSounds } from "@/data/speechAdventureMockData";
-import { getConfiguredProvider } from "@/lib/config/storageProvider";
 
 // ── Icons ─────────────────────────────────────────────────────────────────────
 
@@ -51,7 +50,7 @@ interface AddChildModalProps {
 }
 
 export default function AddChildModal({ open, onClose }: AddChildModalProps) {
-  const { profiles, saveProfile, selectChild } = useChildProfile();
+  const { saveProfile, selectChild } = useChildProfile();
   const { setSelectedSound } = useSpeechProgress();
 
   const [step, setStep] = useState<1 | 2>(1);
@@ -96,13 +95,6 @@ export default function AddChildModal({ open, onClose }: AddChildModalProps) {
   }, [open, handleClose]);
 
   if (!open) return null;
-
-  const provider = getConfiguredProvider();
-  const isSupabaseMode = provider !== "local";
-  const alreadyHasChild = profiles.length > 0;
-  // Supabase schema has UNIQUE INDEX on user_id → only 1 child per account.
-  // Multi-child is localStorage-only until a schema migration is performed.
-  const supabaseBlocked = isSupabaseMode && alreadyHasChild;
 
   async function handleSubmit() {
     if (!name.trim() || submitting) return;
@@ -149,7 +141,7 @@ export default function AddChildModal({ open, onClose }: AddChildModalProps) {
           {/* ── Header ── */}
           <div className="flex items-center justify-between px-5 py-4 border-b border-border flex-shrink-0">
             <div className="flex items-center gap-3 min-w-0">
-              {step === 2 && !supabaseBlocked && (
+              {step === 2 && (
                 <button
                   onClick={() => setStep(1)}
                   className="w-8 h-8 rounded-lg flex items-center justify-center text-text-muted hover:text-text hover:bg-gray-100 dark:hover:bg-white/10 transition-all flex-shrink-0"
@@ -159,21 +151,17 @@ export default function AddChildModal({ open, onClose }: AddChildModalProps) {
                 </button>
               )}
               <div className="min-w-0">
-                <h2 className="text-base font-bold text-text">
-                  {supabaseBlocked ? "ไม่สามารถเพิ่มเด็กได้" : "เพิ่มเด็กใหม่"}
-                </h2>
-                {!supabaseBlocked && (
-                  <div className="flex items-center gap-1 mt-0.5">
-                    {[1, 2].map((s) => (
-                      <div
-                        key={s}
-                        className={`h-1 rounded-full transition-all duration-300 ${
-                          s === step ? "w-5 bg-primary" : s < step ? "w-3 bg-primary/40" : "w-3 bg-border"
-                        }`}
-                      />
-                    ))}
-                  </div>
-                )}
+                <h2 className="text-base font-bold text-text">เพิ่มเด็กใหม่</h2>
+                <div className="flex items-center gap-1 mt-0.5">
+                  {[1, 2].map((s) => (
+                    <div
+                      key={s}
+                      className={`h-1 rounded-full transition-all duration-300 ${
+                        s === step ? "w-5 bg-primary" : s < step ? "w-3 bg-primary/40" : "w-3 bg-border"
+                      }`}
+                    />
+                  ))}
+                </div>
               </div>
             </div>
             <button
@@ -185,30 +173,8 @@ export default function AddChildModal({ open, onClose }: AddChildModalProps) {
             </button>
           </div>
 
-          {/* ── Supabase limitation notice ── */}
-          {supabaseBlocked && (
-            <div className="flex-1 px-5 py-5 space-y-4 overflow-y-auto">
-              <div className="bg-amber-50 dark:bg-amber-500/10 border border-amber-200 dark:border-amber-500/30 rounded-xl px-4 py-4">
-                <p className="text-sm font-semibold text-amber-700 dark:text-amber-400 mb-2">
-                  ระบบคลาวด์รองรับเด็กได้ 1 คน/บัญชี
-                </p>
-                <p className="text-xs text-text-muted leading-relaxed">
-                  ฐานข้อมูล Supabase มีข้อจำกัด 1 โปรไฟล์เด็กต่อบัญชีผู้ใช้
-                  การเพิ่มเด็กหลายคนรองรับเฉพาะโหมด Local Storage
-                  ตั้งค่า <code className="font-mono bg-black/8 dark:bg-white/10 px-1 rounded">NEXT_PUBLIC_STORAGE_PROVIDER=local</code> เพื่อเปิดใช้งาน
-                </p>
-              </div>
-              <button
-                onClick={handleClose}
-                className="w-full py-3 rounded-xl border border-border text-sm font-semibold text-text-muted hover:text-text hover:bg-gray-50 dark:hover:bg-white/5 transition-all active:scale-[0.99]"
-              >
-                ปิด
-              </button>
-            </div>
-          )}
-
           {/* ── Step 1: Name + Age + Goal ── */}
-          {!supabaseBlocked && step === 1 && (
+          {step === 1 && (
             <div className="flex-1 px-5 py-5 space-y-5 overflow-y-auto">
               {/* Name */}
               <div className="space-y-2">
@@ -313,7 +279,7 @@ export default function AddChildModal({ open, onClose }: AddChildModalProps) {
           )}
 
           {/* ── Step 2: Target Sound + Confirm ── */}
-          {!supabaseBlocked && step === 2 && (
+          {step === 2 && (
             <div className="flex-1 px-5 py-5 space-y-5 overflow-y-auto">
               {/* Summary header */}
               <div className="flex items-center gap-3 px-4 py-3 bg-primary/8 border border-primary/15 rounded-xl">
