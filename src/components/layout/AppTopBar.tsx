@@ -4,6 +4,7 @@ import Link from "next/link";
 import ThemeToggle from "@/components/ui/ThemeToggle";
 import { useSidebar } from "./SidebarContext";
 import { useSpeechProgress } from "@/hooks/useSpeechProgress";
+import { useChildProfile } from "@/hooks/useChildProfile";
 
 function MicLogoIcon() {
   return (
@@ -26,6 +27,7 @@ function StarFilledIcon() {
 export default function AppTopBar() {
   const { setMobileOpen } = useSidebar();
   const { summary, isHydrated, selectedSoundId } = useSpeechProgress();
+  const { profile, isHydrated: profileHydrated } = useChildProfile();
   const stars = isHydrated ? summary.starsEarned : 0;
 
   return (
@@ -51,6 +53,20 @@ export default function AppTopBar() {
           </div>
           <span className="text-xs font-bold text-text">Speech Adventure</span>
         </Link>
+
+        {/* Child chip — tapping opens drawer where full selector lives */}
+        {profileHydrated && profile && (
+          <button
+            onClick={() => setMobileOpen(true)}
+            className="flex items-center gap-1.5 max-w-[120px] min-w-0 px-2 py-1 rounded-xl hover:bg-gray-100 dark:hover:bg-white/10 transition-all flex-shrink-0"
+            aria-label={`เด็ก: ${profile.name} — เปิดเมนู`}
+          >
+            <div className="w-5 h-5 rounded-full bg-primary/12 flex items-center justify-center text-[10px] font-bold text-primary flex-shrink-0">
+              {profile.name.charAt(0)}
+            </div>
+            <span className="text-xs font-semibold text-text truncate">{profile.name}</span>
+          </button>
+        )}
 
         {/* Spacer */}
         <div className="flex-1 min-w-0" />

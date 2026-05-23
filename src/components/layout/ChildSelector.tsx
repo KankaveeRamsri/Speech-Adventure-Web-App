@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
-import Link from "next/link";
 import { useChildProfile } from "@/hooks/useChildProfile";
 import { useSpeechProgress } from "@/hooks/useSpeechProgress";
 import type { ChildProfileData } from "@/lib/child-profile/childProfileStorage";
@@ -57,7 +56,6 @@ export default function ChildSelector({ collapsed = false }: ChildSelectorProps)
 
   const childName = profile.name;
   const initial = childName.charAt(0);
-  const hasMultiple = profiles.length > 1;
 
   function handleSelect(child: ChildProfileData) {
     selectChild(child.id);
@@ -67,27 +65,27 @@ export default function ChildSelector({ collapsed = false }: ChildSelectorProps)
 
   if (collapsed) {
     return (
-      <div
-        className="w-8 h-8 rounded-full bg-primary/12 flex items-center justify-center text-xs font-bold text-primary flex-shrink-0 cursor-default"
+      <button
+        onClick={() => setOpen((v) => !v)}
+        className="w-8 h-8 rounded-full bg-primary/12 flex items-center justify-center text-xs font-bold text-primary flex-shrink-0 hover:bg-primary/20 transition-colors cursor-pointer"
         title={childName}
+        aria-haspopup="listbox"
+        aria-expanded={open}
+        aria-label={`เปลี่ยนเด็ก — กำลังเลือก ${childName}`}
       >
         {initial}
-      </div>
+      </button>
     );
   }
 
   return (
     <div ref={wrapperRef} className="relative">
       <button
-        onClick={() => hasMultiple && setOpen((v) => !v)}
-        className={`w-full flex items-center gap-2 min-w-0 rounded-xl px-2 py-1.5 transition-all ${
-          hasMultiple
-            ? "hover:bg-gray-100 dark:hover:bg-white/8 cursor-pointer"
-            : "cursor-default"
-        }`}
-        aria-haspopup={hasMultiple ? "listbox" : undefined}
-        aria-expanded={hasMultiple ? open : undefined}
-        aria-label={hasMultiple ? `เปลี่ยนเด็ก — กำลังเลือก ${childName}` : childName}
+        onClick={() => setOpen((v) => !v)}
+        className="w-full flex items-center gap-2 min-w-0 rounded-xl px-2 py-1.5 transition-all hover:bg-gray-100 dark:hover:bg-white/8 cursor-pointer"
+        aria-haspopup="listbox"
+        aria-expanded={open}
+        aria-label={`เปลี่ยนเด็ก — กำลังเลือก ${childName}`}
       >
         <div className="w-7 h-7 rounded-full bg-primary/12 flex items-center justify-center text-xs font-bold text-primary flex-shrink-0">
           {initial}
@@ -95,11 +93,9 @@ export default function ChildSelector({ collapsed = false }: ChildSelectorProps)
         <span className="text-sm font-semibold text-text truncate flex-1 text-left">
           {childName}
         </span>
-        {hasMultiple && (
-          <span className={`text-text-muted flex-shrink-0 transition-transform duration-150 ${open ? "rotate-180" : ""}`}>
-            <ChevronDownIcon />
-          </span>
-        )}
+        <span className={`text-text-muted flex-shrink-0 transition-transform duration-150 ${open ? "rotate-180" : ""}`}>
+          <ChevronDownIcon />
+        </span>
       </button>
 
       {/* Dropdown */}
@@ -138,18 +134,20 @@ export default function ChildSelector({ collapsed = false }: ChildSelectorProps)
             );
           })}
 
-          {/* Add Child */}
+          {/* Add Child — coming soon, multi-child creation not yet available */}
           <div className="border-t border-border">
-            <Link
-              href="/onboarding"
-              onClick={() => setOpen(false)}
-              className="flex items-center gap-2.5 px-3 py-2.5 text-sm text-text-muted hover:text-primary hover:bg-primary/5 transition-colors"
+            <div
+              aria-disabled="true"
+              className="flex items-center gap-2.5 px-3 py-2.5 text-sm cursor-not-allowed opacity-50"
             >
-              <span className="w-6 h-6 rounded-full border-2 border-dashed border-current flex items-center justify-center flex-shrink-0">
+              <span className="w-6 h-6 rounded-full border-2 border-dashed border-text-muted flex items-center justify-center flex-shrink-0 text-text-muted">
                 <PlusIcon />
               </span>
-              <span>เพิ่มเด็ก</span>
-            </Link>
+              <span className="text-text-muted flex-1">เพิ่มเด็ก</span>
+              <span className="text-[10px] font-semibold text-text-muted bg-gray-100 dark:bg-white/10 px-1.5 py-0.5 rounded-full flex-shrink-0">
+                เร็วๆ นี้
+              </span>
+            </div>
           </div>
         </div>
       )}
