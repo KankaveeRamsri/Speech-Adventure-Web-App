@@ -37,7 +37,7 @@ interface ChildSelectorProps {
 
 export default function ChildSelector({ collapsed = false }: ChildSelectorProps) {
   const { profile, profiles, sharedProfiles, selectedChildId, isHydrated, selectChild } = useChildProfile();
-  const { setSelectedSound } = useSpeechProgress();
+  const { setSelectedSound, switchChildProgress } = useSpeechProgress();
   const [open, setOpen] = useState(false);
   const [addingChild, setAddingChild] = useState(false);
   const wrapperRef = useRef<HTMLDivElement>(null);
@@ -62,6 +62,7 @@ export default function ChildSelector({ collapsed = false }: ChildSelectorProps)
   function handleSelect(child: ChildProfileData) {
     selectChild(child.id);
     setSelectedSound(child.targetSound);
+    switchChildProgress(child.id);
     setOpen(false);
   }
 

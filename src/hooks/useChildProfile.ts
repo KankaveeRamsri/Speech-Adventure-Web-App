@@ -53,11 +53,17 @@ export function useChildProfile() {
     [receivedGrants],
   );
 
-  // Effective profile: owned child takes precedence, then look in shared profiles
-  const profile = ownedProfile
-    ?? sharedProfiles.find((p) => p.id === selectedChildId)
-    ?? sharedProfiles[0]
-    ?? null;
+  // Effective profile: resolve by selectedChildId across owned + shared first,
+  // then fall back so switching to a shared child actually updates the card.
+  const profile = useMemo<ChildProfileData | null>(() => {
+    if (selectedChildId) {
+      const ownedMatch = profiles.find((p) => p.id === selectedChildId);
+      if (ownedMatch) return ownedMatch;
+      const sharedMatch = sharedProfiles.find((p) => p.id === selectedChildId);
+      if (sharedMatch) return sharedMatch;
+    }
+    return ownedProfile ?? sharedProfiles[0] ?? null;
+  }, [selectedChildId, profiles, sharedProfiles, ownedProfile]);
 
   // false during SSR + hydration, true right after
   const isHydrated = useSyncExternalStore(noopSubscribe, clientTrue, serverFalse);

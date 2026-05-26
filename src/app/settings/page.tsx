@@ -13,6 +13,7 @@ import {
 import { useAuth } from "@/hooks/useAuth";
 import { useChildAccess } from "@/hooks/useChildAccess";
 import { useInvitations } from "@/hooks/useInvitations";
+import { useCurrentChildAccess } from "@/hooks/useCurrentChildAccess";
 import { ACCESS_ROLE_LABELS } from "@/types/childAccess";
 import { INVITATION_ROLE_LABELS } from "@/types/invitations";
 
@@ -291,6 +292,8 @@ function ReceivedGrantsSection() {
 // ── Page ──────────────────────────────────────────────────────────────────────
 
 export default function SettingsPage() {
+  const { isOwner, isSharedChild } = useCurrentChildAccess();
+
   return (
     <AppShell>
       <div className="max-w-2xl mx-auto px-4 py-6 space-y-8">
@@ -321,38 +324,60 @@ export default function SettingsPage() {
           </div>
         </section>
 
-        {/* 1. Invite new member */}
-        <section>
-          <SectionHeader
-            title="เชิญสมาชิกใหม่"
-            description="เชิญผู้ปกครอง ครู หรือนักบำบัดเข้ามาดูพัฒนาการของเด็ก"
-          />
-          <div className="bg-surface border border-border rounded-xl p-5">
-            <InviteNewMemberSection />
-          </div>
-        </section>
+        {/* 1–3. Owner-only: invite, access management, sent invites */}
+        {isOwner ? (
+          <>
+            {/* 1. Invite new member */}
+            <section>
+              <SectionHeader
+                title="เชิญสมาชิกใหม่"
+                description="เชิญผู้ปกครอง ครู หรือนักบำบัดเข้ามาดูพัฒนาการของเด็ก"
+              />
+              <div className="bg-surface border border-border rounded-xl p-5">
+                <InviteNewMemberSection />
+              </div>
+            </section>
 
-        {/* 2. Active child access — grouped by child */}
-        <section>
-          <SectionHeader
-            title="สมาชิกที่เข้าถึงเด็กได้"
-            description="จัดการสิทธิ์การเข้าถึงของสมาชิกแต่ละคนต่อเด็กแต่ละคน"
-          />
-          <div className="bg-surface border border-border rounded-xl p-5">
-            <ChildAccessSection />
-          </div>
-        </section>
+            {/* 2. Active child access — grouped by child */}
+            <section>
+              <SectionHeader
+                title="สมาชิกที่เข้าถึงเด็กได้"
+                description="จัดการสิทธิ์การเข้าถึงของสมาชิกแต่ละคนต่อเด็กแต่ละคน"
+              />
+              <div className="bg-surface border border-border rounded-xl p-5">
+                <ChildAccessSection />
+              </div>
+            </section>
 
-        {/* 3. Sent invitations history */}
-        <section>
-          <SectionHeader
-            title="คำเชิญที่ส่งแล้ว"
-            description="ประวัติคำเชิญและสถานะการตอบรับ"
-          />
-          <div className="bg-surface border border-border rounded-xl p-5">
-            <SentInvitesSection />
-          </div>
-        </section>
+            {/* 3. Sent invitations history */}
+            <section>
+              <SectionHeader
+                title="คำเชิญที่ส่งแล้ว"
+                description="ประวัติคำเชิญและสถานะการตอบรับ"
+              />
+              <div className="bg-surface border border-border rounded-xl p-5">
+                <SentInvitesSection />
+              </div>
+            </section>
+          </>
+        ) : isSharedChild ? (
+          <section>
+            <SectionHeader title="การจัดการสิทธิ์" />
+            <div className="bg-surface border border-border rounded-xl px-4 py-5 flex items-start gap-3">
+              <div className="w-8 h-8 rounded-lg bg-info/10 flex items-center justify-center flex-shrink-0 mt-0.5">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#5BA4CF" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                  <circle cx="12" cy="12" r="10" />
+                  <line x1="12" y1="8" x2="12" y2="12" />
+                  <line x1="12" y1="16" x2="12.01" y2="16" />
+                </svg>
+              </div>
+              <div>
+                <p className="text-sm font-semibold text-text">คุณมีสิทธิ์ดูเท่านั้น</p>
+                <p className="text-xs text-text-muted mt-0.5">การเชิญสมาชิกและจัดการสิทธิ์ทำได้เฉพาะเจ้าของโปรไฟล์เด็ก</p>
+              </div>
+            </div>
+          </section>
+        ) : null}
 
         {/* Received invitations / grants (for current user) */}
         <section>

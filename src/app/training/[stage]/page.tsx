@@ -9,6 +9,8 @@ import LevelCompletionSummary from "@/components/speech-adventure/LevelCompletio
 import PracticeSessionSummary from "@/components/speech-adventure/PracticeSessionSummary";
 import { useSpeechProgress } from "@/hooks/useSpeechProgress";
 import { useChildProfile } from "@/hooks/useChildProfile";
+import { useCurrentChildAccess } from "@/hooks/useCurrentChildAccess";
+import PermissionBanner from "@/components/ui/PermissionBanner";
 import {
   mockPracticeItemsBySound,
   mockTrainingStages,
@@ -29,6 +31,7 @@ export default function PracticePage() {
   const stage = mockTrainingStages.find((s) => s.slug === stageSlug);
   const { addAttempt, selectedSoundId, isHydrated, startSession, completeSession } = useSpeechProgress();
   const { profile } = useChildProfile();
+  const { canStartPractice } = useCurrentChildAccess();
 
   const soundContent =
     mockPracticeItemsBySound[selectedSoundId] ??
@@ -44,7 +47,9 @@ export default function PracticePage() {
   const sessionStarted = useRef(false);
 
   // Start a session when the stage loads with content
+  // Guard: only start a session if the user has canStartPractice permission.
   useEffect(() => {
+    if (!canStartPractice) return; // viewer — never create a session
     if (!isHydrated || !stage || items.length === 0 || sessionStarted.current) return;
     sessionStarted.current = true;
     void (async () => {
@@ -56,7 +61,7 @@ export default function PracticePage() {
       });
       setActiveSession(session);
     })();
-  }, [isHydrated, stage, stageSlug, items.length, selectedSoundId, startSession, profile?.id]);
+  }, [canStartPractice, isHydrated, stage, stageSlug, items.length, selectedSoundId, startSession, profile?.id]);
 
   const handleSaveAttempt = useCallback(
     (attempt: PracticeAttempt) => {
@@ -90,6 +95,7 @@ export default function PracticePage() {
   }, [currentIndex]);
 
   const handleRetry = useCallback(() => {
+    if (!canStartPractice) return; // viewers cannot retry
     setCurrentIndex(0);
     setShowCompletion(false);
     setSessionAttempts([]);
@@ -105,7 +111,51 @@ export default function PracticePage() {
       });
       setActiveSession(session);
     })();
-  }, [stageSlug, selectedSoundId, items.length, startSession, profile?.id]);
+  }, [canStartPractice, stageSlug, selectedSoundId, items.length, startSession, profile?.id]);
+
+  /* ── Permission guard: viewer cannot start practice ── */
+  if (isHydrated && !canStartPractice) {
+    return (
+      <main className="min-h-screen bg-bg">
+        <nav className="sticky top-0 z-20 bg-surface/90 backdrop-blur-md border-b border-border">
+          <div className="flex items-center justify-between px-6 py-3 max-w-3xl mx-auto">
+            <Link href="/training" className="flex items-center gap-2 text-text-muted hover:text-text transition-colors px-2 py-1 rounded-lg hover:bg-gray-100 dark:hover:bg-white/8">
+              <BackIcon />
+              <span className="text-sm font-medium hidden sm:inline">แผนที่</span>
+            </Link>
+            <h1 className="font-semibold text-text text-sm">{stage?.name ?? stageSlug}</h1>
+            <ThemeToggle />
+          </div>
+        </nav>
+        <div className="max-w-3xl mx-auto px-6 py-16 flex flex-col items-center gap-6 text-center">
+          <div
+            className="w-16 h-16 rounded-2xl flex items-center justify-center text-3xl"
+            style={{ backgroundColor: stage ? `${stage.accentColor}15` : "var(--border)" }}
+            aria-hidden="true"
+          >
+            {stage?.icon ?? "🔒"}
+          </div>
+          <div>
+            <h2 className="text-xl font-bold text-text mb-2">คุณมีสิทธิ์ดูความก้าวหน้าเท่านั้น</h2>
+            <p className="text-sm text-text-muted max-w-sm mx-auto leading-relaxed">
+              ไม่สามารถเริ่มการฝึกได้ ติดต่อเจ้าของโปรไฟล์เด็กเพื่อขอสิทธิ์เพิ่มเติม
+            </p>
+          </div>
+          <PermissionBanner
+            message="คุณมีสิทธิ์ดูความก้าวหน้าเท่านั้น ไม่สามารถเริ่มการฝึกได้"
+            hint="ติดต่อเจ้าของโปรไฟล์เด็กเพื่อขอสิทธิ์ “เริ่มการฝึก”"
+            className="w-full max-w-sm"
+          />
+          <Link
+            href="/progress"
+            className="text-sm font-semibold text-primary hover:text-primary/80 px-5 py-2.5 rounded-xl border border-primary/30 hover:bg-primary/8 transition-all"
+          >
+            ดูความก้าวหน้า →
+          </Link>
+        </div>
+      </main>
+    );
+  }
 
   /* ── Not found ── */
   if (!stage) {

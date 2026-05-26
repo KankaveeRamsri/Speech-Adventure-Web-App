@@ -17,6 +17,9 @@ const STORAGE_KEY = STORAGE_KEYS.CHILD_GRANTS;
 const ChildPermissionsSchema = z.object({
   canViewProgress: z.boolean(),
   canViewAudio: z.boolean(),
+  // canStartPractice was added in Phase 11. Old stored grants won't have it;
+  // default false so that unrecognized viewers can't start practice.
+  canStartPractice: z.boolean().default(false),
   canAssignPractice: z.boolean(),
   canEditChild: z.boolean(),
   canExportReport: z.boolean(),

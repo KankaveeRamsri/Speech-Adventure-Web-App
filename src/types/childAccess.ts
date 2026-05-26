@@ -9,6 +9,9 @@ export type AccessRole = "guardian" | "teacher" | "therapist" | "viewer";
 export interface ChildPermissions {
   canViewProgress: boolean;
   canViewAudio: boolean;
+  /** User can start practice sessions, record audio, and create attempts. */
+  canStartPractice: boolean;
+  /** User can assign/plan practice for the child (separate from actually running it). */
   canAssignPractice: boolean;
   canEditChild: boolean;
   canExportReport: boolean;
@@ -42,16 +45,17 @@ export interface GrantChildAccessInput {
 export const FULL_PERMISSIONS: ChildPermissions = {
   canViewProgress: true,
   canViewAudio: true,
+  canStartPractice: true,
   canAssignPractice: true,
   canEditChild: true,
   canExportReport: true,
 };
 
 export const ROLE_DEFAULT_PERMISSIONS: Record<AccessRole, ChildPermissions> = {
-  guardian:  { canViewProgress: true,  canViewAudio: true,  canAssignPractice: false, canEditChild: true,  canExportReport: true  },
-  teacher:   { canViewProgress: true,  canViewAudio: false, canAssignPractice: true,  canEditChild: false, canExportReport: true  },
-  therapist: { canViewProgress: true,  canViewAudio: true,  canAssignPractice: false, canEditChild: false, canExportReport: true  },
-  viewer:    { canViewProgress: true,  canViewAudio: false, canAssignPractice: false, canEditChild: false, canExportReport: false },
+  guardian:  { canViewProgress: true,  canViewAudio: true,  canStartPractice: true,  canAssignPractice: false, canEditChild: true,  canExportReport: true  },
+  teacher:   { canViewProgress: true,  canViewAudio: false, canStartPractice: true,  canAssignPractice: true,  canEditChild: false, canExportReport: true  },
+  therapist: { canViewProgress: true,  canViewAudio: true,  canStartPractice: true,  canAssignPractice: false, canEditChild: false, canExportReport: true  },
+  viewer:    { canViewProgress: true,  canViewAudio: false, canStartPractice: false, canAssignPractice: false, canEditChild: false, canExportReport: false },
 };
 
 export const ACCESS_ROLE_LABELS: Record<AccessRole, string> = {

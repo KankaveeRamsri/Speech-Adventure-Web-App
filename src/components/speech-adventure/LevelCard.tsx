@@ -1,12 +1,16 @@
+"use client";
+
 import type { TrainingStage } from "@/types/speechAdventure";
 import Link from "next/link";
 
 interface Props {
   stage: TrainingStage;
   index: number;
+  /** When false the practice CTAs are disabled (viewer role). */
+  canStartPractice?: boolean;
 }
 
-export default function LevelCard({ stage, index }: Props) {
+export default function LevelCard({ stage, index, canStartPractice = true }: Props) {
   const isLocked = stage.status === "locked";
   const isCompleted = stage.status === "completed";
   const isCurrent = stage.status === "current";
@@ -108,33 +112,57 @@ export default function LevelCard({ stage, index }: Props) {
 
         {/* Inline action button (desktop) */}
         {!isLocked && (
-          <Link
-            href={`/training/${stage.slug}`}
-            className={`hidden sm:flex-shrink-0 sm:flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all hover:scale-[1.02] active:scale-[0.98] flex-shrink-0 ${
-              isCurrent
-                ? "text-white shadow-sm"
-                : "border border-current hover:bg-black/5 dark:hover:bg-white/5"
-            }`}
-            style={
-              isCurrent
-                ? { backgroundColor: stage.accentColor, color: "#fff" }
-                : { color: stage.accentColor }
-            }
-          >
-            {isCompleted ? "ทบทวน" : isCurrent && stage.starsEarned > 0 ? "ฝึกต่อ" : "เริ่มฝึก"}
-          </Link>
+          isCompleted
+            // "Review" is always allowed — it only shows historical data
+            ? <Link
+                href={`/training/${stage.slug}`}
+                className="hidden sm:flex-shrink-0 sm:flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all hover:scale-[1.02] active:scale-[0.98] flex-shrink-0 border border-current hover:bg-black/5 dark:hover:bg-white/5"
+                style={{ color: stage.accentColor }}
+              >
+                ทบทวน
+              </Link>
+            : canStartPractice
+              ? <Link
+                  href={`/training/${stage.slug}`}
+                  className={`hidden sm:flex-shrink-0 sm:flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all hover:scale-[1.02] active:scale-[0.98] flex-shrink-0 ${
+                    isCurrent ? "text-white shadow-sm" : "border border-current hover:bg-black/5 dark:hover:bg-white/5"
+                  }`}
+                  style={isCurrent ? { backgroundColor: stage.accentColor, color: "#fff" } : { color: stage.accentColor }}
+                >
+                  {isCurrent && stage.starsEarned > 0 ? "ฝึกต่อ" : "เริ่มฝึก"}
+                </Link>
+              : <span
+                  className="hidden sm:flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-semibold border border-border/60 text-text-muted/60 cursor-not-allowed flex-shrink-0"
+                  title="คุณมีสิทธิ์ดูเท่านั้น"
+                >
+                  {isCurrent && stage.starsEarned > 0 ? "ฝึกต่อ" : "เริ่มฝึก"}
+                </span>
         )}
       </div>
 
       {/* Mobile full-width CTA */}
       {!isLocked && (
-        <Link
-          href={`/training/${stage.slug}`}
-          className="sm:hidden block text-center py-2 text-xs font-semibold border-t border-border/50 transition-all hover:bg-bg"
-          style={{ color: stage.accentColor }}
-        >
-          {isCompleted ? "ทบทวน" : isCurrent && stage.starsEarned > 0 ? "ฝึกต่อ" : "เริ่มฝึก"}
-        </Link>
+        isCompleted
+          ? <Link
+              href={`/training/${stage.slug}`}
+              className="sm:hidden block text-center py-2 text-xs font-semibold border-t border-border/50 transition-all hover:bg-bg"
+              style={{ color: stage.accentColor }}
+            >
+              ทบทวน
+            </Link>
+          : canStartPractice
+            ? <Link
+                href={`/training/${stage.slug}`}
+                className="sm:hidden block text-center py-2 text-xs font-semibold border-t border-border/50 transition-all hover:bg-bg"
+                style={{ color: stage.accentColor }}
+              >
+                {isCurrent && stage.starsEarned > 0 ? "ฝึกต่อ" : "เริ่มฝึก"}
+              </Link>
+            : <span
+                className="sm:hidden block text-center py-2 text-xs text-text-muted/60 border-t border-border/50 cursor-not-allowed"
+              >
+                {isCurrent && stage.starsEarned > 0 ? "ฝึกต่อ" : "เริ่มฝึก"}
+              </span>
       )}
       {isLocked && (
         <div className="sm:hidden text-center py-2 text-xs text-text-muted border-t border-border/50 cursor-not-allowed">

@@ -7,6 +7,7 @@ import TrainingMap from "@/components/speech-adventure/TrainingMap";
 import AppShell from "@/components/layout/AppShell";
 import { useSpeechProgress } from "@/hooks/useSpeechProgress";
 import { useChildProfile } from "@/hooks/useChildProfile";
+import { useCurrentChildAccess } from "@/hooks/useCurrentChildAccess";
 import {
   mockChildProfile,
   mockTargetSounds,
@@ -26,6 +27,7 @@ export default function TrainingMapPage() {
     setSelectedSound,
   } = useSpeechProgress();
   const { profile, hasProfile } = useChildProfile();
+  const { isSharedChild, canEditChild, canStartPractice } = useCurrentChildAccess();
 
   const activeSoundId = isHydrated ? (selectedSoundId || undefined) : undefined;
 
@@ -56,7 +58,7 @@ export default function TrainingMapPage() {
       <div className="max-w-6xl mx-auto px-4 sm:px-6 py-6 space-y-6">
 
         {/* ── Setup banner ── */}
-        {isHydrated && !hasProfile && (
+        {isHydrated && !hasProfile && !isSharedChild && (
           <div className="flex items-center justify-between gap-3 bg-info/8 border border-info/25 rounded-xl px-4 py-3">
             <p className="text-sm text-text">
               <span className="font-semibold">ยังไม่ได้ตั้งค่าโปรไฟล์</span>
@@ -91,15 +93,24 @@ export default function TrainingMapPage() {
                   <p className="font-bold text-primary text-lg leading-none">{completedCount}<span className="text-text-muted text-xs font-normal">/7</span></p>
                   <p className="text-xs text-text-muted">ระดับผ่าน</p>
                 </div>
-                {currentStage && (
-                  <a
-                    href={`/training/${currentStage.slug}`}
-                    className="px-5 py-2.5 rounded-xl text-sm font-semibold text-white transition-all hover:scale-[1.02] active:scale-[0.98] shadow-sm"
-                    style={{ backgroundColor: currentStage.accentColor }}
-                  >
-                    ฝึกต่อ →
-                  </a>
-                )}
+              {currentStage && (
+                  canStartPractice ? (
+                    <a
+                      href={`/training/${currentStage.slug}`}
+                      className="px-5 py-2.5 rounded-xl text-sm font-semibold text-white transition-all hover:scale-[1.02] active:scale-[0.98] shadow-sm"
+                      style={{ backgroundColor: currentStage.accentColor }}
+                    >
+                      ฝึกต่อ →
+                    </a>
+                  ) : (
+                    <span
+                      className="px-5 py-2.5 rounded-xl text-sm font-semibold text-text-muted/60 bg-border/40 cursor-not-allowed"
+                      title="คุณมีสิทธิ์ดูเท่านั้น"
+                    >
+                      ฝึกต่อ →
+                    </span>
+                  )
+              )}
               </div>
             )}
           </div>
@@ -120,7 +131,7 @@ export default function TrainingMapPage() {
               <h2 className="text-sm font-semibold text-text-muted uppercase tracking-wider mb-3 px-1">
                 เส้นทางการฝึก
               </h2>
-              <TrainingMap stages={liveStages} />
+              <TrainingMap stages={liveStages} canStartPractice={canStartPractice} />
             </section>
           </div>
 
@@ -134,7 +145,7 @@ export default function TrainingMapPage() {
                 compact
                 isHydrated={isHydrated}
               />
-              {isHydrated && (
+              {isHydrated && (!isSharedChild || canEditChild) && (
                 <Link
                   href="/onboarding"
                   className="absolute top-2 right-2 text-xs text-text-muted hover:text-primary transition-colors px-2 py-1 rounded-lg hover:bg-primary/8"
@@ -179,13 +190,19 @@ export default function TrainingMapPage() {
                     <p className="text-xs text-text-muted mt-0.5">{currentStage.shortGoal}</p>
                   </div>
                 </div>
-                <a
-                  href={`/training/${currentStage.slug}`}
-                  className="block w-full text-center mt-3 px-4 py-2 rounded-xl text-sm font-semibold text-white transition-all hover:scale-[1.01] active:scale-[0.98]"
-                  style={{ backgroundColor: currentStage.accentColor }}
-                >
-                  ฝึกเลย
-                </a>
+                {canStartPractice ? (
+                  <a
+                    href={`/training/${currentStage.slug}`}
+                    className="block w-full text-center mt-3 px-4 py-2 rounded-xl text-sm font-semibold text-white transition-all hover:scale-[1.01] active:scale-[0.98]"
+                    style={{ backgroundColor: currentStage.accentColor }}
+                  >
+                    ฝึกเลย
+                  </a>
+                ) : (
+                  <div className="mt-3 px-4 py-2 rounded-xl text-sm font-medium text-text-muted bg-border/30 text-center cursor-not-allowed select-none">
+                    คุณมีสิทธิ์ดูเท่านั้น
+                  </div>
+                )}
               </div>
             )}
 

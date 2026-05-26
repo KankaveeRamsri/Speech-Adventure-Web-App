@@ -49,6 +49,7 @@ import type {
 } from "@/types/supabase";
 import type { Invitation, InvitationRole, InvitationStatus } from "@/types/invitations";
 import type { ChildAccess, AccessRole, ChildPermissions } from "@/types/childAccess";
+import { ROLE_DEFAULT_PERMISSIONS } from "@/types/childAccess";
 
 // ── DB → Domain ───────────────────────────────────────────────────────────────
 
@@ -250,14 +251,19 @@ export function domainToDbInvitation(
 // ── ChildAccess mappers ───────────────────────────────────────────────────────
 
 export function dbToDomainChildAccess(db: DbChildAccess): ChildAccess {
+  const role = db.role as AccessRole;
+  // can_start_practice may not exist in older DB rows; fall back to role default.
+  const roleDefault = ROLE_DEFAULT_PERMISSIONS[role];
   return {
     id: db.id,
     childId: db.child_id,
     userId: db.user_id,
-    role: db.role as AccessRole,
+    role,
     permissions: {
       canViewProgress:   db.can_view_progress,
       canViewAudio:      db.can_view_audio,
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      canStartPractice:  (db as any).can_start_practice ?? roleDefault.canStartPractice,
       canAssignPractice: db.can_assign_practice,
       canEditChild:      db.can_edit_child,
       canExportReport:   db.can_export_report,
@@ -280,6 +286,9 @@ export function domainToDbChildAccess(
     granted_by: grant.grantedBy,
     can_view_progress:   grant.permissions.canViewProgress,
     can_view_audio:      grant.permissions.canViewAudio,
+    // can_start_practice is a new column — cast to any until migration adds it
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    ...(grant.permissions.canStartPractice !== undefined && { can_start_practice: grant.permissions.canStartPractice } as any),
     can_assign_practice: grant.permissions.canAssignPractice,
     can_edit_child:      grant.permissions.canEditChild,
     can_export_report:   grant.permissions.canExportReport,
@@ -287,9 +296,13 @@ export function domainToDbChildAccess(
 }
 
 export function dbPermissions(db: DbChildAccess): ChildPermissions {
+  const role = db.role as AccessRole;
+  const roleDefault = ROLE_DEFAULT_PERMISSIONS[role];
   return {
     canViewProgress:   db.can_view_progress,
     canViewAudio:      db.can_view_audio,
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    canStartPractice:  (db as any).can_start_practice ?? roleDefault.canStartPractice,
     canAssignPractice: db.can_assign_practice,
     canEditChild:      db.can_edit_child,
     canExportReport:   db.can_export_report,

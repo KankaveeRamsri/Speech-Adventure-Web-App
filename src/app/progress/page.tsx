@@ -9,8 +9,10 @@ import ObservationNoteList from "@/components/observations/ObservationNoteList";
 import AppShell from "@/components/layout/AppShell";
 import SessionDetailDrawer from "@/components/details/SessionDetailDrawer";
 import AttemptDetailDrawer from "@/components/details/AttemptDetailDrawer";
+
 import { useSpeechProgress } from "@/hooks/useSpeechProgress";
 import { useChildProfile } from "@/hooks/useChildProfile";
+import { useCurrentChildAccess } from "@/hooks/useCurrentChildAccess";
 import { useObservationNotes } from "@/hooks/useObservationNotes";
 import { mockChildProfile, mockTrainingStages } from "@/data/speechAdventureMockData";
 import {
@@ -87,6 +89,7 @@ export default function ProgressDashboardPage() {
   const { progress, summary, clearProgressForChild, getStageStatus, getStageAttempts, isHydrated } =
     useSpeechProgress();
   const { profile, hasProfile } = useChildProfile();
+  const { isOwner, isSharedChild, canEditChild, canExportReport } = useCurrentChildAccess();
   const { notes, addNote, updateNote, deleteNote, clearNotes } = useObservationNotes();
 
   const [activeTab, setActiveTab] = useState<TabId>("overview");
@@ -202,7 +205,7 @@ export default function ProgressDashboardPage() {
                     สำหรับผู้ปกครองและคุณครู{dateStr ? ` · ${dateStr}` : ""}
                   </p>
                 </div>
-                {isHydrated && (
+                {isHydrated && (!isSharedChild || canEditChild) && (
                   <Link
                     href="/onboarding"
                     className="flex-shrink-0 text-sm font-medium text-primary hover:text-primary/80 px-3 py-1.5 rounded-xl hover:bg-primary/8 transition-all border border-primary/20"
@@ -606,12 +609,21 @@ export default function ProgressDashboardPage() {
               <h2 className="text-xl font-bold text-text">รายงานสำหรับผู้ปกครอง</h2>
               {dateStr && <p className="text-sm text-text-muted mt-0.5">ข้อมูล ณ {dateStr}</p>}
             </div>
-            <Link
-              href="/report"
-              className="flex-shrink-0 text-sm font-medium text-primary hover:text-primary/80 px-3 py-1.5 rounded-xl hover:bg-primary/8 transition-all border border-primary/20"
-            >
-              รายงานฉบับเต็ม →
-            </Link>
+            {canExportReport ? (
+              <Link
+                href="/report"
+                className="flex-shrink-0 text-sm font-medium text-primary hover:text-primary/80 px-3 py-1.5 rounded-xl hover:bg-primary/8 transition-all border border-primary/20"
+              >
+                รายงานฉบับเต็ม →
+              </Link>
+            ) : (
+              <span
+                className="flex-shrink-0 text-sm text-text-muted px-3 py-1.5 rounded-xl border border-border/60 cursor-not-allowed opacity-60"
+                title="ต้องได้รับสิทธิ์จากผู้ดูแลเด็ก"
+              >
+                รายงานฉบับเต็ม →
+              </span>
+            )}
           </div>
 
           {/* Difficult items */}
@@ -699,8 +711,8 @@ export default function ProgressDashboardPage() {
             </p>
           </section>
 
-          {/* Demo / Presentation Controls */}
-          <section
+          {/* Demo / Presentation Controls — owner only */}
+          {isOwner && <section
             className="rounded-2xl border border-dashed border-primary/30 bg-primary/4 dark:bg-primary/6 p-5 pb-6"
             aria-label="ส่วนควบคุมโหมดสาธิต"
           >
@@ -769,7 +781,7 @@ export default function ProgressDashboardPage() {
                 </button>
               </div>
             )}
-          </section>
+          </section>}
           <div className="pb-4" />
         </div>
       )}

@@ -5,6 +5,7 @@ import { useInvitations } from "@/hooks/useInvitations";
 import { useChildAccess } from "@/hooks/useChildAccess";
 import { useChildProfile } from "@/hooks/useChildProfile";
 import { useAuth } from "@/hooks/useAuth";
+import { useCurrentChildAccess } from "@/hooks/useCurrentChildAccess";
 import type { ChildAccess, ChildPermissions } from "@/types/childAccess";
 import type { Invitation, InvitationRole, InvitationStatus } from "@/types/invitations";
 import { INVITATION_ROLE_LABELS, INVITATION_STATUS_LABELS } from "@/types/invitations";
@@ -77,6 +78,7 @@ function StatusBadge({ status }: { status: InvitationStatus }) {
 const PERMISSION_LABELS: Record<keyof ChildPermissions, string> = {
   canViewProgress:   "ดูพัฒนาการ",
   canViewAudio:      "ฟังเสียง",
+  canStartPractice:  "เริ่มการฝึก",
   canAssignPractice: "มอบหมายฝึก",
   canEditChild:      "แก้ไขโปรไฟล์",
   canExportReport:   "ส่งออกรายงาน",
@@ -220,12 +222,22 @@ function CreateInviteForm({ onClose }: CreateFormProps) {
 
 export function InviteNewMemberSection() {
   const { isAuthenticated } = useAuth();
+  const { canManageAccess } = useCurrentChildAccess();
   const [showForm, setShowForm] = useState(false);
 
   if (!isAuthenticated) {
     return (
       <p className="text-sm text-text-muted bg-surface border border-border rounded-xl px-4 py-3">
         กรุณา <span className="font-semibold text-primary">เข้าสู่ระบบ</span> ก่อนเชิญสมาชิก
+      </p>
+    );
+  }
+
+  // Only owner can invite new members.
+  if (!canManageAccess) {
+    return (
+      <p className="text-sm text-text-muted">
+        คุณมีสิทธิ์ดูเท่านั้น — การเชิญสมาชิกทำได้เฉพาะเจ้าของโปรไฟล์เด็ก
       </p>
     );
   }

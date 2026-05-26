@@ -6,6 +6,8 @@ import type { PracticeAttempt, PracticeSession, EvaluationStatus } from "@/types
 import DetailMetricCard from "./DetailMetricCard";
 import LinkedObservationNotes from "./LinkedObservationNotes";
 import AttemptAudioPlayer from "./AttemptAudioPlayer";
+import PermissionBanner from "@/components/ui/PermissionBanner";
+import { useCurrentChildAccess } from "@/hooks/useCurrentChildAccess";
 
 interface Props {
   attempt: PracticeAttempt | null;
@@ -43,6 +45,7 @@ const ATTEMPT_STATUS_INFO: Record<EvaluationStatus, { label: string; color: stri
 };
 
 export default function AttemptDetailDrawer({ attempt, linkedSession, onClose, onSessionClick }: Props) {
+  const { canViewAudio } = useCurrentChildAccess();
   useEffect(() => {
     if (!attempt) return;
     document.body.style.overflow = "hidden";
@@ -166,12 +169,19 @@ export default function AttemptDetailDrawer({ attempt, linkedSession, onClose, o
             </div>
           </div>
 
-          {/* Audio playback — shown only when a recording was stored in Supabase Storage */}
+          {/* Audio playback — gated by canViewAudio permission */}
           {attempt.audioPath && (
-            <AttemptAudioPlayer
-              audioPath={attempt.audioPath}
-              accentColor={accentColor}
-            />
+            canViewAudio ? (
+              <AttemptAudioPlayer
+                audioPath={attempt.audioPath}
+                accentColor={accentColor}
+              />
+            ) : (
+              <PermissionBanner
+                message="คุณมีสิทธิ์ดูเท่านั้น"
+                hint="ต้องได้รับสิทธิ์จากผู้ดูแลเด็กเพื่อฟังเสียงที่บันทึก"
+              />
+            )
           )}
 
           {/* Feedback */}

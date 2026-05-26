@@ -18,6 +18,7 @@ import {
 import { QueryError, warnRepo } from "./errors";
 import { localRead, localWrite, localRemove } from "@/lib/storage/local/localStorageClient";
 import { STORAGE_KEYS, getScopedStorageKey } from "@/lib/storage/storageKeys";
+import { getSelectedChildId } from "@/lib/child-profile/childProfileListStorage";
 import { SpeechProgressSchema, parseOrNull } from "@/lib/validation";
 
 // ── Pending-clear marker ──────────────────────────────────────────────────────
@@ -80,6 +81,10 @@ export class SupabaseProgressRepository implements IProgressRepository {
   // Child profile UUID — populated during hydration, used for writes
   private _childId: string | null = null;
 
+  // Explicit selected child override — set by setSelectedChildId() when the
+  // user switches children; takes precedence over the localStorage default.
+  private _selectedChildIdOverride: string | null = null;
+
   // Listener sets (separate for progress and sound — mirrors local storage)
   private readonly _progressListeners = new Set<() => void>();
   private readonly _soundListeners = new Set<() => void>();
@@ -93,6 +98,17 @@ export class SupabaseProgressRepository implements IProgressRepository {
 
   public setScope(userId: string | null): void {
     this._localScopeUserId = userId;
+  }
+
+  /**
+   * Switch the active child for progress loading.
+   * Called by ChildSelector when the user switches children.
+   * Triggers rehydration so practice_sessions/attempts reload for the new child.
+   */
+  public setSelectedChildId(id: string | null): void {
+    if (id === this._selectedChildIdOverride) return;
+    this._selectedChildIdOverride = id;
+    this.rehydrate();
   }
 
   private _localProgressKey(): string {
@@ -452,6 +468,7 @@ export class SupabaseProgressRepository implements IProgressRepository {
     this._hydrated = false;
     this._hydratePromise = null;
     this._childId = null;
+    this._selectedChildIdOverride = null;
     this._localScopeUserId = null;
     this._progress = SERVER_PROGRESS;
     this._selectedSoundId = DEFAULT_SOUND_ID;
@@ -499,12 +516,22 @@ export class SupabaseProgressRepository implements IProgressRepository {
   private async _hydrate(): Promise<void> {
     const myGen = this._hydrateGen;
 
+    // Determine which child to hydrate for:
+    //  1. Explicit override set by setSelectedChildId() (child switch)
+    //  2. Persisted selected child ID from localStorage (page refresh)
+    //  3. Fall back to first owned profile (single-child / initial load)
+    const targetChildId = this._selectedChildIdOverride ?? getSelectedChildId();
+
     // Step 1: get child profile (needed for child_id + selected_sound_id + target_sound)
-    const { data: profile, error: profileError } = await this.client
+    const profileQuery = this.client
       .from("child_profiles")
-      .select("id, selected_sound_id, target_sound")
-      .limit(1)
-      .maybeSingle();
+      .select("id, selected_sound_id, target_sound");
+
+    const { data: profile, error: profileError } = await (
+      targetChildId
+        ? profileQuery.eq("id", targetChildId)
+        : profileQuery.limit(1)
+    ).maybeSingle();
 
     // Bail if a newer rehydrate() superseded us
     if (this._hydrateGen !== myGen) return;

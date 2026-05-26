@@ -30,7 +30,7 @@ const serverSnapshot = () => false as const;
 
 export function useSpeechProgress() {
   const { progress: repo } = useRepositories();
-  const { profiles, profile } = useChildProfile();
+  const { profile } = useChildProfile();
 
   // progress is synchronized via the repository's pub-sub.
   // getServerProgress() is used on the server AND during client hydration so
@@ -54,10 +54,10 @@ export function useSpeechProgress() {
     repo.getServerSoundId.bind(repo),
   );
 
-  // When multiple children exist, filter attempts/sessions to the selected child
-  // so Child A's progress is never shown in Child B's training map.
-  // Single-child users (legacy): show all data unfiltered for backward compat.
-  const activeChildId = profiles.length > 1 ? (profile?.id ?? null) : null;
+  // Always filter by the selected child's ID so owned and shared children
+  // never bleed into each other. When no child is selected (profile === null),
+  // activeChildId = null and no filtering is applied (anonymous/legacy fallback).
+  const activeChildId = profile?.id ?? null;
 
   const filteredAttempts = useMemo(
     () =>
@@ -105,6 +105,15 @@ export function useSpeechProgress() {
 
   const setSelectedSound = useCallback((id: string) => {
     repo.setSelectedSoundId(id);
+  }, [repo]);
+
+  // Notifies the progress repository that the selected child changed.
+  // Only meaningful in Supabase mode (duck-typed — no-op for local repo).
+  const switchChildProgress = useCallback((childId: string) => {
+    const r = repo as { setSelectedChildId?: (id: string | null) => void };
+    if (typeof r.setSelectedChildId === "function") {
+      r.setSelectedChildId(childId);
+    }
   }, [repo]);
 
   const getStageStatus = useCallback(
@@ -171,5 +180,6 @@ export function useSpeechProgress() {
     abandonSession,
     getActiveSessionForStage,
     getSessionById,
+    switchChildProgress,
   };
 }

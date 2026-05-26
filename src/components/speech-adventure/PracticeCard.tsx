@@ -7,12 +7,14 @@ import { evaluateSpeechViaApi } from "@/lib/speech-evaluation/client";
 import { useAudioRecorder } from "@/hooks/useAudioRecorder";
 import { useAuth } from "@/hooks/useAuth";
 import { useChildProfile } from "@/hooks/useChildProfile";
+import { useCurrentChildAccess } from "@/hooks/useCurrentChildAccess";
 import { uploadPracticeAudio } from "@/lib/storage/supabase/audioStorage";
 import { isSupabaseConfigured } from "@/lib/supabase/client";
 import AudioRecorder from "./AudioRecorder";
 import EvaluationResultCard from "./EvaluationResultCard";
 import RewardBadge from "./RewardBadge";
 import SessionSummaryCard from "./SessionSummaryCard";
+import PermissionBanner from "@/components/ui/PermissionBanner";
 
 interface Props {
   item: PracticeItem;
@@ -85,6 +87,7 @@ export default function PracticeCard({
   const recorder = useAudioRecorder();
   const { user, isAuthenticated } = useAuth();
   const { profile } = useChildProfile();
+  const { canStartPractice } = useCurrentChildAccess();
   const [phase, setPhase] = useState<"idle" | "listening" | "recording" | "evaluated" | "saved" | "reward">("idle");
   const [result, setResult] = useState<EvaluationResult | null>(null);
   const [evalResult, setEvalResult] = useState<SpeechEvaluationResult | null>(null);
@@ -334,13 +337,20 @@ export default function PracticeCard({
           {item.type === "oral_motor" && (
             <div className="text-center space-y-3">
               <p className="text-sm text-text-muted">ทำตามภารกิจด้านบน แล้วกดปุ่มเมื่อเสร็จ</p>
-              <button
-                onClick={handleOralMotorComplete}
-                className="w-full py-3.5 rounded-xl font-bold text-base text-white transition-all active:scale-[0.98] shadow-sm hover:opacity-90"
-                style={{ backgroundColor: accentColor }}
-              >
-                เสร็จแล้ว
-              </button>
+              {canStartPractice ? (
+                <button
+                  onClick={handleOralMotorComplete}
+                  className="w-full py-3.5 rounded-xl font-bold text-base text-white transition-all active:scale-[0.98] shadow-sm hover:opacity-90"
+                  style={{ backgroundColor: accentColor }}
+                >
+                  เสร็จแล้ว
+                </button>
+              ) : (
+                <PermissionBanner
+                  message="คุณมีสิทธิ์ดูเท่านั้น ไม่สามารถบันทึกผลได้"
+                  hint="ติดต่อเจ้าของโปรไฟล์เด็กเพื่อขอสิทธิ์ “เริ่มการฝึก”"
+                />
+              )}
             </div>
           )}
 
@@ -348,17 +358,24 @@ export default function PracticeCard({
           {item.type === "sound_choice" && item.soundChoices && (
             <div className="space-y-3">
               <p className="text-center text-sm text-text-muted font-medium">เลือกคำตอบที่ถูกต้อง</p>
-              <div className="grid grid-cols-2 gap-3">
-                {item.soundChoices.map((choice) => (
-                  <button
-                    key={choice}
-                    onClick={() => handleSoundChoice(choice)}
-                    className="py-5 rounded-xl border-2 border-border bg-bg dark:bg-white/3 text-2xl font-bold text-text hover:border-primary/40 hover:bg-primary/5 transition-all active:scale-[0.96]"
-                  >
-                    {choice}
-                  </button>
-                ))}
-              </div>
+              {canStartPractice ? (
+                <div className="grid grid-cols-2 gap-3">
+                  {item.soundChoices.map((choice) => (
+                    <button
+                      key={choice}
+                      onClick={() => handleSoundChoice(choice)}
+                      className="py-5 rounded-xl border-2 border-border bg-bg dark:bg-white/3 text-2xl font-bold text-text hover:border-primary/40 hover:bg-primary/5 transition-all active:scale-[0.96]"
+                    >
+                      {choice}
+                    </button>
+                  ))}
+                </div>
+              ) : (
+                <PermissionBanner
+                  message="คุณมีสิทธิ์ดูเท่านั้น ไม่สามารถตอบได้"
+                  hint="ติดต่อเจ้าของโปรไฟล์เด็กเพื่อขอสิทธิ์ “เริ่มการฝึก”"
+                />
+              )}
               {item.hint && (
                 <p className="text-center text-xs text-text-muted">{item.hint}</p>
               )}
@@ -398,17 +415,25 @@ export default function PracticeCard({
                 </button>
               </div>
 
-              <AudioRecorder
-                state={recorder.state}
-                durationMs={recorder.durationMs}
-                errorMessage={recorder.errorMessage}
-                onStartRecording={handleStartRecording}
-                onStopRecording={handleStopRecording}
-                onPlayRecording={recorder.playRecording}
-                onClearRecording={handleRetry}
-                onEvaluate={handleEvaluate}
-                accentColor={accentColor}
-              />
+              {/* Recorder controls — gated by canStartPractice */}
+              {canStartPractice ? (
+                <AudioRecorder
+                  state={recorder.state}
+                  durationMs={recorder.durationMs}
+                  errorMessage={recorder.errorMessage}
+                  onStartRecording={handleStartRecording}
+                  onStopRecording={handleStopRecording}
+                  onPlayRecording={recorder.playRecording}
+                  onClearRecording={handleRetry}
+                  onEvaluate={handleEvaluate}
+                  accentColor={accentColor}
+                />
+              ) : (
+                <PermissionBanner
+                  message="คุณมีสิทธิ์ดูเท่านั้น ไม่สามารถบันทึกเสียงได้"
+                  hint="ติดต่อเจ้าของโปรไฟล์เด็กเพื่อขอสิทธิ์ “เริ่มการฝึก”"
+                />
+              )}
             </>
           )}
         </>

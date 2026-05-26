@@ -8,9 +8,11 @@ import ReportMetricCard from "@/components/report/ReportMetricCard";
 import ReportStageTable from "@/components/report/ReportStageTable";
 import ReportSummaryCard from "@/components/report/ReportSummaryCard";
 import PrintActions from "@/components/report/PrintActions";
+import PermissionBanner from "@/components/ui/PermissionBanner";
 import { useSpeechProgress } from "@/hooks/useSpeechProgress";
 import { useChildProfile } from "@/hooks/useChildProfile";
 import { useObservationNotes } from "@/hooks/useObservationNotes";
+import { useCurrentChildAccess } from "@/hooks/useCurrentChildAccess";
 import { CATEGORY_META } from "@/types/observations";
 import {
   mockChildProfile,
@@ -116,10 +118,44 @@ export default function ReportPage() {
   const { summary, getStageStatus, getStageAttempts, isHydrated, selectedSoundId } = useSpeechProgress();
   const { profile } = useChildProfile();
   const { recentNotes } = useObservationNotes();
+  const { canExportReport } = useCurrentChildAccess();
 
   const handlePrint = useCallback(() => {
     window.print();
   }, []);
+
+  // ── Permission guard — shared viewers without canExportReport see a notice ────
+  if (!canExportReport) {
+    return (
+      <AppShell>
+        <div className="max-w-2xl mx-auto px-4 py-16 flex flex-col items-center gap-5 text-center">
+          <div className="w-16 h-16 rounded-2xl bg-border/40 flex items-center justify-center">
+            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" className="text-text-muted" aria-hidden="true">
+              <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
+              <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+            </svg>
+          </div>
+          <div>
+            <h2 className="text-xl font-bold text-text mb-2">คุณมีสิทธิ์ดูเท่านั้น</h2>
+            <p className="text-sm text-text-muted max-w-sm mx-auto leading-relaxed">
+              ต้องได้รับสิทธิ์จากผู้ดูแลเด็กเพื่อส่งออกรายงานฉบับเต็ม
+            </p>
+          </div>
+          <PermissionBanner
+            message="ต้องได้รับสิทธิ์จากผู้ดูแลเด็ก"
+            hint="ติดต่อเจ้าของโปรไฟล์เด็กเพื่อขอสิทธิ์ “ส่งออกรายงาน”"
+            className="w-full max-w-sm"
+          />
+          <Link
+            href="/progress"
+            className="text-sm font-semibold text-primary hover:text-primary/80 px-5 py-2.5 rounded-xl border border-primary/30 hover:bg-primary/8 transition-all"
+          >
+            กลับไปหน้าความก้าวหน้า ←
+          </Link>
+        </div>
+      </AppShell>
+    );
+  }
 
   // ── Derived data ────────────────────────────────────────────────────────────
 
