@@ -1,8 +1,8 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { Suspense, useState, useEffect } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useAuth } from "@/hooks/useAuth";
 import { isSupabaseConfigured } from "@/lib/supabase/client";
 import ThemeToggle from "@/components/ui/ThemeToggle";
@@ -32,9 +32,11 @@ function EyeIcon({ show }: { show: boolean }) {
   );
 }
 
-export default function SignInPage() {
+function SignInContent() {
   const { signIn, isAuthenticated, isLoading } = useAuth();
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const redirectTo = searchParams.get("redirect") ?? "/training";
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -45,12 +47,11 @@ export default function SignInPage() {
 
   useEffect(() => { setMounted(true); }, []);
 
-  // Redirect if already authenticated
   useEffect(() => {
     if (mounted && !isLoading && isAuthenticated) {
-      router.replace("/training");
+      router.replace(redirectTo);
     }
-  }, [mounted, isLoading, isAuthenticated, router]);
+  }, [mounted, isLoading, isAuthenticated, router, redirectTo]);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -62,7 +63,7 @@ export default function SignInPage() {
     const result = await signIn(email.trim(), password);
 
     if (result.success) {
-      router.replace("/training");
+      router.replace(redirectTo);
     } else {
       setError(result.error ?? "เข้าสู่ระบบไม่สำเร็จ");
       setSubmitting(false);
@@ -190,5 +191,17 @@ export default function SignInPage() {
         </div>
       </div>
     </main>
+  );
+}
+
+export default function SignInPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-bg flex items-center justify-center">
+        <div className="w-6 h-6 rounded-full border-2 border-primary border-t-transparent animate-spin" />
+      </div>
+    }>
+      <SignInContent />
+    </Suspense>
   );
 }

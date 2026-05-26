@@ -34,7 +34,7 @@ export type InsertChildProfile = Omit<DbChildProfile, "id" | "created_at" | "upd
 export type InsertPracticeSession = Omit<DbPracticeSession, "id" | "created_at">;
 export type InsertPracticeAttempt = Omit<DbPracticeAttempt, "id" | "created_at">;
 export type InsertObservationNote = Omit<DbObservationNote, "id" | "created_at" | "updated_at">;
-export type InsertInvitation = Omit<DbInvitation, "id" | "created_at" | "accepted_at"> & { id?: string };
+export type InsertInvitation = Omit<DbInvitation, "id" | "created_at" | "updated_at" | "accepted_at" | "accepted_by"> & { id?: string };
 export type InsertChildAccess = Omit<DbChildAccess, "id" | "created_at" | "revoked_at"> & { id?: string };
 export type UpdateChildAccess = Partial<Omit<DbChildAccess, "id" | "created_at">>;
 
@@ -103,6 +103,14 @@ export interface Database {
       };
       accept_invitation_with_access: {
         Args: { p_token: string; p_user_id: string };
+        Returns: void;
+      };
+      expire_stale_invitations: {
+        Args: Record<string, never>;
+        Returns: void;
+      };
+      revoke_child_access: {
+        Args: { p_access_id: string };
         Returns: void;
       };
     };

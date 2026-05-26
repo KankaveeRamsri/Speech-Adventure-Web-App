@@ -33,8 +33,8 @@ import type { Repositories } from "@/lib/providers/RepositoryProvider";
 import { SupabaseProgressRepository } from "./SupabaseProgressRepository";
 import { SupabaseProfileRepository } from "./SupabaseProfileRepository";
 import { SupabaseObservationRepository } from "./SupabaseObservationRepository";
-import { LocalInvitationRepository } from "@/lib/storage/local/LocalInvitationRepository";
-import { LocalChildAccessRepository } from "@/lib/storage/local/LocalChildAccessRepository";
+import { SupabaseInvitationRepository } from "./SupabaseInvitationRepository";
+import { SupabaseChildAccessRepository } from "./SupabaseChildAccessRepository";
 
 /**
  * Creates Supabase repository instances when Supabase is configured.
@@ -51,10 +51,8 @@ export function createSupabaseRepositories(): Repositories | null {
     progress: new SupabaseProgressRepository(client),
     profile: new SupabaseProfileRepository(client),
     observations: new SupabaseObservationRepository(client),
-    // Invitation Supabase repo deferred to future phase — local fallback for now.
-    invitations: new LocalInvitationRepository(),
-    // Child access Supabase repo deferred to future phase — local fallback for now.
-    childAccess: new LocalChildAccessRepository(),
+    invitations: new SupabaseInvitationRepository(client),
+    childAccess: new SupabaseChildAccessRepository(client),
   };
 }
 

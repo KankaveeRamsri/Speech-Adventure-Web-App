@@ -1,81 +1,109 @@
 -- ============================================================
--- Migration: 009 — Invitation System Foundation
+-- Migration: 009 — Invitation System
 -- Project:   Speech Adventure
--- Date:      2026-05-23
+-- Date:      2026-05-23 (revised 2026-05-26)
 -- ============================================================
--- Creates the invitations table and RLS policies.
--- Includes two SECURITY DEFINER helpers:
---   get_invitation_by_token(token)  — public read for accept page
---   accept_invitation_by_token(token)  — authenticated accept action
+-- Creates the invitations table with full schema required for Phase 10:
+--   • token stored as text (UUID string from crypto.randomUUID())
+--   • inviter_email for display on accept page
+--   • accepted_by / updated_at for audit trail
+--   • Invitee RLS: can read pending invite by email match
+--   • SECURITY DEFINER helpers for token lookup and accept
 -- ============================================================
 
--- ── Enum ─────────────────────────────────────────────────────────────────────
+-- ── Safe teardown (idempotent) ────────────────────────────────────────────────
+-- Drop functions first (they depend on the table via rowtype); drop table last.
 
-do $$ begin
-  create type invitation_role as enum (
-    'parent', 'teacher', 'therapist', 'school_admin', 'viewer'
-  );
-exception when duplicate_object then null;
-end $$;
+drop function if exists get_invitation_by_token(uuid);
+drop function if exists get_invitation_by_token(text);
+drop function if exists accept_invitation_by_token(uuid);
+drop function if exists accept_invitation_by_token(text);
+drop function if exists expire_stale_invitations();
+drop table  if exists invitations;
+drop type   if exists invitation_status;
+drop type   if exists invitation_role;
 
-do $$ begin
-  create type invitation_status as enum (
-    'pending', 'accepted', 'expired', 'revoked'
-  );
-exception when duplicate_object then null;
-end $$;
+-- ── Enums ─────────────────────────────────────────────────────────────────────
 
--- ── invitations ───────────────────────────────────────────────────────────────
-
-create table if not exists invitations (
-  id           uuid             primary key default gen_random_uuid(),
-  email        text             not null,
-  role         invitation_role  not null default 'parent',
-  child_id     uuid             references child_profiles(id) on delete set null,
-  invited_by   uuid             not null references auth.users(id) on delete cascade,
-  status       invitation_status not null default 'pending',
-  token        uuid             not null default gen_random_uuid() unique,
-  expires_at   timestamptz      not null default (now() + interval '7 days'),
-  created_at   timestamptz      not null default now(),
-  accepted_at  timestamptz
+create type invitation_role as enum (
+  'parent', 'teacher', 'therapist', 'school_admin', 'viewer'
 );
 
-create index if not exists invitations_invited_by_idx on invitations(invited_by);
-create index if not exists invitations_token_idx      on invitations(token);
-create index if not exists invitations_email_idx      on invitations(email);
+create type invitation_status as enum (
+  'pending', 'accepted', 'expired', 'revoked'
+);
 
--- ── RLS ───────────────────────────────────────────────────────────────────────
+-- ── Table ─────────────────────────────────────────────────────────────────────
+
+create table invitations (
+  id            uuid              primary key default gen_random_uuid(),
+  email         text              not null,
+  role          invitation_role   not null default 'parent',
+  child_id      uuid              references child_profiles(id) on delete cascade,
+  invited_by    uuid              not null references auth.users(id) on delete cascade,
+  inviter_email text,
+  token         text              not null unique,
+  status        invitation_status not null default 'pending',
+  expires_at    timestamptz       not null,
+  accepted_at   timestamptz,
+  accepted_by   uuid              references auth.users(id),
+  created_at    timestamptz       not null default now(),
+  updated_at    timestamptz       not null default now()
+);
+
+-- ── Indexes ───────────────────────────────────────────────────────────────────
+
+create index invitations_invited_by_idx on invitations(invited_by);
+create index invitations_token_idx      on invitations(token);
+create index invitations_email_idx      on invitations(email);
+create index invitations_child_id_idx   on invitations(child_id) where child_id is not null;
+create index invitations_status_idx     on invitations(status);
+
+-- ── Row Level Security ────────────────────────────────────────────────────────
 
 alter table invitations enable row level security;
 
--- Owner: full control over their own invitations
-drop policy if exists "invitations: owner select"  on invitations;
+-- Inviter: full control over invitations they created
 create policy "invitations: owner select"
   on invitations for select
   using (auth.uid() = invited_by);
 
-drop policy if exists "invitations: owner insert"  on invitations;
 create policy "invitations: owner insert"
   on invitations for insert
   with check (auth.uid() = invited_by);
 
-drop policy if exists "invitations: owner update"  on invitations;
 create policy "invitations: owner update"
   on invitations for update
-  using (auth.uid() = invited_by)
+  using  (auth.uid() = invited_by)
   with check (auth.uid() = invited_by);
 
-drop policy if exists "invitations: owner delete"  on invitations;
 create policy "invitations: owner delete"
   on invitations for delete
   using (auth.uid() = invited_by);
 
--- ── Public token lookup (SECURITY DEFINER) ────────────────────────────────────
--- Allows unauthenticated users (e.g. from invite link) to read a single
--- invitation by its token — needed to show invite details on the accept page
--- before the user signs in/up.
+-- Invitee: can read pending invitations sent to their email
+create policy "invitations: invitee select"
+  on invitations for select
+  using (
+    lower(email) = lower((select u.email from auth.users u where u.id = auth.uid()))
+  );
 
-create or replace function get_invitation_by_token(p_token uuid)
+-- Invitee: can accept (update status/accepted fields) on pending invites to their email
+create policy "invitations: invitee accept"
+  on invitations for update
+  using (
+    lower(email) = lower((select u.email from auth.users u where u.id = auth.uid()))
+    and status = 'pending'
+  )
+  with check (
+    lower(email) = lower((select u.email from auth.users u where u.id = auth.uid()))
+  );
+
+-- ── SECURITY DEFINER: public token lookup ─────────────────────────────────────
+-- Allows unauthenticated visitors to read invite details by token
+-- (needed to show invite card before sign-in/up).
+
+create or replace function get_invitation_by_token(p_token text)
 returns setof invitations
 language sql
 security definer
@@ -87,12 +115,11 @@ as $$
   limit  1;
 $$;
 
--- ── Accept invitation (SECURITY DEFINER) ─────────────────────────────────────
--- Marks a pending invitation as accepted. Called after the invitee signs in/up.
--- Only updates rows where status = 'pending' and expires_at > now().
--- NOTE: child_access grants are Phase 10 — this function only updates status.
+-- ── SECURITY DEFINER: mark accepted ──────────────────────────────────────────
+-- Simple accept — only updates status.
+-- Used by legacy flows; prefer accept_invitation_with_access (Phase 10) instead.
 
-create or replace function accept_invitation_by_token(p_token uuid)
+create or replace function accept_invitation_by_token(p_token text)
 returns void
 language sql
 security definer
@@ -100,15 +127,16 @@ set search_path = public
 as $$
   update invitations
   set    status      = 'accepted',
-         accepted_at = now()
+         accepted_at = now(),
+         accepted_by = auth.uid(),
+         updated_at  = now()
   where  token      = p_token
     and  status     = 'pending'
     and  expires_at > now();
 $$;
 
--- ── Expire stale invitations ──────────────────────────────────────────────────
--- Update any pending invitations past their expiry time.
--- pg_cron or a scheduled call can invoke this periodically.
+-- ── SECURITY DEFINER: expire stale invitations ────────────────────────────────
+-- Call periodically from pg_cron or a background job.
 
 create or replace function expire_stale_invitations()
 returns void
@@ -117,7 +145,8 @@ security definer
 set search_path = public
 as $$
   update invitations
-  set    status = 'expired'
+  set    status     = 'expired',
+         updated_at = now()
   where  status     = 'pending'
     and  expires_at < now();
 $$;

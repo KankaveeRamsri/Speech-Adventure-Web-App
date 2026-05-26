@@ -6,21 +6,27 @@ import type { Invitation, CreateInvitationInput } from "@/types/invitations";
  * Follows the same useSyncExternalStore-compatible subscribe/snapshot
  * pattern as IProfileRepository and IObservationRepository.
  *
- * child_access grants are NOT performed here — documented as Phase 10.
+ * Sent vs received are kept strictly separate to avoid showing invites
+ * addressed to the current user under their own "sent history" list.
  */
 export interface IInvitationRepository {
   // ── useSyncExternalStore plumbing ──────────────────────────────────────────
-  /** Returns all invitations created by the current user. */
-  listInvitations(): Invitation[];
-  getServerInvitations(): Invitation[];
   subscribe(callback: () => void): () => void;
+
+  /** Invitations created BY the current user (invited_by = auth.uid()). */
+  listSentInvitations(): Invitation[];
+  getServerSentInvitations(): Invitation[];
+
+  /** Invitations sent TO the current user's email (pending or otherwise). */
+  listReceivedInvitations(): Invitation[];
+  getServerReceivedInvitations(): Invitation[];
 
   // ── Token lookup (also used by unauthenticated accept page) ───────────────
   /** Returns a single invitation by token, regardless of owner. Null when not found. */
   getInvitationByToken(token: string): Invitation | null;
 
   // ── Write operations ───────────────────────────────────────────────────────
-  createInvitation(input: CreateInvitationInput, invitedBy: string): Promise<Invitation>;
+  createInvitation(input: CreateInvitationInput, invitedBy: string, inviterEmail?: string): Promise<Invitation>;
   acceptInvitation(token: string): Promise<void>;
   revokeInvitation(id: string): Promise<void>;
 }

@@ -1,11 +1,20 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useCallback } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import AppShell from "@/components/layout/AppShell";
 import CloudSyncPreview from "@/components/sync/CloudSyncPreview";
-import InviteSection from "@/components/layout/InviteSection";
+import {
+  InviteNewMemberSection,
+  SentInvitesSection,
+  ChildAccessSection,
+} from "@/components/layout/InviteSection";
 import { useAuth } from "@/hooks/useAuth";
+import { useChildAccess } from "@/hooks/useChildAccess";
+import { useInvitations } from "@/hooks/useInvitations";
+import { ACCESS_ROLE_LABELS } from "@/types/childAccess";
+import { INVITATION_ROLE_LABELS } from "@/types/invitations";
 
 // ── Icons ─────────────────────────────────────────────────────────────────────
 
@@ -139,6 +148,146 @@ function AccountSection() {
   );
 }
 
+// ── Received invite lookup ─────────────────────────────────────────────────────
+
+function LinkIcon() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" />
+      <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" />
+    </svg>
+  );
+}
+
+function ReceivedInviteSection() {
+  const router = useRouter();
+  const [input, setInput] = useState("");
+  const [error, setError] = useState<string | null>(null);
+
+  const extractToken = useCallback((raw: string): string | null => {
+    const trimmed = raw.trim();
+    try {
+      const url = new URL(trimmed);
+      const t = url.searchParams.get("token");
+      if (t) return t;
+      const parts = url.pathname.split("/").filter(Boolean);
+      const last = parts[parts.length - 1];
+      return last && last !== "accept" ? last : null;
+    } catch {
+      if (/^[a-z0-9-]{8,}$/i.test(trimmed)) return trimmed;
+    }
+    return null;
+  }, []);
+
+  function handleOpen() {
+    setError(null);
+    const token = extractToken(input);
+    if (!token) {
+      setError("กรุณาวางลิงก์คำเชิญหรือ token ที่ถูกต้อง");
+      return;
+    }
+    router.push(`/invite/accept?token=${token}`);
+  }
+
+  return (
+    <div className="space-y-3">
+      <p className="text-sm text-text-muted">
+        วางลิงก์คำเชิญหรือ token ที่ได้รับเพื่อดูรายละเอียดและตอบรับ
+      </p>
+      <div className="flex gap-2">
+        <input
+          type="text"
+          value={input}
+          onChange={(e) => { setInput(e.target.value); setError(null); }}
+          placeholder="https://…/invite/accept?token=… หรือ token"
+          className="flex-1 min-w-0 bg-bg border border-border rounded-lg px-3 py-2 text-sm text-text placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary/60 transition-all"
+        />
+        <button
+          onClick={handleOpen}
+          disabled={!input.trim()}
+          className="flex items-center gap-1.5 px-4 py-2 rounded-lg bg-primary text-white text-sm font-semibold hover:bg-primary/90 disabled:opacity-40 disabled:cursor-not-allowed transition-all flex-shrink-0"
+        >
+          <LinkIcon />
+          เปิด
+        </button>
+      </div>
+      {error && <p className="text-xs text-error">{error}</p>}
+    </div>
+  );
+}
+
+// ── Received invitations (pending invites addressed to me) ────────────────────
+
+function PendingReceivedInvites() {
+  const router = useRouter();
+  const { receivedInvitations } = useInvitations();
+  const pending = receivedInvitations.filter((i) => i.status === "pending");
+
+  if (pending.length === 0) return null;
+
+  return (
+    <div className="space-y-2">
+      <p className="text-xs font-semibold text-text-muted uppercase tracking-wide">
+        คำเชิญที่ส่งถึงฉัน
+      </p>
+      {pending.map((inv) => (
+        <div
+          key={inv.id}
+          className="bg-surface border border-primary/20 rounded-xl px-4 py-3 flex items-start justify-between gap-3"
+        >
+          <div className="flex-1 min-w-0 space-y-0.5">
+            <p className="text-sm font-semibold text-text truncate">
+              {inv.inviterEmail ?? "ผู้ส่งคำเชิญ"}
+            </p>
+            <p className="text-xs text-text-muted">
+              {INVITATION_ROLE_LABELS[inv.role]} · หมดอายุ {new Date(inv.expiresAt).toLocaleDateString("th-TH", { day: "numeric", month: "short", year: "numeric" })}
+            </p>
+          </div>
+          <button
+            onClick={() => router.push(`/invite/accept?token=${inv.token}`)}
+            className="px-3 py-1.5 rounded-lg bg-primary text-white text-xs font-semibold hover:bg-primary/90 transition-all flex-shrink-0"
+          >
+            ตอบรับ
+          </button>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+// ── Received grants (child access shared to current user) ─────────────────────
+
+function ReceivedGrantsSection() {
+  const { receivedGrants } = useChildAccess();
+  const active = receivedGrants.filter((g) => !g.revokedAt);
+
+  if (active.length === 0) return null;
+
+  return (
+    <div className="space-y-2">
+      <p className="text-xs font-semibold text-text-muted uppercase tracking-wide">สิทธิ์ที่ได้รับ</p>
+      {active.map((grant) => (
+        <div
+          key={grant.id}
+          className="bg-surface border border-border rounded-xl px-4 py-3 flex items-start justify-between gap-3"
+        >
+          <div className="flex-1 min-w-0 space-y-0.5">
+            <p className="text-sm font-semibold text-text truncate">
+              {grant.childSnapshot?.name ?? grant.childId}
+            </p>
+            <p className="text-xs text-text-muted">
+              {ACCESS_ROLE_LABELS[grant.role]}
+            </p>
+          </div>
+          <span className="text-xs px-2 py-0.5 rounded-full bg-success/10 text-success border border-success/20 flex-shrink-0">
+            ใช้งานอยู่
+          </span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 // ── Page ──────────────────────────────────────────────────────────────────────
 
 export default function SettingsPage() {
@@ -172,14 +321,49 @@ export default function SettingsPage() {
           </div>
         </section>
 
-        {/* Invitations section */}
+        {/* 1. Invite new member */}
         <section>
           <SectionHeader
-            title="คำเชิญ"
+            title="เชิญสมาชิกใหม่"
             description="เชิญผู้ปกครอง ครู หรือนักบำบัดเข้ามาดูพัฒนาการของเด็ก"
           />
           <div className="bg-surface border border-border rounded-xl p-5">
-            <InviteSection />
+            <InviteNewMemberSection />
+          </div>
+        </section>
+
+        {/* 2. Active child access — grouped by child */}
+        <section>
+          <SectionHeader
+            title="สมาชิกที่เข้าถึงเด็กได้"
+            description="จัดการสิทธิ์การเข้าถึงของสมาชิกแต่ละคนต่อเด็กแต่ละคน"
+          />
+          <div className="bg-surface border border-border rounded-xl p-5">
+            <ChildAccessSection />
+          </div>
+        </section>
+
+        {/* 3. Sent invitations history */}
+        <section>
+          <SectionHeader
+            title="คำเชิญที่ส่งแล้ว"
+            description="ประวัติคำเชิญและสถานะการตอบรับ"
+          />
+          <div className="bg-surface border border-border rounded-xl p-5">
+            <SentInvitesSection />
+          </div>
+        </section>
+
+        {/* Received invitations / grants (for current user) */}
+        <section>
+          <SectionHeader
+            title="คำเชิญที่ได้รับ"
+            description="ตอบรับคำเชิญจากผู้ปกครอง ครู หรือนักบำบัดท่านอื่น"
+          />
+          <div className="bg-surface border border-border rounded-xl p-5 space-y-4">
+            <PendingReceivedInvites />
+            <ReceivedInviteSection />
+            <ReceivedGrantsSection />
           </div>
         </section>
 

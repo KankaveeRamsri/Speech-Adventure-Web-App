@@ -83,11 +83,14 @@ export type DbInvitation = {
   role: DbInvitationRole;
   child_id: string | null;
   invited_by: string;
+  inviter_email: string | null;
   status: DbInvitationStatus;
   token: string;
   expires_at: string;
-  created_at: string;
   accepted_at: string | null;
+  accepted_by: string | null;
+  created_at: string;
+  updated_at: string;
 };
 
 // ── child_access ──────────────────────────────────────────────────────────────

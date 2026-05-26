@@ -3,21 +3,41 @@ import type { IInvitationRepository } from "@/lib/repositories/IInvitationReposi
 import type { Invitation, CreateInvitationInput } from "@/types/invitations";
 import { getProfiles } from "@/lib/child-profile/childProfileListStorage";
 
+const EMPTY_INVITATIONS: Invitation[] = [];
+
 /**
  * localStorage-backed implementation of IInvitationRepository.
  *
- * Invitations are scoped per user (same pattern as profile/observations).
- * The token is embedded in accept links: /invite/[token]
+ * Invitations are scoped per user (same pattern as profile/observations),
+ * so every row in the current scope is a "sent" invitation owned by the
+ * authenticated user. Cross-account "received" invites are not supported
+ * in local mode (storage is per-user); listReceivedInvitations() returns
+ * an empty list unless the scoped email is recorded and matches.
+ *
+ * The token is embedded in accept links: /invite/accept?token=
  */
 export class LocalInvitationRepository implements IInvitationRepository {
+  private _scopeUserId: string | null = null;
+  private _scopeEmail: string | null = null;
+
   // ── useSyncExternalStore plumbing ────────────────────────────────────────────
 
-  listInvitations(): Invitation[] {
+  listSentInvitations(): Invitation[] {
     return storage.getInvitations();
   }
 
-  getServerInvitations(): Invitation[] {
+  getServerSentInvitations(): Invitation[] {
     return storage.getServerInvitations();
+  }
+
+  listReceivedInvitations(): Invitation[] {
+    if (!this._scopeEmail) return EMPTY_INVITATIONS;
+    const target = this._scopeEmail.toLowerCase();
+    return storage.getInvitations().filter((i) => i.email.toLowerCase() === target);
+  }
+
+  getServerReceivedInvitations(): Invitation[] {
+    return EMPTY_INVITATIONS;
   }
 
   subscribe(callback: () => void): () => void {
@@ -35,6 +55,7 @@ export class LocalInvitationRepository implements IInvitationRepository {
   async createInvitation(
     input: CreateInvitationInput,
     invitedBy: string,
+    inviterEmail?: string,
   ): Promise<Invitation> {
     const now = new Date().toISOString();
     const childSnapshot = input.childId
@@ -50,6 +71,7 @@ export class LocalInvitationRepository implements IInvitationRepository {
       token: storage.generateToken(),
       expiresAt: storage.makeExpiresAt(),
       createdAt: now,
+      inviterEmail,
       childSnapshot,
     };
     storage.addInvitation(invitation);
@@ -64,6 +86,7 @@ export class LocalInvitationRepository implements IInvitationRepository {
       ...inv,
       status: "accepted",
       acceptedAt: new Date().toISOString(),
+      acceptedBy: this._scopeUserId ?? undefined,
     });
   }
 
@@ -74,7 +97,9 @@ export class LocalInvitationRepository implements IInvitationRepository {
     storage.updateInvitation({ ...inv, status: "revoked" });
   }
 
-  setScope(userId: string | null): void {
+  setScope(userId: string | null, email?: string | null): void {
     storage.setScope(userId);
+    this._scopeUserId = userId;
+    this._scopeEmail = email ?? null;
   }
 }

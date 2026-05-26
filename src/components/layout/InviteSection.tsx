@@ -1,11 +1,12 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useMemo } from "react";
 import { useInvitations } from "@/hooks/useInvitations";
 import { useChildAccess } from "@/hooks/useChildAccess";
 import { useChildProfile } from "@/hooks/useChildProfile";
 import { useAuth } from "@/hooks/useAuth";
-import type { InvitationRole, InvitationStatus } from "@/types/invitations";
+import type { ChildAccess, ChildPermissions } from "@/types/childAccess";
+import type { Invitation, InvitationRole, InvitationStatus } from "@/types/invitations";
 import { INVITATION_ROLE_LABELS, INVITATION_STATUS_LABELS } from "@/types/invitations";
 import { ACCESS_ROLE_LABELS } from "@/types/childAccess";
 
@@ -38,6 +39,22 @@ function XIcon() {
   );
 }
 
+function CheckIcon() {
+  return (
+    <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <polyline points="20 6 9 17 4 12" />
+    </svg>
+  );
+}
+
+function DashIcon() {
+  return (
+    <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <line x1="5" y1="12" x2="19" y2="12" />
+    </svg>
+  );
+}
+
 // ── Status badge ──────────────────────────────────────────────────────────────
 
 const STATUS_CLASSES: Record<InvitationStatus, string> = {
@@ -52,6 +69,51 @@ function StatusBadge({ status }: { status: InvitationStatus }) {
     <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold border ${STATUS_CLASSES[status]}`}>
       {INVITATION_STATUS_LABELS[status]}
     </span>
+  );
+}
+
+// ── Permission chips ──────────────────────────────────────────────────────────
+
+const PERMISSION_LABELS: Record<keyof ChildPermissions, string> = {
+  canViewProgress:   "ดูพัฒนาการ",
+  canViewAudio:      "ฟังเสียง",
+  canAssignPractice: "มอบหมายฝึก",
+  canEditChild:      "แก้ไขโปรไฟล์",
+  canExportReport:   "ส่งออกรายงาน",
+};
+
+interface PermissionChipsProps {
+  permissions: ChildPermissions;
+  editable: boolean;
+  onToggle?: (key: keyof ChildPermissions, value: boolean) => void;
+}
+
+function PermissionChips({ permissions, editable, onToggle }: PermissionChipsProps) {
+  const entries = Object.keys(PERMISSION_LABELS) as (keyof ChildPermissions)[];
+  return (
+    <div className="flex flex-wrap gap-1.5">
+      {entries.map((key) => {
+        const on = permissions[key];
+        const baseClass = "inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium border transition-all";
+        const stateClass = on
+          ? "bg-success/10 text-success border-success/20"
+          : "bg-border/40 text-text-muted border-border";
+        const clickableClass = editable ? " hover:scale-[1.02] cursor-pointer" : "";
+        return (
+          <button
+            key={key}
+            type="button"
+            disabled={!editable}
+            onClick={() => editable && onToggle?.(key, !on)}
+            className={`${baseClass} ${stateClass}${clickableClass} disabled:cursor-default`}
+            aria-pressed={on}
+          >
+            <span className="flex-shrink-0">{on ? <CheckIcon /> : <DashIcon />}</span>
+            {PERMISSION_LABELS[key]}
+          </button>
+        );
+      })}
+    </div>
   );
 }
 
@@ -154,17 +216,47 @@ function CreateInviteForm({ onClose }: CreateFormProps) {
   );
 }
 
-// ── Main component ────────────────────────────────────────────────────────────
+// ── Section 1: Invite New Member ──────────────────────────────────────────────
 
-export default function InviteSection() {
-  const { invitations, revokeInvitation } = useInvitations();
-  const { issuedGrants, revokeChildAccess } = useChildAccess();
+export function InviteNewMemberSection() {
   const { isAuthenticated } = useAuth();
   const [showForm, setShowForm] = useState(false);
+
+  if (!isAuthenticated) {
+    return (
+      <p className="text-sm text-text-muted bg-surface border border-border rounded-xl px-4 py-3">
+        กรุณา <span className="font-semibold text-primary">เข้าสู่ระบบ</span> ก่อนเชิญสมาชิก
+      </p>
+    );
+  }
+
+  if (showForm) {
+    return <CreateInviteForm onClose={() => setShowForm(false)} />;
+  }
+
+  return (
+    <button
+      onClick={() => setShowForm(true)}
+      className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-primary text-white text-sm font-semibold hover:bg-primary/90 transition-all"
+    >
+      <PlusIcon />
+      เชิญสมาชิกใหม่
+    </button>
+  );
+}
+
+// ── Section 2: Sent Invitations (history + cancel pending) ────────────────────
+
+export function SentInvitesSection() {
+  const { sentInvitations, revokeInvitation } = useInvitations();
+  const { isAuthenticated } = useAuth();
   const [copiedToken, setCopiedToken] = useState<string | null>(null);
+  const [confirmRevokeId, setConfirmRevokeId] = useState<string | null>(null);
+  const [revoking, setRevoking] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const copyLink = useCallback((token: string) => {
-    const url = `${window.location.origin}/invite/${token}`;
+    const url = `${window.location.origin}/invite/accept?token=${token}`;
     void navigator.clipboard.writeText(url).then(() => {
       setCopiedToken(token);
       setTimeout(() => setCopiedToken(null), 2000);
@@ -173,57 +265,45 @@ export default function InviteSection() {
 
   const handleRevoke = useCallback(
     async (id: string) => {
-      await revokeInvitation(id);
+      setRevoking(true);
+      setError(null);
+      try {
+        await revokeInvitation(id);
+        setConfirmRevokeId(null);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "ยกเลิกคำเชิญไม่สำเร็จ");
+      } finally {
+        setRevoking(false);
+      }
     },
     [revokeInvitation],
   );
 
-  const handleRevokeAccess = useCallback(
-    async (grantId: string) => {
-      await revokeChildAccess(grantId);
-    },
-    [revokeChildAccess],
-  );
+  const pending = sentInvitations.filter((i) => i.status === "pending");
+  const others = sentInvitations.filter((i) => i.status !== "pending");
 
-  const activeGrants = issuedGrants.filter((g) => !g.revokedAt);
+  if (!isAuthenticated) return null;
 
-  const pending = invitations.filter((i) => i.status === "pending");
-  const others = invitations.filter((i) => i.status !== "pending");
+  if (sentInvitations.length === 0) {
+    return (
+      <p className="text-sm text-text-muted text-center py-4">
+        ยังไม่มีคำเชิญที่ส่ง — กดปุ่ม &quot;เชิญสมาชิกใหม่&quot; เพื่อเริ่มต้น
+      </p>
+    );
+  }
 
   return (
-    <div className="space-y-4">
-      {/* Header row */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h3 className="text-base font-bold text-text">คำเชิญ</h3>
-          <p className="text-xs text-text-muted mt-0.5">
-            เชิญผู้ปกครอง ครู หรือนักบำบัดเข้ามาดูพัฒนาการ
-          </p>
-        </div>
-        {isAuthenticated && !showForm && (
-          <button
-            onClick={() => setShowForm(true)}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-primary text-white text-xs font-semibold hover:bg-primary/90 transition-all"
-          >
-            <PlusIcon />
-            เชิญ
+    <div className="space-y-3">
+      {error && (
+        <div className="flex items-start justify-between gap-3 bg-error/10 border border-error/30 text-error rounded-xl px-3 py-2 text-xs">
+          <span className="flex-1">{error}</span>
+          <button onClick={() => setError(null)} className="font-semibold hover:underline flex-shrink-0">
+            ปิด
           </button>
-        )}
-      </div>
-
-      {/* Require login hint */}
-      {!isAuthenticated && (
-        <p className="text-sm text-text-muted bg-surface border border-border rounded-xl px-4 py-3">
-          กรุณา <span className="font-semibold text-primary">เข้าสู่ระบบ</span> ก่อนส่งคำเชิญ
-        </p>
+        </div>
       )}
 
-      {/* Create form */}
-      {showForm && isAuthenticated && (
-        <CreateInviteForm onClose={() => setShowForm(false)} />
-      )}
-
-      {/* Pending invitations */}
+      {/* Pending: still actionable (copy link / cancel) */}
       {pending.length > 0 && (
         <div className="space-y-2">
           {pending.map((inv) => (
@@ -243,35 +323,55 @@ export default function InviteSection() {
               </div>
 
               <div className="flex items-center gap-1.5 flex-shrink-0">
-                <button
-                  onClick={() => copyLink(inv.token)}
-                  title="คัดลอกลิงก์คำเชิญ"
-                  className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg border border-border text-xs text-text-muted hover:text-text hover:border-primary/30 transition-all"
-                >
-                  <CopyIcon />
-                  {copiedToken === inv.token ? "คัดลอกแล้ว" : "คัดลอกลิงก์"}
-                </button>
-                <button
-                  onClick={() => void handleRevoke(inv.id)}
-                  title="ยกเลิกคำเชิญ"
-                  className="p-1.5 rounded-lg border border-transparent text-text-muted hover:text-error hover:border-error/30 transition-all"
-                >
-                  <XIcon />
-                </button>
+                {confirmRevokeId === inv.id ? (
+                  <>
+                    <button
+                      onClick={() => void handleRevoke(inv.id)}
+                      disabled={revoking}
+                      className="px-2.5 py-1.5 rounded-lg bg-error text-white text-xs font-semibold hover:bg-error/90 disabled:opacity-40 transition-all"
+                    >
+                      {revoking ? "…" : "ยืนยัน"}
+                    </button>
+                    <button
+                      onClick={() => setConfirmRevokeId(null)}
+                      className="px-2.5 py-1.5 rounded-lg border border-border text-xs text-text-muted hover:text-text transition-all"
+                    >
+                      ยกเลิก
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    <button
+                      onClick={() => copyLink(inv.token)}
+                      title="คัดลอกลิงก์คำเชิญ"
+                      className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg border border-border text-xs text-text-muted hover:text-text hover:border-primary/30 transition-all"
+                    >
+                      <CopyIcon />
+                      {copiedToken === inv.token ? "คัดลอกแล้ว" : "คัดลอกลิงก์"}
+                    </button>
+                    <button
+                      onClick={() => setConfirmRevokeId(inv.id)}
+                      title="ยกเลิกคำเชิญ"
+                      className="p-1.5 rounded-lg border border-transparent text-text-muted hover:text-error hover:border-error/30 transition-all"
+                    >
+                      <XIcon />
+                    </button>
+                  </>
+                )}
               </div>
             </div>
           ))}
         </div>
       )}
 
-      {/* Past invitations (collapsed style) */}
+      {/* History: accepted / expired / revoked, read-only */}
       {others.length > 0 && (
         <div className="space-y-1.5">
           <p className="text-xs font-semibold text-text-muted uppercase tracking-wide">ประวัติ</p>
           {others.map((inv) => (
             <div
               key={inv.id}
-              className="flex items-center justify-between gap-3 px-3 py-2.5 bg-surface border border-border rounded-xl opacity-70"
+              className="flex items-center justify-between gap-3 px-3 py-2.5 bg-surface border border-border rounded-xl opacity-80"
             >
               <span className="text-sm text-text-muted truncate">{inv.email}</span>
               <div className="flex items-center gap-2 flex-shrink-0">
@@ -282,42 +382,175 @@ export default function InviteSection() {
           ))}
         </div>
       )}
+    </div>
+  );
+}
 
-      {/* Active access grants issued by current user */}
-      {activeGrants.length > 0 && (
-        <div className="space-y-2">
-          <p className="text-xs font-semibold text-text-muted uppercase tracking-wide">สิทธิ์เข้าถึงที่ให้ไว้</p>
-          {activeGrants.map((grant) => (
-            <div
-              key={grant.id}
-              className="bg-surface border border-border rounded-xl px-4 py-3 flex items-start justify-between gap-3"
-            >
-              <div className="flex-1 min-w-0 space-y-0.5">
-                <p className="text-sm font-semibold text-text truncate">
-                  {grant.childSnapshot?.name ?? grant.childId}
-                </p>
-                <p className="text-xs text-text-muted">
-                  {ACCESS_ROLE_LABELS[grant.role]} · {grant.userId.slice(0, 8)}…
-                </p>
-              </div>
-              <button
-                onClick={() => void handleRevokeAccess(grant.id)}
-                title="เพิกถอนสิทธิ์"
-                className="p-1.5 rounded-lg border border-transparent text-text-muted hover:text-error hover:border-error/30 transition-all flex-shrink-0"
-              >
-                <XIcon />
-              </button>
-            </div>
-          ))}
+// ── Section 3: Active Child Access (grouped by child) ─────────────────────────
+
+interface MemberCardProps {
+  grant: ChildAccess;
+  email: string;
+  onRevoke: () => Promise<void>;
+  onUpdatePermission: (key: keyof ChildPermissions, value: boolean) => Promise<void>;
+}
+
+function MemberCard({ grant, email, onRevoke, onUpdatePermission }: MemberCardProps) {
+  const [editing, setEditing] = useState(false);
+  const [confirmRevoke, setConfirmRevoke] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function handleRevokeClick() {
+    setBusy(true);
+    setError(null);
+    try {
+      await onRevoke();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "ถอนสิทธิ์ไม่สำเร็จ");
+    } finally {
+      setBusy(false);
+      setConfirmRevoke(false);
+    }
+  }
+
+  async function handleToggle(key: keyof ChildPermissions, value: boolean) {
+    setError(null);
+    try {
+      await onUpdatePermission(key, value);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "บันทึกสิทธิ์ไม่สำเร็จ");
+    }
+  }
+
+  return (
+    <div className="bg-surface border border-border rounded-xl p-3 space-y-2.5">
+      <div className="flex items-start justify-between gap-3">
+        <div className="flex-1 min-w-0 space-y-0.5">
+          <p className="text-sm font-semibold text-text truncate">{email}</p>
+          <p className="text-xs text-text-muted">{ACCESS_ROLE_LABELS[grant.role]}</p>
         </div>
-      )}
 
-      {/* Empty state */}
-      {invitations.length === 0 && !showForm && isAuthenticated && (
-        <p className="text-sm text-text-muted text-center py-4">
-          ยังไม่มีคำเชิญ — กดปุ่ม &quot;เชิญ&quot; เพื่อเริ่มต้น
-        </p>
-      )}
+        <div className="flex items-center gap-1.5 flex-shrink-0">
+          {confirmRevoke ? (
+            <>
+              <button
+                onClick={() => void handleRevokeClick()}
+                disabled={busy}
+                className="px-2.5 py-1.5 rounded-lg bg-error text-white text-xs font-semibold hover:bg-error/90 disabled:opacity-40 transition-all"
+              >
+                {busy ? "…" : "ยืนยัน"}
+              </button>
+              <button
+                onClick={() => setConfirmRevoke(false)}
+                className="px-2.5 py-1.5 rounded-lg border border-border text-xs text-text-muted hover:text-text transition-all"
+              >
+                ยกเลิก
+              </button>
+            </>
+          ) : (
+            <>
+              <button
+                onClick={() => setEditing((v) => !v)}
+                className="px-2.5 py-1.5 rounded-lg border border-border text-xs text-text-muted hover:text-text hover:border-primary/30 transition-all"
+              >
+                {editing ? "เสร็จ" : "แก้สิทธิ์"}
+              </button>
+              <button
+                onClick={() => setConfirmRevoke(true)}
+                className="px-2.5 py-1.5 rounded-lg border border-border text-xs text-text-muted hover:text-error hover:border-error/30 transition-all"
+              >
+                ถอนสิทธิ์
+              </button>
+            </>
+          )}
+        </div>
+      </div>
+
+      <PermissionChips permissions={grant.permissions} editable={editing} onToggle={handleToggle} />
+
+      {error && <p className="text-xs text-error">{error}</p>}
+    </div>
+  );
+}
+
+export function ChildAccessSection() {
+  const { profiles } = useChildProfile();
+  const { issuedGrants, revokeChildAccess, updateChildPermissions } = useChildAccess();
+  const { sentInvitations } = useInvitations();
+  const { isAuthenticated } = useAuth();
+
+  const active = useMemo(() => issuedGrants.filter((g) => !g.revokedAt), [issuedGrants]);
+
+  // Group active grants by childId
+  const grouped = useMemo(() => {
+    const map = new Map<string, ChildAccess[]>();
+    for (const g of active) {
+      const list = map.get(g.childId);
+      if (list) list.push(g);
+      else map.set(g.childId, [g]);
+    }
+    return map;
+  }, [active]);
+
+  // Email lookup: invitation.acceptedBy === grant.userId AND childId matches.
+  const memberEmail = useCallback(
+    (grant: ChildAccess): string => {
+      const inv = sentInvitations.find(
+        (i: Invitation) =>
+          i.acceptedBy === grant.userId &&
+          i.childId === grant.childId &&
+          i.status === "accepted",
+      );
+      return inv?.email ?? `${grant.userId.slice(0, 8)}…`;
+    },
+    [sentInvitations],
+  );
+
+  // Child name lookup: prefer owned profile, fall back to snapshot, else id prefix.
+  const childName = useCallback(
+    (childId: string): string => {
+      const owned = profiles.find((p) => p.id === childId);
+      if (owned) return owned.name;
+      const snap = active.find((g) => g.childId === childId)?.childSnapshot;
+      return snap?.name ?? `เด็ก ${childId.slice(0, 6)}`;
+    },
+    [profiles, active],
+  );
+
+  if (!isAuthenticated) return null;
+
+  if (active.length === 0) {
+    return (
+      <p className="text-sm text-text-muted text-center py-4">
+        ยังไม่มีสมาชิกที่เข้าถึงเด็ก — เริ่มต้นด้วยการส่งคำเชิญ
+      </p>
+    );
+  }
+
+  return (
+    <div className="space-y-5">
+      {[...grouped.entries()].map(([childId, grants]) => (
+        <div key={childId} className="space-y-2">
+          <div className="flex items-baseline justify-between gap-2">
+            <h4 className="text-sm font-bold text-text">{childName(childId)}</h4>
+            <span className="text-xs text-text-muted">
+              {grants.length} คน
+            </span>
+          </div>
+          <div className="space-y-2">
+            {grants.map((g) => (
+              <MemberCard
+                key={g.id}
+                grant={g}
+                email={memberEmail(g)}
+                onRevoke={() => revokeChildAccess(g.id)}
+                onUpdatePermission={(k, v) => updateChildPermissions(g.id, { [k]: v })}
+              />
+            ))}
+          </div>
+        </div>
+      ))}
     </div>
   );
 }

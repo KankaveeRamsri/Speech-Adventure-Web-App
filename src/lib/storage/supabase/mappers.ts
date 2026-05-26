@@ -36,13 +36,19 @@ import type {
   DbPracticeSession,
   DbChildProfile,
   DbObservationNote,
+  DbInvitation,
+  DbChildAccess,
 } from "@/types/database";
 import type {
   InsertPracticeAttempt,
   InsertPracticeSession,
   InsertObservationNote,
   InsertChildProfile,
+  InsertInvitation,
+  InsertChildAccess,
 } from "@/types/supabase";
+import type { Invitation, InvitationRole, InvitationStatus } from "@/types/invitations";
+import type { ChildAccess, AccessRole, ChildPermissions } from "@/types/childAccess";
 
 // ── DB → Domain ───────────────────────────────────────────────────────────────
 
@@ -200,5 +206,92 @@ export function domainToDbNote(
     category: note.category,
     title: note.title,
     content: note.content,
+  };
+}
+
+// ── Invitation mappers ────────────────────────────────────────────────────────
+
+export function dbToDomainInvitation(db: DbInvitation): Invitation {
+  return {
+    id: db.id,
+    email: db.email,
+    role: db.role as InvitationRole,
+    childId: db.child_id ?? undefined,
+    invitedBy: db.invited_by,
+    inviterEmail: db.inviter_email ?? undefined,
+    status: db.status as InvitationStatus,
+    token: db.token,
+    expiresAt: db.expires_at,
+    createdAt: db.created_at,
+    acceptedAt: db.accepted_at ?? undefined,
+    acceptedBy: db.accepted_by ?? undefined,
+    // childSnapshot is not stored in DB — must be fetched separately if needed
+  };
+}
+
+export function domainToDbInvitation(
+  inv: Invitation,
+  invitedBy: string,
+  inviterEmail?: string,
+): InsertInvitation {
+  return {
+    id: inv.id,
+    email: inv.email,
+    role: inv.role,
+    child_id: inv.childId ?? null,
+    invited_by: invitedBy,
+    inviter_email: inviterEmail ?? null,
+    token: inv.token,
+    status: inv.status,
+    expires_at: inv.expiresAt,
+  };
+}
+
+// ── ChildAccess mappers ───────────────────────────────────────────────────────
+
+export function dbToDomainChildAccess(db: DbChildAccess): ChildAccess {
+  return {
+    id: db.id,
+    childId: db.child_id,
+    userId: db.user_id,
+    role: db.role as AccessRole,
+    permissions: {
+      canViewProgress:   db.can_view_progress,
+      canViewAudio:      db.can_view_audio,
+      canAssignPractice: db.can_assign_practice,
+      canEditChild:      db.can_edit_child,
+      canExportReport:   db.can_export_report,
+    },
+    grantedBy: db.granted_by,
+    createdAt: db.created_at,
+    revokedAt: db.revoked_at ?? undefined,
+  };
+}
+
+export function domainToDbChildAccess(
+  grant: ChildAccess,
+  userId: string,
+): InsertChildAccess {
+  return {
+    id: grant.id,
+    child_id: grant.childId,
+    user_id: userId,
+    role: grant.role,
+    granted_by: grant.grantedBy,
+    can_view_progress:   grant.permissions.canViewProgress,
+    can_view_audio:      grant.permissions.canViewAudio,
+    can_assign_practice: grant.permissions.canAssignPractice,
+    can_edit_child:      grant.permissions.canEditChild,
+    can_export_report:   grant.permissions.canExportReport,
+  };
+}
+
+export function dbPermissions(db: DbChildAccess): ChildPermissions {
+  return {
+    canViewProgress:   db.can_view_progress,
+    canViewAudio:      db.can_view_audio,
+    canAssignPractice: db.can_assign_practice,
+    canEditChild:      db.can_edit_child,
+    canExportReport:   db.can_export_report,
   };
 }

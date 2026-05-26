@@ -52,6 +52,19 @@ export class NotFoundError extends RepositoryError {
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
+/** Returns true when the Supabase error is a network-level fetch failure
+ *  (e.g. wrong URL, CORS block, offline) rather than a DB/RLS error. */
+export function isNetworkError(error: unknown): boolean {
+  if (!error || typeof error !== "object") return false;
+  const msg: string = (error as { message?: string }).message ?? "";
+  return (
+    msg === "Failed to fetch" ||
+    msg.startsWith("NetworkError") ||
+    msg.includes("network request failed") ||
+    msg.includes("Load failed")
+  );
+}
+
 /** Logs a repository error in development. No-op in production.
  *  For RepositoryError subclasses, also expands the Supabase cause object so
  *  message/code/details/hint are visible without manually drilling into the object. */

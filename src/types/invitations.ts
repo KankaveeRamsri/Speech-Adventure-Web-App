@@ -27,6 +27,10 @@ export interface Invitation {
   expiresAt: string;
   createdAt: string;
   acceptedAt?: string;
+  /** auth.uid() of the user who accepted — used to correlate with child_access rows. */
+  acceptedBy?: string;
+  /** Email of the user who sent this invitation — stored at creation time for display on accept page. */
+  inviterEmail?: string;
   /** Snapshot of the child profile at invite time — used to show child name and seed local access grants. */
   childSnapshot?: ChildProfileData;
 }

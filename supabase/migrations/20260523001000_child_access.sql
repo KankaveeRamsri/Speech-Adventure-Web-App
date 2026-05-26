@@ -104,7 +104,10 @@ BEGIN
 
   -- Mark accepted
   UPDATE invitations
-  SET status = 'accepted', accepted_at = now()
+  SET status      = 'accepted',
+      accepted_at = now(),
+      accepted_by = p_user_id,
+      updated_at  = now()
   WHERE id = v_inv.id;
 
   -- Only create child_access when the invitation is tied to a specific child

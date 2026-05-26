@@ -6,32 +6,52 @@ import type { Invitation, CreateInvitationInput } from "@/types/invitations";
 import { useAuth } from "@/hooks/useAuth";
 import { invitationRoleToAccessRole } from "@/types/childAccess";
 
-const EMPTY_INVITATIONS: Invitation[] = [];
-const getEmptyInvitations = (): Invitation[] => EMPTY_INVITATIONS;
+interface Rehydratable { rehydrate(): void }
+function hasRehydrate(repo: unknown): repo is Rehydratable {
+  return typeof (repo as Rehydratable).rehydrate === "function";
+}
 
 export function useInvitations() {
-  const { invitations: repo, childAccess: accessRepo } = useRepositories();
+  const { invitations: repo, childAccess: accessRepo, profile: profileRepo } = useRepositories();
   const { user } = useAuth();
 
-  const invitations = useSyncExternalStore(
+  const sentInvitations = useSyncExternalStore(
     repo.subscribe.bind(repo),
-    repo.listInvitations.bind(repo),
-    getEmptyInvitations,
+    repo.listSentInvitations.bind(repo),
+    repo.getServerSentInvitations.bind(repo),
+  );
+
+  const receivedInvitations = useSyncExternalStore(
+    repo.subscribe.bind(repo),
+    repo.listReceivedInvitations.bind(repo),
+    repo.getServerReceivedInvitations.bind(repo),
   );
 
   const createInvitation = useCallback(
     async (input: CreateInvitationInput): Promise<Invitation> => {
       const invitedBy = user?.id ?? "anonymous";
-      return repo.createInvitation(input, invitedBy);
+      return repo.createInvitation(input, invitedBy, user?.email);
     },
-    [repo, user?.id],
+    [repo, user?.id, user?.email],
   );
 
   const acceptInvitation = useCallback(
     async (token: string): Promise<void> => {
       const inv = repo.getInvitationByToken(token);
+      if (process.env.NODE_ENV !== "production") {
+        console.debug("[useInvitations.acceptInvitation]", {
+          tokenFound: Boolean(inv),
+          tokenPrefix: token.slice(0, 8),
+          childId: inv?.childId ?? null,
+          acceptingUserId: user?.id ?? null,
+          acceptingEmail: user?.email ?? null,
+        });
+      }
+
       await repo.acceptInvitation(token);
-      // If the invitation was tied to a child and we know who accepted, create a grant.
+
+      // Local mode only: server-side Supabase RPC already creates the grant,
+      // but the local invitation repo does not — so we mirror it here.
       if (inv && inv.childId && inv.childSnapshot && user?.id) {
         await accessRepo.grantChildAccess({
           childId: inv.childId,
@@ -41,8 +61,13 @@ export function useInvitations() {
           childSnapshot: inv.childSnapshot,
         });
       }
+
+      // Refresh both stores so child selector picks up the newly-shared child.
+      // Local repos are no-ops via the duck-type guard.
+      if (hasRehydrate(accessRepo)) accessRepo.rehydrate();
+      if (hasRehydrate(profileRepo)) profileRepo.rehydrate();
     },
-    [repo, accessRepo, user],
+    [repo, accessRepo, profileRepo, user],
   );
 
   const revokeInvitation = useCallback(
@@ -59,11 +84,20 @@ export function useInvitations() {
     [repo],
   );
 
-  const pendingCount = invitations.filter((inv) => inv.status === "pending").length;
+  const pendingSentCount = sentInvitations.filter((inv) => inv.status === "pending").length;
+  const pendingReceivedCount = receivedInvitations.filter((inv) => inv.status === "pending").length;
 
   return {
-    invitations,
-    pendingCount,
+    // Sent (owner-managed)
+    sentInvitations,
+    pendingSentCount,
+    // Received (addressed to me)
+    receivedInvitations,
+    pendingReceivedCount,
+    // Back-compat alias — old callers treated this as "my sent invites"
+    invitations: sentInvitations,
+    pendingCount: pendingSentCount,
+    // Actions
     createInvitation,
     acceptInvitation,
     revokeInvitation,

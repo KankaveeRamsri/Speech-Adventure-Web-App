@@ -174,6 +174,7 @@ export function RepositoryProvider({ children, overrides }: RepositoryProviderPr
       if (hasReset(value.progress)) value.progress.reset();
       if (hasReset(value.observations)) value.observations.reset();
       if (hasReset(value.invitations)) value.invitations.reset();
+      if (hasReset(value.childAccess)) value.childAccess.reset();
       return;
     }
 
@@ -191,6 +192,7 @@ export function RepositoryProvider({ children, overrides }: RepositoryProviderPr
       if (hasReset(value.progress)) value.progress.reset();
       if (hasReset(value.observations)) value.observations.reset();
       if (hasReset(value.invitations)) value.invitations.reset();
+      if (hasReset(value.childAccess)) value.childAccess.reset();
     }
 
     // ── Sign in / session restore / account switch: scope + load cloud data ───
@@ -207,6 +209,7 @@ export function RepositoryProvider({ children, overrides }: RepositoryProviderPr
       if (hasRehydrate(value.progress)) value.progress.rehydrate();
       if (hasRehydrate(value.observations)) value.observations.rehydrate();
       if (hasRehydrate(value.invitations)) value.invitations.rehydrate();
+      if (hasRehydrate(value.childAccess)) value.childAccess.rehydrate();
     }
   // value is a stable useMemo result; safe to include — it rarely changes.
   }, [isLoading, user?.id, value]);

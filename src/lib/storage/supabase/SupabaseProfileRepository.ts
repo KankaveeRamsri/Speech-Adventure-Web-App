@@ -291,9 +291,21 @@ export class SupabaseProfileRepository implements IProfileRepository {
   private async _hydrate(): Promise<void> {
     const myGen = this._hydrateGen;
 
+    // Owner-only fetch: the child_profiles "grantee select" RLS policy would
+    // otherwise leak shared children into this owned list, breaking the
+    // owned-vs-shared split that useChildProfile and ChildSelector depend on.
+    const userId = await this._getCurrentUserId();
+    if (!userId || this._hydrateGen !== myGen) {
+      this._loadFromLocalStorage();
+      this._hydrated = true;
+      this._notify();
+      return;
+    }
+
     const { data: rows, error } = await this.client
       .from("child_profiles")
       .select("*")
+      .eq("user_id", userId)
       .order("created_at", { ascending: true });
 
     if (this._hydrateGen !== myGen) return;

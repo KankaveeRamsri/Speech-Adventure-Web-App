@@ -24,6 +24,8 @@ const InvitationSchema = z.object({
   expiresAt: z.string(),
   createdAt: z.string(),
   acceptedAt: z.string().optional(),
+  acceptedBy: z.string().optional(),
+  inviterEmail: z.string().optional(),
   childSnapshot: z.object({
     id: z.string(),
     name: z.string(),
