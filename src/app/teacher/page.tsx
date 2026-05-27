@@ -5,6 +5,8 @@ import TeacherChildProgressCard from "@/components/teacher/TeacherChildProgressC
 import { useTeacherChildren } from "@/hooks/useTeacherChildren";
 import { useChildProfile } from "@/hooks/useChildProfile";
 import { useSpeechProgress } from "@/hooks/useSpeechProgress";
+import { useSchool } from "@/hooks/useSchool";
+import { useAuth } from "@/hooks/useAuth";
 
 function GraduationCapIcon({ size = 20 }: { size?: number }) {
   return (
@@ -52,10 +54,22 @@ function isNeedsPractice(lastActivityAt: string | null, totalAttempts: number): 
   );
 }
 
+function ClassroomBadge({ name }: { name: string }) {
+  return (
+    <span className="inline-flex items-center px-2.5 py-1 rounded-lg bg-secondary/10 text-secondary text-xs font-medium">
+      {name}
+    </span>
+  );
+}
+
 export default function TeacherDashboardPage() {
   const { children, isHydrated } = useTeacherChildren();
   const { selectChild } = useChildProfile();
   const { switchChildProgress } = useSpeechProgress();
+  const { user } = useAuth();
+  const { listClassroomsForTeacher, listChildrenForClassroom } = useSchool();
+
+  const myClassrooms = user ? listClassroomsForTeacher(user.id) : [];
 
   const needsPracticeCount = isHydrated
     ? children.filter((c) =>
@@ -163,6 +177,56 @@ export default function TeacherDashboardPage() {
               กรุณาติดต่อผู้ปกครองเพื่อขยายสิทธิ์
             </p>
           </div>
+        )}
+
+        {/* Classroom grouping section */}
+        {myClassrooms.length > 0 && (
+          <section aria-label="ห้องเรียนของฉัน">
+            <p className="text-xs font-semibold text-text-muted uppercase tracking-wider mb-3">
+              ห้องเรียนของฉัน
+            </p>
+            <div className="space-y-3">
+              {myClassrooms.map((room) => {
+                const roomStudentIds = new Set(
+                  listChildrenForClassroom(room.id).map((s) => s.childId),
+                );
+                const roomChildren = children.filter((c) =>
+                  roomStudentIds.has(c.child.id),
+                );
+                return (
+                  <div key={room.id} className="bg-surface border border-border rounded-2xl p-4 space-y-3">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <ClassroomBadge name={room.name} />
+                      {room.gradeLevel && (
+                        <span className="text-xs text-text-muted">ชั้น {room.gradeLevel}</span>
+                      )}
+                      {room.academicYear && (
+                        <span className="text-xs text-text-muted">ปี {room.academicYear}</span>
+                      )}
+                      <span className="ml-auto text-xs text-text-muted">
+                        {roomChildren.length} เด็ก
+                      </span>
+                    </div>
+                    {roomChildren.length === 0 ? (
+                      <p className="text-xs text-text-muted italic">ยังไม่มีเด็กในห้องนี้</p>
+                    ) : (
+                      <div className="flex flex-wrap gap-2">
+                        {roomChildren.map((c) => (
+                          <button
+                            key={c.grant.id}
+                            onClick={() => handleSelectChild(c.child.id)}
+                            className="flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-primary/8 hover:bg-primary/15 text-primary text-xs font-medium transition-colors"
+                          >
+                            {c.child.name}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </section>
         )}
       </div>
     </AppShell>

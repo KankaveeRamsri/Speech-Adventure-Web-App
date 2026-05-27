@@ -8,7 +8,8 @@ export type NavIconName =
   | "demo"
   | "profile"
   | "settings"
-  | "teacher";
+  | "teacher"
+  | "school";
 
 interface Props {
   name: NavIconName;
@@ -104,6 +105,15 @@ export default function NavIcon({ name, active = false, size = 17 }: Props) {
       <svg {...shared}>
         <path d="M22 10v6M2 10l10-5 10 5-10 5z" />
         <path d="M6 12v5c3 3 9 3 12 0v-5" />
+      </svg>
+    );
+  }
+  if (name === "school") {
+    return (
+      <svg {...shared}>
+        <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
+        <rect x="9" y="13" width="6" height="9" />
+        <path d="M9 9h.01M15 9h.01" />
       </svg>
     );
   }

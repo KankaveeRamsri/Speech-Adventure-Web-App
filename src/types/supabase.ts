@@ -26,6 +26,14 @@ import type {
   DbInvitationRole,
   DbInvitationStatus,
   DbAccessRole,
+  DbOrganization,
+  DbOrganizationMember,
+  DbClassroom,
+  DbClassroomStudent,
+  DbClassroomTeacher,
+  DbOrganizationType,
+  DbOrgMemberRole,
+  DbOrgMemberStatus,
 } from "@/types/database";
 
 // ── Insert types (server-generated fields become optional) ────────────────────
@@ -37,6 +45,11 @@ export type InsertObservationNote = Omit<DbObservationNote, "id" | "created_at" 
 export type InsertInvitation = Omit<DbInvitation, "id" | "created_at" | "updated_at" | "accepted_at" | "accepted_by"> & { id?: string };
 export type InsertChildAccess = Omit<DbChildAccess, "id" | "created_at" | "revoked_at"> & { id?: string };
 export type UpdateChildAccess = Partial<Omit<DbChildAccess, "id" | "created_at">>;
+export type InsertOrganization = Omit<DbOrganization, "id" | "created_at" | "updated_at"> & { id?: string };
+export type InsertOrganizationMember = Omit<DbOrganizationMember, "id" | "created_at" | "updated_at"> & { id?: string };
+export type InsertClassroom = Omit<DbClassroom, "id" | "created_at" | "updated_at"> & { id?: string };
+export type InsertClassroomStudent = Omit<DbClassroomStudent, "created_at">;
+export type InsertClassroomTeacher = Omit<DbClassroomTeacher, "created_at">;
 
 // ── Update types (all mutable fields optional, PK and created_at immutable) ───
 
@@ -88,6 +101,36 @@ export interface Database {
         Row: DbChildAccess;
         Insert: InsertChildAccess;
         Update: UpdateChildAccess;
+        Relationships: [];
+      };
+      organizations: {
+        Row: DbOrganization;
+        Insert: InsertOrganization;
+        Update: Partial<Omit<DbOrganization, "id" | "created_at">>;
+        Relationships: [];
+      };
+      organization_members: {
+        Row: DbOrganizationMember;
+        Insert: InsertOrganizationMember;
+        Update: Partial<Omit<DbOrganizationMember, "id" | "created_at">>;
+        Relationships: [];
+      };
+      classrooms: {
+        Row: DbClassroom;
+        Insert: InsertClassroom;
+        Update: Partial<Omit<DbClassroom, "id" | "created_at">>;
+        Relationships: [];
+      };
+      classroom_students: {
+        Row: DbClassroomStudent;
+        Insert: InsertClassroomStudent;
+        Update: Partial<DbClassroomStudent>;
+        Relationships: [];
+      };
+      classroom_teachers: {
+        Row: DbClassroomTeacher;
+        Insert: InsertClassroomTeacher;
+        Update: Partial<DbClassroomTeacher>;
         Relationships: [];
       };
     };

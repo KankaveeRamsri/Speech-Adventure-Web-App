@@ -11,3 +11,4 @@ export type { IProfileRepository } from "@/lib/repositories/IProfileRepository";
 export type { IObservationRepository } from "@/lib/repositories/IObservationRepository";
 export type { IInvitationRepository } from "@/lib/repositories/IInvitationRepository";
 export type { IChildAccessRepository } from "@/lib/repositories/IChildAccessRepository";
+export type { ISchoolRepository } from "@/lib/repositories/ISchoolRepository";

@@ -35,6 +35,7 @@ import { SupabaseProfileRepository } from "./SupabaseProfileRepository";
 import { SupabaseObservationRepository } from "./SupabaseObservationRepository";
 import { SupabaseInvitationRepository } from "./SupabaseInvitationRepository";
 import { SupabaseChildAccessRepository } from "./SupabaseChildAccessRepository";
+import { SupabaseSchoolRepository } from "./SupabaseSchoolRepository";
 
 /**
  * Creates Supabase repository instances when Supabase is configured.
@@ -53,6 +54,7 @@ export function createSupabaseRepositories(): Repositories | null {
     observations: new SupabaseObservationRepository(client),
     invitations: new SupabaseInvitationRepository(client),
     childAccess: new SupabaseChildAccessRepository(client),
+    school: new SupabaseSchoolRepository(client),
   };
 }
 

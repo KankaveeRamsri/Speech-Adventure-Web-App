@@ -112,6 +112,62 @@ export type DbChildAccess = {
   revoked_at: string | null;
 };
 
+// ── organizations ─────────────────────────────────────────────────────────────
+
+export type DbOrganizationType = "family" | "school" | "clinic";
+
+export type DbOrganization = {
+  id: string;
+  name: string;
+  type: DbOrganizationType;
+  created_by: string;
+  created_at: string;
+  updated_at: string;
+};
+
+// ── organization_members ──────────────────────────────────────────────────────
+
+export type DbOrgMemberRole = "owner" | "admin" | "teacher" | "therapist" | "parent" | "viewer";
+export type DbOrgMemberStatus = "active" | "invited" | "removed";
+
+export type DbOrganizationMember = {
+  id: string;
+  organization_id: string;
+  user_id: string;
+  role: DbOrgMemberRole;
+  status: DbOrgMemberStatus;
+  created_at: string;
+  updated_at: string;
+};
+
+// ── classrooms ─────────────────────────────────────────────────────────────────
+
+export type DbClassroom = {
+  id: string;
+  organization_id: string;
+  name: string;
+  grade_level: string | null;
+  academic_year: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+// ── classroom_students ─────────────────────────────────────────────────────────
+
+export type DbClassroomStudent = {
+  classroom_id: string;
+  child_id: string;
+  created_at: string;
+};
+
+// ── classroom_teachers ─────────────────────────────────────────────────────────
+
+export type DbClassroomTeacher = {
+  classroom_id: string;
+  teacher_user_id: string;
+  created_at: string;
+};
+
 // ── observation_notes ─────────────────────────────────────────────────────────
 
 export type DbObservationTargetType = "session" | "attempt" | "general";

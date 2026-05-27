@@ -7,11 +7,13 @@ import type { IProfileRepository } from "@/lib/repositories/IProfileRepository";
 import type { IObservationRepository } from "@/lib/repositories/IObservationRepository";
 import type { IInvitationRepository } from "@/lib/repositories/IInvitationRepository";
 import type { IChildAccessRepository } from "@/lib/repositories/IChildAccessRepository";
+import type { ISchoolRepository } from "@/lib/repositories/ISchoolRepository";
 import { LocalProgressRepository } from "@/lib/storage/local/LocalProgressRepository";
 import { LocalProfileRepository } from "@/lib/storage/local/LocalProfileRepository";
 import { LocalObservationRepository } from "@/lib/storage/local/LocalObservationRepository";
 import { LocalInvitationRepository } from "@/lib/storage/local/LocalInvitationRepository";
 import { LocalChildAccessRepository } from "@/lib/storage/local/LocalChildAccessRepository";
+import { LocalSchoolRepository } from "@/lib/storage/local/LocalSchoolRepository";
 import {
   getConfiguredProvider,
   isSupabaseProviderRequested,
@@ -28,6 +30,7 @@ export interface Repositories {
   observations: IObservationRepository;
   invitations: IInvitationRepository;
   childAccess: IChildAccessRepository;
+  school?: ISchoolRepository;
 }
 
 // ── Repository resolution ─────────────────────────────────────────────────────
@@ -49,6 +52,7 @@ const _localRepositories: Repositories = {
   observations: new LocalObservationRepository(),
   invitations: new LocalInvitationRepository(),
   childAccess: new LocalChildAccessRepository(),
+  school: new LocalSchoolRepository(),
 };
 
 function _resolveRepositories(): Repositories {
@@ -136,7 +140,7 @@ export function RepositoryProvider({ children, overrides }: RepositoryProviderPr
     () => ({ ...defaultRepositories, ...overrides }),
     // Spread of overrides intentionally not deep-compared; callers must stabilize.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [overrides?.progress, overrides?.profile, overrides?.observations, overrides?.invitations, overrides?.childAccess],
+    [overrides?.progress, overrides?.profile, overrides?.observations, overrides?.invitations, overrides?.childAccess, overrides?.school],
   );
 
   // Track the last userId we acted on — prevents duplicate calls and lets us
@@ -170,11 +174,13 @@ export function RepositoryProvider({ children, overrides }: RepositoryProviderPr
       if (hasScopeSet(value.observations)) value.observations.setScope(null);
       if (hasScopeSet(value.invitations)) value.invitations.setScope(null);
       if (hasScopeSet(value.childAccess)) value.childAccess.setScope(null);
+      if (value.school && hasScopeSet(value.school)) value.school.setScope(null);
       if (hasReset(value.profile)) value.profile.reset();
       if (hasReset(value.progress)) value.progress.reset();
       if (hasReset(value.observations)) value.observations.reset();
       if (hasReset(value.invitations)) value.invitations.reset();
       if (hasReset(value.childAccess)) value.childAccess.reset();
+      if (value.school && hasReset(value.school)) value.school.reset();
       return;
     }
 
@@ -188,11 +194,13 @@ export function RepositoryProvider({ children, overrides }: RepositoryProviderPr
       if (hasScopeSet(value.observations)) value.observations.setScope(userId);
       if (hasScopeSet(value.invitations)) value.invitations.setScope(userId);
       if (hasScopeSet(value.childAccess)) value.childAccess.setScope(userId);
+      if (value.school && hasScopeSet(value.school)) value.school.setScope(userId);
       if (hasReset(value.profile)) value.profile.reset();
       if (hasReset(value.progress)) value.progress.reset();
       if (hasReset(value.observations)) value.observations.reset();
       if (hasReset(value.invitations)) value.invitations.reset();
       if (hasReset(value.childAccess)) value.childAccess.reset();
+      if (value.school && hasReset(value.school)) value.school.reset();
     }
 
     // ── Sign in / session restore / account switch: scope + load cloud data ───
@@ -205,11 +213,13 @@ export function RepositoryProvider({ children, overrides }: RepositoryProviderPr
       if (hasScopeSet(value.observations)) value.observations.setScope(userId);
       if (hasScopeSet(value.invitations)) value.invitations.setScope(userId);
       if (hasScopeSet(value.childAccess)) value.childAccess.setScope(userId);
+      if (value.school && hasScopeSet(value.school)) value.school.setScope(userId);
       if (hasRehydrate(value.profile)) value.profile.rehydrate();
       if (hasRehydrate(value.progress)) value.progress.rehydrate();
       if (hasRehydrate(value.observations)) value.observations.rehydrate();
       if (hasRehydrate(value.invitations)) value.invitations.rehydrate();
       if (hasRehydrate(value.childAccess)) value.childAccess.rehydrate();
+      if (value.school && hasRehydrate(value.school)) value.school.rehydrate();
     }
   // value is a stable useMemo result; safe to include — it rarely changes.
   }, [isLoading, user?.id, value]);

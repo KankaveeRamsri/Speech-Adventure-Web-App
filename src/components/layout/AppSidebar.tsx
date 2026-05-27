@@ -8,7 +8,7 @@ import { useSidebar } from "./SidebarContext";
 import ChildSelector from "./ChildSelector";
 import ThemeToggle from "@/components/ui/ThemeToggle";
 import { useSpeechProgress } from "@/hooks/useSpeechProgress";
-import { useAuth, isTeacher } from "@/hooks/useAuth";
+import { useAuth, isTeacher, isSchoolAdmin } from "@/hooks/useAuth";
 import { mockTrainingStages } from "@/data/speechAdventureMockData";
 
 type NavItem = { href: string; label: string; icon: NavIconName; exact?: boolean };
@@ -26,6 +26,7 @@ const BASE_NAV_ITEMS: NavItem[] = [
 ];
 
 const TEACHER_NAV_ITEM: NavItem = { href: "/teacher", label: "แดชบอร์ดครู", icon: "teacher" };
+const SCHOOL_NAV_ITEM: NavItem  = { href: "/school",  label: "จัดการโรงเรียน", icon: "school" };
 
 function MicLogoIcon({ size = 16 }: { size?: number }) {
   return (
@@ -68,7 +69,9 @@ export default function AppSidebar() {
   const { summary, isHydrated, selectedSoundId } = useSpeechProgress();
   const { user } = useAuth();
 
-  const NAV_ITEMS: NavItem[] = isTeacher(user)
+  const NAV_ITEMS: NavItem[] = isSchoolAdmin(user)
+    ? [SCHOOL_NAV_ITEM, ...BASE_NAV_ITEMS]
+    : isTeacher(user)
     ? [TEACHER_NAV_ITEM, ...BASE_NAV_ITEMS]
     : BASE_NAV_ITEMS;
 

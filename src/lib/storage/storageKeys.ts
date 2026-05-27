@@ -52,6 +52,9 @@ export const STORAGE_KEYS = {
   /** Child access grants — unscoped shared key (visible to both grantor and grantee on device) */
   CHILD_GRANTS: "speech-adventure-child-grants-v1",
 
+  /** School data — unscoped shared key (org-based, accessible across users on same device) */
+  SCHOOL: "speech-adventure-school-v1",
+
   // ── UI preferences — not cleared on data reset ──────────────────────────────
 
   /** Desktop sidebar collapsed state */
