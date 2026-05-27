@@ -46,6 +46,17 @@ export interface ISchoolRepository {
   /** Resolve display info for a batch of user IDs (best-effort; missing IDs are omitted). */
   resolveUserDisplays(userIds: string[]): Promise<Map<string, UserDisplayInfo>>;
 
+  // ── Student profile resolution ───────────────────────────────────────────────
+  /**
+   * Fetch display data (name + nickname) for a batch of child IDs.
+   * Used to show human-readable names for imported students whose profiles
+   * may not be in the profile repository's in-memory cache yet.
+   * Missing IDs are silently omitted from the result map.
+   */
+  resolveStudentProfiles(
+    childIds: string[],
+  ): Promise<Map<string, { name: string; nickname: string | null }>>;
+
   // ── Student import ────────────────────────────────────────────────────────────
   /** Returns existing student_codes for duplicate detection before import. */
   listStudentCodes(organizationId: string): Promise<string[]>;

@@ -450,6 +450,32 @@ export class SupabaseSchoolRepository implements ISchoolRepository {
     };
   }
 
+  async resolveStudentProfiles(
+    childIds: string[],
+  ): Promise<Map<string, { name: string; nickname: string | null }>> {
+    if (childIds.length === 0) return new Map();
+
+    const { data, error } = await this.client
+      .from("child_profiles")
+      .select("id, name, nickname")
+      .in("id", childIds);
+
+    if (error) {
+      warnRepo("SupabaseSchoolRepository.resolveStudentProfiles",
+        new QueryError("child_profiles", "select", error));
+      return new Map();
+    }
+
+    const result = new Map<string, { name: string; nickname: string | null }>();
+    for (const row of (data ?? [])) {
+      result.set(row.id, {
+        name:     row.name,
+        nickname: (row as { nickname?: string | null }).nickname ?? null,
+      });
+    }
+    return result;
+  }
+
   public setScope(_userId: string | null): void {
     // Scope handled via Supabase RLS
   }
@@ -478,7 +504,10 @@ export class SupabaseSchoolRepository implements ISchoolRepository {
       this.client.from("organization_members").select("*").eq("user_id", user.id),
       this.client.from("classrooms").select("*"),
       this.client.from("classroom_students").select("*"),
-      this.client.from("classroom_teachers").select("*").eq("teacher_user_id", user.id),
+      // No user filter here — RLS handles scoping:
+      //   org members see all teachers in their org's classrooms
+      //   teachers (non-org-members) see only their own assignments
+      this.client.from("classroom_teachers").select("*"),
     ]);
 
     if (this._hydrateGen !== myGen) return;

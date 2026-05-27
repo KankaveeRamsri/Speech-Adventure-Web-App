@@ -92,6 +92,13 @@ export function useSchool() {
     return school.resolveUserDisplays(userIds);
   }
 
+  async function resolveStudentProfiles(
+    childIds: string[],
+  ): Promise<Map<string, { name: string; nickname: string | null }>> {
+    if (!school) return new Map();
+    return school.resolveStudentProfiles(childIds);
+  }
+
   return {
     organizations,
     listClassrooms,
@@ -106,5 +113,6 @@ export function useSchool() {
     removeChild,
     findTeacherByEmail,
     resolveUserDisplays,
+    resolveStudentProfiles,
   };
 }

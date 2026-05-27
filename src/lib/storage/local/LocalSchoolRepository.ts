@@ -258,6 +258,14 @@ export class LocalSchoolRepository implements ISchoolRepository {
     return new Map(); // not available in local/demo mode
   }
 
+  // ── Student profile resolution ───────────────────────────────────────────────
+
+  async resolveStudentProfiles(
+    _childIds: string[],
+  ): Promise<Map<string, { name: string; nickname: string | null }>> {
+    return new Map(); // not available in local/demo mode
+  }
+
   // ── Student import (local/demo mode — minimal mock) ──────────────────────────
 
   async listStudentCodes(_organizationId: string): Promise<string[]> {

@@ -129,6 +129,12 @@ export default function SchoolAdminPage() {
         onClose={() => setShowImportWizard(false)}
       />
     )}
+    {selectedClassroom && (
+      <ClassroomManagementPanel
+        classroom={selectedClassroom}
+        onClose={() => setSelectedClassroomId(null)}
+      />
+    )}
     <AppShell>
       <div className="max-w-5xl mx-auto px-4 sm:px-6 py-6 space-y-6">
         {/* Page header */}
@@ -362,13 +368,7 @@ export default function SchoolAdminPage() {
                   </div>
                 )}
 
-                {/* Classroom management panel — shown below grid when a room is selected */}
-                {selectedClassroom && (
-                  <ClassroomManagementPanel
-                    classroom={selectedClassroom}
-                    onClose={() => setSelectedClassroomId(null)}
-                  />
-                )}
+                {/* Classroom panel is rendered as a modal overlay at the page root */}
               </div>
             )}
           </div>
