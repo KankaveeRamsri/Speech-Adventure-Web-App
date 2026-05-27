@@ -33,10 +33,10 @@ function EyeIcon({ show }: { show: boolean }) {
 }
 
 function SignInContent() {
-  const { signIn, isAuthenticated, isLoading } = useAuth();
+  const { signIn, isAuthenticated, isLoading, user } = useAuth();
   const router = useRouter();
   const searchParams = useSearchParams();
-  const redirectTo = searchParams.get("redirect") ?? "/training";
+  const explicitRedirect = searchParams.get("redirect");
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -49,9 +49,15 @@ function SignInContent() {
 
   useEffect(() => {
     if (mounted && !isLoading && isAuthenticated) {
-      router.replace(redirectTo);
+      if (explicitRedirect) {
+        router.replace(explicitRedirect);
+      } else if (user?.role === "teacher") {
+        router.replace("/teacher");
+      } else {
+        router.replace("/training");
+      }
     }
-  }, [mounted, isLoading, isAuthenticated, router, redirectTo]);
+  }, [mounted, isLoading, isAuthenticated, router, explicitRedirect, user?.role]);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -62,12 +68,12 @@ function SignInContent() {
 
     const result = await signIn(email.trim(), password);
 
-    if (result.success) {
-      router.replace(redirectTo);
-    } else {
+    if (!result.success) {
       setError(result.error ?? "เข้าสู่ระบบไม่สำเร็จ");
       setSubmitting(false);
     }
+    // On success: subscribeToAuthChanges updates the session, then the
+    // useEffect above redirects based on user.role.
   }
 
   // Render a minimal skeleton until client hydrates

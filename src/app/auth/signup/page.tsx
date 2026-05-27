@@ -48,13 +48,13 @@ const PASSWORD_RULES = [
 
 const ROLE_OPTIONS: { value: UserRole; label: string; desc: string; available: boolean }[] = [
   { value: "parent", label: "ผู้ปกครอง", desc: "ติดตามพัฒนาการบุตรหลาน", available: true },
-  { value: "teacher", label: "ครู", desc: "จัดการนักเรียนในชั้นเรียน", available: false },
+  { value: "teacher", label: "ครู", desc: "ติดตามเด็กที่ได้รับมอบหมาย", available: true },
   { value: "therapist", label: "นักบำบัด", desc: "ดูแลผู้ใช้หลายคน", available: false },
   { value: "school_admin", label: "ผู้ดูแลโรงเรียน", desc: "บริหารจัดการทั้งโรงเรียน", available: false },
 ];
 
 export default function SignUpPage() {
-  const { signUp, isAuthenticated, isLoading } = useAuth();
+  const { signUp, isAuthenticated, isLoading, user } = useAuth();
   const router = useRouter();
 
   const [email, setEmail] = useState("");
@@ -70,9 +70,9 @@ export default function SignUpPage() {
 
   useEffect(() => {
     if (mounted && !isLoading && isAuthenticated) {
-      router.replace("/training");
+      router.replace(user?.role === "teacher" ? "/teacher" : "/training");
     }
-  }, [mounted, isLoading, isAuthenticated, router]);
+  }, [mounted, isLoading, isAuthenticated, router, user?.role]);
 
   const passwordValid = PASSWORD_RULES.every((r) => r.test(password));
 
