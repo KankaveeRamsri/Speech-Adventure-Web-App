@@ -3,6 +3,7 @@
 import { useState } from "react";
 import AppShell from "@/components/layout/AppShell";
 import ClassroomCard from "@/components/school/ClassroomCard";
+import ClassroomManagementPanel from "@/components/school/ClassroomManagementPanel";
 import { useSchool } from "@/hooks/useSchool";
 import { useAuth } from "@/hooks/useAuth";
 import { ORG_TYPE_LABELS, type OrganizationType } from "@/types/school";
@@ -47,6 +48,7 @@ export default function SchoolAdminPage() {
   } = useSchool();
 
   const [selectedOrgId, setSelectedOrgId] = useState<string | null>(null);
+  const [selectedClassroomId, setSelectedClassroomId] = useState<string | null>(null);
   const [showCreateOrg, setShowCreateOrg] = useState(false);
   const [showCreateRoom, setShowCreateRoom] = useState(false);
 
@@ -65,6 +67,7 @@ export default function SchoolAdminPage() {
 
   const selectedOrg = organizations.find((o) => o.id === selectedOrgId) ?? organizations[0] ?? null;
   const classrooms = selectedOrg ? listClassrooms(selectedOrg.id) : [];
+  const selectedClassroom = classrooms.find((c) => c.id === selectedClassroomId) ?? null;
 
   async function handleCreateOrg(e: React.FormEvent) {
     e.preventDefault();
@@ -208,7 +211,7 @@ export default function SchoolAdminPage() {
                 {organizations.map((org) => (
                   <button
                     key={org.id}
-                    onClick={() => setSelectedOrgId(org.id)}
+                    onClick={() => { setSelectedOrgId(org.id); setSelectedClassroomId(null); }}
                     className={`px-3 py-1.5 rounded-xl text-sm font-medium transition-all ${
                       (selectedOrg?.id === org.id)
                         ? "bg-primary/10 text-primary"
@@ -322,9 +325,20 @@ export default function SchoolAdminPage() {
                         classroom={room}
                         students={listChildrenForClassroom(room.id)}
                         teachers={listTeachersForClassroom(room.id)}
+                        onManage={(id) => setSelectedClassroomId(
+                          selectedClassroomId === id ? null : id,
+                        )}
                       />
                     ))}
                   </div>
+                )}
+
+                {/* Classroom management panel — shown below grid when a room is selected */}
+                {selectedClassroom && (
+                  <ClassroomManagementPanel
+                    classroom={selectedClassroom}
+                    onClose={() => setSelectedClassroomId(null)}
+                  />
                 )}
               </div>
             )}

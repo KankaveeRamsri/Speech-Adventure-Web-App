@@ -9,6 +9,7 @@ import type {
   ClassroomTeacher,
   CreateOrganizationInput,
   CreateClassroomInput,
+  UserDisplayInfo,
 } from "@/types/school";
 
 // ── Stored shape ───────────────────────────────────────────────────────────────
@@ -185,6 +186,18 @@ export class LocalSchoolRepository implements ISchoolRepository {
     return entry;
   }
 
+  async removeTeacherFromClassroom(classroomId: string, teacherUserId: string): Promise<void> {
+    _init();
+    _store = {
+      ..._store,
+      classroomTeachers: _store.classroomTeachers.filter(
+        (t) => !(t.classroomId === classroomId && t.teacherUserId === teacherUserId),
+      ),
+    };
+    _write();
+    _notify();
+  }
+
   async addChildToClassroom(classroomId: string, childId: string): Promise<ClassroomStudent> {
     _init();
     const existing = _store.classroomStudents.find(
@@ -200,6 +213,18 @@ export class LocalSchoolRepository implements ISchoolRepository {
     _write();
     _notify();
     return entry;
+  }
+
+  async removeChildFromClassroom(classroomId: string, childId: string): Promise<void> {
+    _init();
+    _store = {
+      ..._store,
+      classroomStudents: _store.classroomStudents.filter(
+        (s) => !(s.classroomId === classroomId && s.childId === childId),
+      ),
+    };
+    _write();
+    _notify();
   }
 
   listChildrenForClassroom(classroomId: string): ClassroomStudent[] {
@@ -220,6 +245,16 @@ export class LocalSchoolRepository implements ISchoolRepository {
   listTeachersForClassroom(classroomId: string): ClassroomTeacher[] {
     _init();
     return _store.classroomTeachers.filter((t) => t.classroomId === classroomId);
+  }
+
+  // ── User display ──────────────────────────────────────────────────────────────
+
+  async findTeacherByEmail(_email: string): Promise<UserDisplayInfo | null> {
+    return null; // not available in local/demo mode
+  }
+
+  async resolveUserDisplays(_userIds: string[]): Promise<Map<string, UserDisplayInfo>> {
+    return new Map(); // not available in local/demo mode
   }
 
   // ── Scope ─────────────────────────────────────────────────────────────────────

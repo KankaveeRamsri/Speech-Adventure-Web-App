@@ -168,6 +168,15 @@ export type DbClassroomTeacher = {
   created_at: string;
 };
 
+// ── user_display_profiles ─────────────────────────────────────────────────────
+
+export type DbUserDisplayProfile = {
+  user_id: string;
+  email: string;
+  role: string | null;
+  created_at: string;
+};
+
 // ── observation_notes ─────────────────────────────────────────────────────────
 
 export type DbObservationTargetType = "session" | "attempt" | "general";

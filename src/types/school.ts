@@ -59,6 +59,12 @@ export interface CreateClassroomInput {
   academicYear?: string;
 }
 
+export interface UserDisplayInfo {
+  userId: string;
+  email: string;
+  role: string | null;
+}
+
 export const ORG_TYPE_LABELS: Record<OrganizationType, string> = {
   family: "ครอบครัว",
   school: "โรงเรียน",

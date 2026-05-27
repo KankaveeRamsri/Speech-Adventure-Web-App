@@ -7,16 +7,18 @@ import type {
   ClassroomTeacher,
   CreateOrganizationInput,
   CreateClassroomInput,
+  UserDisplayInfo,
 } from "@/types/school";
 import type { SupabaseClient } from "@/lib/supabase/client";
 import type { Database } from "@/types/supabase";
 import { QueryError, warnRepo } from "./errors";
 
-type DbOrg    = Database["public"]["Tables"]["organizations"]["Row"];
-type DbMember = Database["public"]["Tables"]["organization_members"]["Row"];
-type DbRoom   = Database["public"]["Tables"]["classrooms"]["Row"];
+type DbOrg     = Database["public"]["Tables"]["organizations"]["Row"];
+type DbMember  = Database["public"]["Tables"]["organization_members"]["Row"];
+type DbRoom    = Database["public"]["Tables"]["classrooms"]["Row"];
 type DbStudent = Database["public"]["Tables"]["classroom_students"]["Row"];
 type DbTeacher = Database["public"]["Tables"]["classroom_teachers"]["Row"];
+type DbDisplay = Database["public"]["Tables"]["user_display_profiles"]["Row"];
 
 function mapOrg(row: DbOrg): Organization {
   return {
@@ -67,6 +69,10 @@ function mapTeacher(row: DbTeacher): ClassroomTeacher {
     teacherUserId:  row.teacher_user_id,
     createdAt:      row.created_at,
   };
+}
+
+function mapDisplay(row: DbDisplay): UserDisplayInfo {
+  return { userId: row.user_id, email: row.email, role: row.role };
 }
 
 const SERVER_ORGS: Organization[] = [];
@@ -198,6 +204,28 @@ export class SupabaseSchoolRepository implements ISchoolRepository {
     return entry;
   }
 
+  async removeTeacherFromClassroom(classroomId: string, teacherUserId: string): Promise<void> {
+    const prev = this._classroomTeachers;
+    this._classroomTeachers = this._classroomTeachers.filter(
+      (t) => !(t.classroomId === classroomId && t.teacherUserId === teacherUserId),
+    );
+    this._notify();
+
+    const { error } = await this.client
+      .from("classroom_teachers")
+      .delete()
+      .eq("classroom_id", classroomId)
+      .eq("teacher_user_id", teacherUserId);
+
+    if (error) {
+      this._classroomTeachers = prev;
+      this._notify();
+      warnRepo("SupabaseSchoolRepository.removeTeacherFromClassroom",
+        new QueryError("classroom_teachers", "delete", error));
+      throw new Error(error.message);
+    }
+  }
+
   async addChildToClassroom(classroomId: string, childId: string): Promise<ClassroomStudent> {
     const existing = this._classroomStudents.find(
       (s) => s.classroomId === classroomId && s.childId === childId,
@@ -220,6 +248,28 @@ export class SupabaseSchoolRepository implements ISchoolRepository {
     this._classroomStudents = [...this._classroomStudents, entry];
     this._notify();
     return entry;
+  }
+
+  async removeChildFromClassroom(classroomId: string, childId: string): Promise<void> {
+    const prev = this._classroomStudents;
+    this._classroomStudents = this._classroomStudents.filter(
+      (s) => !(s.classroomId === classroomId && s.childId === childId),
+    );
+    this._notify();
+
+    const { error } = await this.client
+      .from("classroom_students")
+      .delete()
+      .eq("classroom_id", classroomId)
+      .eq("child_id", childId);
+
+    if (error) {
+      this._classroomStudents = prev;
+      this._notify();
+      warnRepo("SupabaseSchoolRepository.removeChildFromClassroom",
+        new QueryError("classroom_students", "delete", error));
+      throw new Error(error.message);
+    }
   }
 
   listChildrenForClassroom(classroomId: string): ClassroomStudent[] {
@@ -256,6 +306,42 @@ export class SupabaseSchoolRepository implements ISchoolRepository {
     this._hydratePromise = null;
     this._hydrateGen++;
     this._triggerHydrate();
+  }
+
+  // ── User display ──────────────────────────────────────────────────────────────
+
+  async findTeacherByEmail(email: string): Promise<UserDisplayInfo | null> {
+    const { data, error } = await this.client
+      .from("user_display_profiles")
+      .select("*")
+      .ilike("email", email.trim())
+      .maybeSingle();
+
+    if (error) {
+      warnRepo("SupabaseSchoolRepository.findTeacherByEmail",
+        new QueryError("user_display_profiles", "select", error));
+      return null;
+    }
+    return data ? mapDisplay(data) : null;
+  }
+
+  async resolveUserDisplays(userIds: string[]): Promise<Map<string, UserDisplayInfo>> {
+    if (userIds.length === 0) return new Map();
+    const { data, error } = await this.client
+      .from("user_display_profiles")
+      .select("*")
+      .in("user_id", userIds);
+
+    if (error) {
+      warnRepo("SupabaseSchoolRepository.resolveUserDisplays",
+        new QueryError("user_display_profiles", "select", error));
+      return new Map();
+    }
+    const result = new Map<string, UserDisplayInfo>();
+    for (const row of (data ?? [])) {
+      result.set(row.user_id, mapDisplay(row));
+    }
+    return result;
   }
 
   public setScope(_userId: string | null): void {

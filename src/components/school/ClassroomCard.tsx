@@ -6,6 +6,7 @@ interface Props {
   classroom: Classroom;
   students: ClassroomStudent[];
   teachers: ClassroomTeacher[];
+  onManage?: (classroomId: string) => void;
 }
 
 function UsersIcon({ size = 16 }: { size?: number }) {
@@ -29,7 +30,7 @@ function UsersIcon({ size = 16 }: { size?: number }) {
   );
 }
 
-export default function ClassroomCard({ classroom, students, teachers }: Props) {
+export default function ClassroomCard({ classroom, students, teachers, onManage }: Props) {
   const meta: string[] = [];
   if (classroom.gradeLevel)   meta.push(`ชั้น ${classroom.gradeLevel}`);
   if (classroom.academicYear) meta.push(`ปี ${classroom.academicYear}`);
@@ -80,6 +81,15 @@ export default function ClassroomCard({ classroom, students, teachers }: Props) 
 
       {students.length === 0 && (
         <p className="text-xs text-text-muted italic">ยังไม่มีนักเรียน</p>
+      )}
+
+      {onManage && (
+        <button
+          onClick={() => onManage(classroom.id)}
+          className="w-full mt-1 px-3 py-2 rounded-xl border border-border text-xs font-medium text-text-muted hover:text-primary hover:border-primary/40 transition-all"
+        >
+          จัดการห้องเรียน →
+        </button>
       )}
     </div>
   );

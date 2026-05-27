@@ -5,6 +5,7 @@ import type {
   ClassroomTeacher,
   CreateOrganizationInput,
   CreateClassroomInput,
+  UserDisplayInfo,
 } from "@/types/school";
 
 /**
@@ -31,10 +32,18 @@ export interface ISchoolRepository {
 
   // ── Classroom assignments ─────────────────────────────────────────────────────
   assignTeacherToClassroom(classroomId: string, teacherUserId: string): Promise<ClassroomTeacher>;
+  removeTeacherFromClassroom(classroomId: string, teacherUserId: string): Promise<void>;
   addChildToClassroom(classroomId: string, childId: string): Promise<ClassroomStudent>;
+  removeChildFromClassroom(classroomId: string, childId: string): Promise<void>;
   listChildrenForClassroom(classroomId: string): ClassroomStudent[];
   listClassroomsForTeacher(userId: string): Classroom[];
   listTeachersForClassroom(classroomId: string): ClassroomTeacher[];
+
+  // ── User display (for teacher search / list display) ─────────────────────────
+  /** Find a user by exact email match — returns null if not found. */
+  findTeacherByEmail(email: string): Promise<UserDisplayInfo | null>;
+  /** Resolve display info for a batch of user IDs (best-effort; missing IDs are omitted). */
+  resolveUserDisplays(userIds: string[]): Promise<Map<string, UserDisplayInfo>>;
 
   // ── Scope ─────────────────────────────────────────────────────────────────────
   setScope(userId: string | null): void;

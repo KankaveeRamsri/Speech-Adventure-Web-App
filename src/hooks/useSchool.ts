@@ -9,6 +9,7 @@ import type {
   ClassroomTeacher,
   CreateOrganizationInput,
   CreateClassroomInput,
+  UserDisplayInfo,
 } from "@/types/school";
 
 // Module-level stable refs required by useSyncExternalStore
@@ -66,9 +67,29 @@ export function useSchool() {
     return school.assignTeacherToClassroom(classroomId, teacherUserId);
   }
 
+  async function removeTeacher(classroomId: string, teacherUserId: string): Promise<void> {
+    if (!school) throw new Error("School repository not available");
+    return school.removeTeacherFromClassroom(classroomId, teacherUserId);
+  }
+
   async function addChild(classroomId: string, childId: string): Promise<ClassroomStudent> {
     if (!school) throw new Error("School repository not available");
     return school.addChildToClassroom(classroomId, childId);
+  }
+
+  async function removeChild(classroomId: string, childId: string): Promise<void> {
+    if (!school) throw new Error("School repository not available");
+    return school.removeChildFromClassroom(classroomId, childId);
+  }
+
+  async function findTeacherByEmail(email: string): Promise<UserDisplayInfo | null> {
+    if (!school) return null;
+    return school.findTeacherByEmail(email);
+  }
+
+  async function resolveUserDisplays(userIds: string[]): Promise<Map<string, UserDisplayInfo>> {
+    if (!school) return new Map();
+    return school.resolveUserDisplays(userIds);
   }
 
   return {
@@ -80,6 +101,10 @@ export function useSchool() {
     createOrganization,
     createClassroom,
     assignTeacher,
+    removeTeacher,
     addChild,
+    removeChild,
+    findTeacherByEmail,
+    resolveUserDisplays,
   };
 }

@@ -34,6 +34,7 @@ import type {
   DbOrganizationType,
   DbOrgMemberRole,
   DbOrgMemberStatus,
+  DbUserDisplayProfile,
 } from "@/types/database";
 
 // ── Insert types (server-generated fields become optional) ────────────────────
@@ -131,6 +132,12 @@ export interface Database {
         Row: DbClassroomTeacher;
         Insert: InsertClassroomTeacher;
         Update: Partial<DbClassroomTeacher>;
+        Relationships: [];
+      };
+      user_display_profiles: {
+        Row: DbUserDisplayProfile;
+        Insert: Omit<DbUserDisplayProfile, "created_at">;
+        Update: Partial<Omit<DbUserDisplayProfile, "user_id" | "created_at">>;
         Relationships: [];
       };
     };
