@@ -156,6 +156,10 @@ export interface Database {
         Args: { p_access_id: string };
         Returns: void;
       };
+      create_school_organization: {
+        Args: { p_name: string; p_type: DbOrganizationType };
+        Returns: string;
+      };
     };
     Enums: {
       session_status: DbSessionStatus;

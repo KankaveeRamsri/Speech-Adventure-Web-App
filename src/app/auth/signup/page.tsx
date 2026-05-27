@@ -50,7 +50,7 @@ const ROLE_OPTIONS: { value: UserRole; label: string; desc: string; available: b
   { value: "parent", label: "ผู้ปกครอง", desc: "ติดตามพัฒนาการบุตรหลาน", available: true },
   { value: "teacher", label: "ครู", desc: "ติดตามเด็กที่ได้รับมอบหมาย", available: true },
   { value: "therapist", label: "นักบำบัด", desc: "ดูแลผู้ใช้หลายคน", available: false },
-  { value: "school_admin", label: "ผู้ดูแลโรงเรียน", desc: "บริหารจัดการทั้งโรงเรียน", available: false },
+  { value: "school_admin", label: "ผู้ดูแลโรงเรียน", desc: "บริหารจัดการทั้งโรงเรียน", available: true },
 ];
 
 export default function SignUpPage() {
@@ -70,7 +70,9 @@ export default function SignUpPage() {
 
   useEffect(() => {
     if (mounted && !isLoading && isAuthenticated) {
-      router.replace(user?.role === "teacher" ? "/teacher" : "/training");
+      if (user?.role === "school_admin") router.replace("/school");
+      else if (user?.role === "teacher") router.replace("/teacher");
+      else router.replace("/training");
     }
   }, [mounted, isLoading, isAuthenticated, router, user?.role]);
 

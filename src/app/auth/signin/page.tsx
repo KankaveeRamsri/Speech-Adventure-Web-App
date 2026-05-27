@@ -51,6 +51,8 @@ function SignInContent() {
     if (mounted && !isLoading && isAuthenticated) {
       if (explicitRedirect) {
         router.replace(explicitRedirect);
+      } else if (user?.role === "school_admin") {
+        router.replace("/school");
       } else if (user?.role === "teacher") {
         router.replace("/teacher");
       } else {

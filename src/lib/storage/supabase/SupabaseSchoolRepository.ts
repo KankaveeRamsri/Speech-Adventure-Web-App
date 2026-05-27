@@ -108,39 +108,34 @@ export class SupabaseSchoolRepository implements ISchoolRepository {
   }
 
   async createSchoolOrganization(input: CreateOrganizationInput): Promise<Organization> {
-    const { data, error } = await this.client
+    // Use SECURITY DEFINER RPC to atomically insert org + owner membership.
+    // Direct INSERT on organizations would hit the RLS chicken-and-egg problem:
+    // the org_members INSERT policy (is_org_admin) fails before any member exists.
+    const { data: orgId, error: rpcErr } = await this.client.rpc(
+      "create_school_organization",
+      { p_name: input.name, p_type: input.type },
+    );
+
+    if (rpcErr || !orgId) {
+      warnRepo("SupabaseSchoolRepository.createSchoolOrganization",
+        new QueryError("organizations", "rpc:create_school_organization", rpcErr ?? new Error("no org id returned")));
+      throw new Error(rpcErr?.message ?? "Failed to create organization");
+    }
+
+    // Fetch the full org row — now readable because the owner member row exists.
+    const { data, error: fetchErr } = await this.client
       .from("organizations")
-      .insert({
-        name:       input.name,
-        type:       input.type,
-        created_by: input.createdBy,
-      })
-      .select()
+      .select("*")
+      .eq("id", orgId)
       .single();
 
-    if (error || !data) {
-      warnRepo("SupabaseSchoolRepository.createSchoolOrganization",
-        new QueryError("organizations", "insert", error ?? new Error("no data")));
-      throw new Error(error?.message ?? "Failed to create organization");
+    if (fetchErr || !data) {
+      warnRepo("SupabaseSchoolRepository.createSchoolOrganization:fetch",
+        new QueryError("organizations", "select", fetchErr ?? new Error("no data")));
+      throw new Error(fetchErr?.message ?? "Organization created but could not be fetched");
     }
 
     const org = mapOrg(data);
-
-    // Auto-insert owner membership
-    const { error: memErr } = await this.client
-      .from("organization_members")
-      .insert({
-        organization_id: org.id,
-        user_id:         input.createdBy,
-        role:            "owner",
-        status:          "active",
-      });
-
-    if (memErr) {
-      warnRepo("SupabaseSchoolRepository.createSchoolOrganization:member",
-        new QueryError("organization_members", "insert", memErr));
-    }
-
     this._orgs = [...this._orgs, org];
     this._notify();
     this.rehydrate();
