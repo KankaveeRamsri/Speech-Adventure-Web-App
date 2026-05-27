@@ -39,7 +39,16 @@ import type {
 
 // ── Insert types (server-generated fields become optional) ────────────────────
 
-export type InsertChildProfile = Omit<DbChildProfile, "id" | "created_at" | "updated_at"> & { id?: string };
+export type InsertChildProfile =
+  Omit<DbChildProfile, "id" | "created_at" | "updated_at" | "organization_id" | "student_code" | "nickname" | "grade_level" | "parent_email_pending">
+  & {
+    id?: string;
+    organization_id?: string | null;
+    student_code?: string | null;
+    nickname?: string | null;
+    grade_level?: string | null;
+    parent_email_pending?: string | null;
+  };
 export type InsertPracticeSession = Omit<DbPracticeSession, "id" | "created_at">;
 export type InsertPracticeAttempt = Omit<DbPracticeAttempt, "id" | "created_at">;
 export type InsertObservationNote = Omit<DbObservationNote, "id" | "created_at" | "updated_at">;

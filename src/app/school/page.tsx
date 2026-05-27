@@ -4,6 +4,7 @@ import { useState } from "react";
 import AppShell from "@/components/layout/AppShell";
 import ClassroomCard from "@/components/school/ClassroomCard";
 import ClassroomManagementPanel from "@/components/school/ClassroomManagementPanel";
+import StudentImportWizard from "@/components/school/StudentImportWizard";
 import { useSchool } from "@/hooks/useSchool";
 import { useAuth } from "@/hooks/useAuth";
 import { ORG_TYPE_LABELS, type OrganizationType } from "@/types/school";
@@ -36,6 +37,16 @@ function PlusIcon({ size = 16 }: { size?: number }) {
   );
 }
 
+function UploadIcon({ size = 15 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+      <polyline points="17 8 12 3 7 8" />
+      <line x1="12" y1="3" x2="12" y2="15" />
+    </svg>
+  );
+}
+
 export default function SchoolAdminPage() {
   const { user } = useAuth();
   const {
@@ -51,6 +62,7 @@ export default function SchoolAdminPage() {
   const [selectedClassroomId, setSelectedClassroomId] = useState<string | null>(null);
   const [showCreateOrg, setShowCreateOrg] = useState(false);
   const [showCreateRoom, setShowCreateRoom] = useState(false);
+  const [showImportWizard, setShowImportWizard] = useState(false);
 
   // Create org form state
   const [orgName, setOrgName] = useState("");
@@ -109,6 +121,14 @@ export default function SchoolAdminPage() {
   }
 
   return (
+    <>
+    {showImportWizard && selectedOrg && (
+      <StudentImportWizard
+        organizationId={selectedOrg.id}
+        classrooms={classrooms}
+        onClose={() => setShowImportWizard(false)}
+      />
+    )}
     <AppShell>
       <div className="max-w-5xl mx-auto px-4 sm:px-6 py-6 space-y-6">
         {/* Page header */}
@@ -234,13 +254,22 @@ export default function SchoolAdminPage() {
                       {ORG_TYPE_LABELS[selectedOrg.type]}
                     </p>
                   </div>
-                  <button
-                    onClick={() => setShowCreateRoom(true)}
-                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-border text-sm text-text-muted hover:text-text hover:bg-gray-50 dark:hover:bg-white/5 transition-all"
-                  >
-                    <PlusIcon size={14} />
-                    เพิ่มห้องเรียน
-                  </button>
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => setShowImportWizard(true)}
+                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-border text-sm text-text-muted hover:text-text hover:bg-gray-50 dark:hover:bg-white/5 transition-all"
+                    >
+                      <UploadIcon size={14} />
+                      นำเข้านักเรียน
+                    </button>
+                    <button
+                      onClick={() => setShowCreateRoom(true)}
+                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-border text-sm text-text-muted hover:text-text hover:bg-gray-50 dark:hover:bg-white/5 transition-all"
+                    >
+                      <PlusIcon size={14} />
+                      เพิ่มห้องเรียน
+                    </button>
+                  </div>
                 </div>
 
                 {/* Create classroom form */}
@@ -346,5 +375,6 @@ export default function SchoolAdminPage() {
         )}
       </div>
     </AppShell>
+    </>
   );
 }

@@ -9,6 +9,7 @@ import type {
   CreateClassroomInput,
   UserDisplayInfo,
 } from "@/types/school";
+import type { ValidatedImportRow, ImportResult, ImportRowResult } from "@/types/schoolImport";
 import type { SupabaseClient } from "@/lib/supabase/client";
 import type { Database } from "@/types/supabase";
 import { QueryError, warnRepo } from "./errors";
@@ -342,6 +343,111 @@ export class SupabaseSchoolRepository implements ISchoolRepository {
       result.set(row.user_id, mapDisplay(row));
     }
     return result;
+  }
+
+  // ── Student import ────────────────────────────────────────────────────────────
+
+  async listStudentCodes(organizationId: string): Promise<string[]> {
+    const { data, error } = await this.client
+      .from("child_profiles")
+      .select("student_code")
+      .eq("organization_id", organizationId)
+      .not("student_code", "is", null);
+
+    if (error) {
+      warnRepo("SupabaseSchoolRepository.listStudentCodes",
+        new QueryError("child_profiles", "select", error));
+      return [];
+    }
+    return (data ?? [])
+      .map((r) => (r as { student_code: string | null }).student_code ?? "")
+      .filter(Boolean);
+  }
+
+  async importStudents(
+    rows: ValidatedImportRow[],
+    classrooms: Classroom[],
+    organizationId: string,
+    creatorUserId: string,
+  ): Promise<ImportResult> {
+    const classroomMap = new Map(classrooms.map((c) => [c.name, c]));
+    const results: ImportRowResult[] = [];
+
+    for (const row of rows) {
+      // Skip rows that cannot be imported
+      if (row.status === "error") {
+        results.push({ rowNumber: row.rowNumber, status: "failed", message: row.errors.join("; ") });
+        continue;
+      }
+      if (row.isExistingInDb) {
+        results.push({ rowNumber: row.rowNumber, status: "skipped", message: row.warnings.find((w) => w.includes("ข้าม")) ?? "ซ้ำ" });
+        continue;
+      }
+
+      try {
+        const { data: profile, error: profileErr } = await this.client
+          .from("child_profiles")
+          .insert({
+            user_id:              creatorUserId,
+            name:                 row.name || row.nickname || `Student ${row.studentCode}`,
+            age:                  row.age ?? 6,
+            target_sound:         row.targetSounds[0] ?? "ก",
+            training_goal:        "",
+            selected_sound_id:    row.targetSounds[0] ?? "ก",
+            avatar_emoji:         "🧒",
+            organization_id:      organizationId,
+            student_code:         row.studentCode || null,
+            nickname:             row.nickname || null,
+            grade_level:          row.gradeLevel || null,
+            parent_email_pending: row.parentEmail || null,
+          })
+          .select()
+          .single();
+
+        if (profileErr || !profile) {
+          results.push({
+            rowNumber: row.rowNumber,
+            status:    "failed",
+            message:   profileErr?.message ?? "สร้างโปรไฟล์ไม่สำเร็จ",
+          });
+          continue;
+        }
+
+        const classroom = classroomMap.get(row.classroom);
+        if (classroom) {
+          const { error: csErr } = await this.client
+            .from("classroom_students")
+            .insert({ classroom_id: classroom.id, child_id: profile.id });
+
+          if (!csErr) {
+            const entry: ClassroomStudent = {
+              classroomId: classroom.id,
+              childId:     profile.id,
+              createdAt:   new Date().toISOString(),
+            };
+            this._classroomStudents = [...this._classroomStudents, entry];
+          }
+        }
+
+        results.push({ rowNumber: row.rowNumber, status: "created" });
+      } catch (e) {
+        results.push({
+          rowNumber: row.rowNumber,
+          status:    "failed",
+          message:   e instanceof Error ? e.message : "เกิดข้อผิดพลาด",
+        });
+      }
+    }
+
+    this._notify();
+    this.rehydrate();
+
+    return {
+      results,
+      createdCount: results.filter((r) => r.status === "created").length,
+      skippedCount: results.filter((r) => r.status === "skipped").length,
+      failedCount:  results.filter((r) => r.status === "failed").length,
+    };
   }
 
   public setScope(_userId: string | null): void {

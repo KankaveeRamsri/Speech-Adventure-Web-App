@@ -7,6 +7,7 @@ import type {
   CreateClassroomInput,
   UserDisplayInfo,
 } from "@/types/school";
+import type { ValidatedImportRow, ImportResult } from "@/types/schoolImport";
 
 /**
  * Contract for school / classroom data.
@@ -44,6 +45,21 @@ export interface ISchoolRepository {
   findTeacherByEmail(email: string): Promise<UserDisplayInfo | null>;
   /** Resolve display info for a batch of user IDs (best-effort; missing IDs are omitted). */
   resolveUserDisplays(userIds: string[]): Promise<Map<string, UserDisplayInfo>>;
+
+  // ── Student import ────────────────────────────────────────────────────────────
+  /** Returns existing student_codes for duplicate detection before import. */
+  listStudentCodes(organizationId: string): Promise<string[]>;
+  /**
+   * Bulk-create child_profiles + classroom_students for validated import rows.
+   * Rows with status "error" or isExistingInDb are skipped automatically.
+   * creatorUserId becomes the user_id on each created child_profile.
+   */
+  importStudents(
+    rows: ValidatedImportRow[],
+    classrooms: Classroom[],
+    organizationId: string,
+    creatorUserId: string,
+  ): Promise<ImportResult>;
 
   // ── Scope ─────────────────────────────────────────────────────────────────────
   setScope(userId: string | null): void;

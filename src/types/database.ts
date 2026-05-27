@@ -26,6 +26,12 @@ export type DbChildProfile = {
   avatar_emoji: string;
   created_at: string;
   updated_at: string;
+  // School import fields (nullable — only set for school-imported students)
+  organization_id: string | null;
+  student_code: string | null;
+  nickname: string | null;
+  grade_level: string | null;
+  parent_email_pending: string | null;
 };
 
 // ── practice_sessions ─────────────────────────────────────────────────────────

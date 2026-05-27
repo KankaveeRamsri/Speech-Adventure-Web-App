@@ -11,6 +11,7 @@ import type {
   CreateClassroomInput,
   UserDisplayInfo,
 } from "@/types/school";
+import type { ValidatedImportRow, ImportResult, ImportRowResult } from "@/types/schoolImport";
 
 // ── Stored shape ───────────────────────────────────────────────────────────────
 
@@ -255,6 +256,56 @@ export class LocalSchoolRepository implements ISchoolRepository {
 
   async resolveUserDisplays(_userIds: string[]): Promise<Map<string, UserDisplayInfo>> {
     return new Map(); // not available in local/demo mode
+  }
+
+  // ── Student import (local/demo mode — minimal mock) ──────────────────────────
+
+  async listStudentCodes(_organizationId: string): Promise<string[]> {
+    return []; // not tracked in local storage
+  }
+
+  async importStudents(
+    rows: ValidatedImportRow[],
+    classrooms: Classroom[],
+    _organizationId: string,
+    _creatorUserId: string,
+  ): Promise<ImportResult> {
+    _init();
+    const classroomMap = new Map(classrooms.map((c) => [c.name, c]));
+    const results: ImportRowResult[] = [];
+
+    for (const row of rows) {
+      if (row.status === "error") {
+        results.push({ rowNumber: row.rowNumber, status: "failed", message: row.errors.join("; ") });
+        continue;
+      }
+      if (row.isExistingInDb) {
+        results.push({ rowNumber: row.rowNumber, status: "skipped" });
+        continue;
+      }
+
+      const classroom = classroomMap.get(row.classroom);
+      if (classroom) {
+        const entry: ClassroomStudent = {
+          classroomId: classroom.id,
+          childId:     _id(),
+          createdAt:   new Date().toISOString(),
+        };
+        _store = { ..._store, classroomStudents: [..._store.classroomStudents, entry] };
+      }
+
+      results.push({ rowNumber: row.rowNumber, status: "created" });
+    }
+
+    _write();
+    _notify();
+
+    return {
+      results,
+      createdCount: results.filter((r) => r.status === "created").length,
+      skippedCount: results.filter((r) => r.status === "skipped").length,
+      failedCount:  results.filter((r) => r.status === "failed").length,
+    };
   }
 
   // ── Scope ─────────────────────────────────────────────────────────────────────
