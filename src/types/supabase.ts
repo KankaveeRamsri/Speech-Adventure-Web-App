@@ -176,6 +176,10 @@ export interface Database {
         Args: { p_name: string; p_type: DbOrganizationType };
         Returns: string;
       };
+      archive_student: {
+        Args: { p_child_id: string };
+        Returns: void;
+      };
     };
     Enums: {
       session_status: DbSessionStatus;

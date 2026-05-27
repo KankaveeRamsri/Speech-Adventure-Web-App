@@ -49,6 +49,7 @@ export default function ClassroomManagementPanel({ classroom, onClose }: Props) 
     findTeacherByEmail,
     resolveUserDisplays,
     resolveStudentProfiles,
+    archiveStudent,
   } = useSchool();
   const { profiles, sharedProfiles } = useChildProfile();
 
@@ -169,6 +170,23 @@ export default function ClassroomManagementPanel({ classroom, onClose }: Props) 
 
   async function handleRemoveStudent(childId: string) {
     try { await removeChild(classroom.id, childId); } catch { /* silent */ }
+  }
+
+  const [confirmArchiveId, setConfirmArchiveId] = useState<string | null>(null);
+  const [archiveBusy, setArchiveBusy] = useState(false);
+  const [archiveError, setArchiveError] = useState("");
+
+  async function handleArchiveStudent(childId: string) {
+    setArchiveBusy(true);
+    setArchiveError("");
+    try {
+      await archiveStudent(childId);
+      setConfirmArchiveId(null);
+    } catch (err) {
+      setArchiveError(err instanceof Error ? err.message : "เกิดข้อผิดพลาด");
+    } finally {
+      setArchiveBusy(false);
+    }
   }
 
   const meta = [
@@ -301,20 +319,54 @@ export default function ClassroomManagementPanel({ classroom, onClose }: Props) 
             {students.length > 0 ? (
               <ul className="space-y-2 mb-3">
                 {students.map((s) => (
-                  <li
-                    key={s.childId}
-                    className="flex items-center justify-between gap-2 px-3 py-2 rounded-xl bg-black/[0.03] dark:bg-white/[0.03] border border-border"
-                  >
-                    <span className="text-xs text-text truncate min-w-0">
-                      {getStudentDisplay(s.childId)}
-                    </span>
-                    <button
-                      onClick={() => handleRemoveStudent(s.childId)}
-                      aria-label="ลบนักเรียน"
-                      className="flex-shrink-0 text-text-muted hover:text-error transition-colors p-1 rounded"
-                    >
-                      <TrashIcon />
-                    </button>
+                  <li key={s.childId} className="rounded-xl border border-border bg-black/[0.03] dark:bg-white/[0.03] overflow-hidden">
+                    <div className="flex items-center justify-between gap-2 px-3 py-2">
+                      <span className="text-xs text-text truncate min-w-0">
+                        {getStudentDisplay(s.childId)}
+                      </span>
+                      <div className="flex items-center gap-1 flex-shrink-0">
+                        <button
+                          onClick={() => handleRemoveStudent(s.childId)}
+                          className="text-xs text-text-muted hover:text-text transition-colors px-2 py-1 rounded-lg hover:bg-black/5 dark:hover:bg-white/10"
+                        >
+                          นำออกจากห้อง
+                        </button>
+                        <button
+                          onClick={() => { setConfirmArchiveId(s.childId); setArchiveError(""); }}
+                          className="text-xs text-error/70 hover:text-error transition-colors px-2 py-1 rounded-lg hover:bg-error/5"
+                        >
+                          ลบนักเรียน
+                        </button>
+                      </div>
+                    </div>
+
+                    {confirmArchiveId === s.childId && (
+                      <div className="px-3 pb-3 pt-0 border-t border-border/50 bg-error/5">
+                        <p className="text-xs text-text mt-2 mb-2">
+                          ต้องการลบนักเรียนคนนี้ออกจากระบบโรงเรียนหรือไม่?{" "}
+                          <span className="text-text-muted">ข้อมูลการฝึกจะไม่ถูกลบทันที</span>
+                        </p>
+                        {archiveError && (
+                          <p className="text-xs text-error mb-2">{archiveError}</p>
+                        )}
+                        <div className="flex gap-2">
+                          <button
+                            onClick={() => handleArchiveStudent(s.childId)}
+                            disabled={archiveBusy}
+                            className="px-3 py-1.5 rounded-lg bg-error text-white text-xs font-semibold hover:bg-error/90 transition-all disabled:opacity-50"
+                          >
+                            {archiveBusy ? "กำลังลบ…" : "ยืนยันลบ"}
+                          </button>
+                          <button
+                            onClick={() => { setConfirmArchiveId(null); setArchiveError(""); }}
+                            disabled={archiveBusy}
+                            className="px-3 py-1.5 rounded-lg border border-border text-text-muted text-xs hover:text-text hover:bg-black/5 dark:hover:bg-white/10 transition-all disabled:opacity-50"
+                          >
+                            ยกเลิก
+                          </button>
+                        </div>
+                      </div>
+                    )}
                   </li>
                 ))}
               </ul>

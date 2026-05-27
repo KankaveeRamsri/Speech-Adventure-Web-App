@@ -72,6 +72,13 @@ export interface ISchoolRepository {
     creatorUserId: string,
   ): Promise<ImportResult>;
 
+  /**
+   * Soft-delete a student from the organisation: marks the profile archived,
+   * removes classroom membership, and revokes parent access/invitations.
+   * Practice data is NOT deleted.
+   */
+  archiveStudent(childId: string): Promise<void>;
+
   // ── Scope ─────────────────────────────────────────────────────────────────────
   setScope(userId: string | null): void;
 }

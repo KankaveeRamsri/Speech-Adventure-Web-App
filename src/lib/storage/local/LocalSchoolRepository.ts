@@ -316,6 +316,10 @@ export class LocalSchoolRepository implements ISchoolRepository {
     };
   }
 
+  async archiveStudent(_childId: string): Promise<void> {
+    // Not implemented in local/demo mode — no-op
+  }
+
   // ── Scope ─────────────────────────────────────────────────────────────────────
 
   setScope(userId: string | null): void {

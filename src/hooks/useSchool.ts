@@ -99,6 +99,11 @@ export function useSchool() {
     return school.resolveStudentProfiles(childIds);
   }
 
+  async function archiveStudent(childId: string): Promise<void> {
+    if (!school) throw new Error("School repository not available");
+    return school.archiveStudent(childId);
+  }
+
   return {
     organizations,
     listClassrooms,
@@ -114,5 +119,6 @@ export function useSchool() {
     findTeacherByEmail,
     resolveUserDisplays,
     resolveStudentProfiles,
+    archiveStudent,
   };
 }

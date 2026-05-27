@@ -352,7 +352,8 @@ export class SupabaseSchoolRepository implements ISchoolRepository {
       .from("child_profiles")
       .select("student_code")
       .eq("organization_id", organizationId)
-      .not("student_code", "is", null);
+      .not("student_code", "is", null)
+      .is("archived_at", null);
 
     if (error) {
       warnRepo("SupabaseSchoolRepository.listStudentCodes",
@@ -474,6 +475,14 @@ export class SupabaseSchoolRepository implements ISchoolRepository {
       });
     }
     return result;
+  }
+
+  async archiveStudent(childId: string): Promise<void> {
+    const { error } = await this.client.rpc("archive_student", { p_child_id: childId });
+    if (error) throw new Error(error.message);
+    // Remove from local cache so UI updates immediately
+    this._classroomStudents = this._classroomStudents.filter((s) => s.childId !== childId);
+    this._notify();
   }
 
   public setScope(_userId: string | null): void {
