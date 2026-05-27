@@ -3,22 +3,42 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import NavIcon, { type NavIconName } from "./NavIcon";
+import { useAuth, isTeacher, isSchoolAdmin } from "@/hooks/useAuth";
 
-const MOBILE_NAV: { href: string; label: string; icon: NavIconName; exact?: boolean }[] = [
-  { href: "/", label: "หน้าแรก", icon: "home", exact: true },
+type NavItem = { href: string; label: string; icon: NavIconName; exact?: boolean };
+
+const PARENT_MOBILE: NavItem[] = [
   { href: "/training", label: "ฝึก", icon: "training" },
   { href: "/library", label: "เนื้อหา", icon: "library" },
   { href: "/progress", label: "ก้าวหน้า", icon: "progress" },
   { href: "/rewards", label: "รางวัล", icon: "rewards" },
+  { href: "/settings", label: "ตั้งค่า", icon: "settings" },
+];
+
+const TEACHER_MOBILE: NavItem[] = [
+  { href: "/teacher", label: "ครู", icon: "teacher" },
+  { href: "/report", label: "รายงาน", icon: "report" },
+  { href: "/settings", label: "ตั้งค่า", icon: "settings" },
+];
+
+const SCHOOL_MOBILE: NavItem[] = [
+  { href: "/school", label: "โรงเรียน", icon: "school" },
+  { href: "/report", label: "รายงาน", icon: "report" },
+  { href: "/settings", label: "ตั้งค่า", icon: "settings" },
 ];
 
 export default function MobileNav() {
   const pathname = usePathname();
+  const { user } = useAuth();
 
-  const isActive = (item: (typeof MOBILE_NAV)[0]) =>
-    item.exact
-      ? pathname === item.href
-      : (pathname?.startsWith(item.href) ?? false);
+  const items = isSchoolAdmin(user)
+    ? SCHOOL_MOBILE
+    : isTeacher(user)
+    ? TEACHER_MOBILE
+    : PARENT_MOBILE;
+
+  const isActive = (item: NavItem) =>
+    item.exact ? pathname === item.href : (pathname?.startsWith(item.href) ?? false);
 
   return (
     <nav
@@ -26,7 +46,7 @@ export default function MobileNav() {
       aria-label="เมนูหลัก"
     >
       <div className="flex h-full">
-        {MOBILE_NAV.map((item) => {
+        {items.map((item) => {
           const active = isActive(item);
           return (
             <Link

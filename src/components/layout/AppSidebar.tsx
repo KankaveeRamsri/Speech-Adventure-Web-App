@@ -13,20 +13,28 @@ import { mockTrainingStages } from "@/data/speechAdventureMockData";
 
 type NavItem = { href: string; label: string; icon: NavIconName; exact?: boolean };
 
-const BASE_NAV_ITEMS: NavItem[] = [
-  { href: "/", label: "หน้าแรก", icon: "home", exact: true },
+const PARENT_NAV_ITEMS: NavItem[] = [
   { href: "/training", label: "ฝึกออกเสียง", icon: "training" },
   { href: "/library", label: "เนื้อหา", icon: "library" },
   { href: "/progress", label: "ความก้าวหน้า", icon: "progress" },
   { href: "/rewards", label: "รางวัล", icon: "rewards" },
   { href: "/report", label: "รายงาน", icon: "report" },
-  { href: "/demo", label: " Showcase", icon: "demo" },
+  { href: "/demo", label: "Showcase", icon: "demo" },
   { href: "/onboarding", label: "โปรไฟล์", icon: "profile" },
   { href: "/settings", label: "ตั้งค่า", icon: "settings" },
 ];
 
-const TEACHER_NAV_ITEM: NavItem = { href: "/teacher", label: "แดชบอร์ดครู", icon: "teacher" };
-const SCHOOL_NAV_ITEM: NavItem  = { href: "/school",  label: "จัดการโรงเรียน", icon: "school" };
+const TEACHER_NAV_ITEMS: NavItem[] = [
+  { href: "/teacher", label: "แดชบอร์ดครู", icon: "teacher" },
+  { href: "/report", label: "รายงาน", icon: "report" },
+  { href: "/settings", label: "ตั้งค่า", icon: "settings" },
+];
+
+const SCHOOL_ADMIN_NAV_ITEMS: NavItem[] = [
+  { href: "/school", label: "จัดการโรงเรียน", icon: "school" },
+  { href: "/report", label: "รายงาน", icon: "report" },
+  { href: "/settings", label: "ตั้งค่า", icon: "settings" },
+];
 
 function MicLogoIcon({ size = 16 }: { size?: number }) {
   return (
@@ -70,10 +78,10 @@ export default function AppSidebar() {
   const { user } = useAuth();
 
   const NAV_ITEMS: NavItem[] = isSchoolAdmin(user)
-    ? [SCHOOL_NAV_ITEM, ...BASE_NAV_ITEMS]
+    ? SCHOOL_ADMIN_NAV_ITEMS
     : isTeacher(user)
-    ? [TEACHER_NAV_ITEM, ...BASE_NAV_ITEMS]
-    : BASE_NAV_ITEMS;
+    ? TEACHER_NAV_ITEMS
+    : PARENT_NAV_ITEMS;
 
   const isActive = (item: (typeof NAV_ITEMS)[0]) =>
     item.exact ? pathname === item.href : (pathname?.startsWith(item.href) ?? false);
@@ -102,10 +110,23 @@ export default function AppSidebar() {
     ? "w-0 opacity-0 overflow-hidden"
     : "w-auto opacity-100";
 
-  // ── Context section (child info + actions) ──
-  const contextSection = (
+  // ── Context section (role-aware) ──
+  const isProfRole = isSchoolAdmin(user) || isTeacher(user);
+  const contextSection = isProfRole ? (
+    // Teacher / school_admin: minimal context (no child selector)
+    <div className={`px-3 py-3 border-b border-border flex-shrink-0 ${isCollapsed ? "" : ""}`}>
+      {!isCollapsed && (
+        <div className="flex items-center justify-between">
+          <span className="text-xs font-medium text-text-muted">
+            {isSchoolAdmin(user) ? "ผู้ดูแลโรงเรียน" : "ครูผู้สอน"}
+          </span>
+          <ThemeToggle />
+        </div>
+      )}
+    </div>
+  ) : (
+    // Parent / default: full child context
     <div className={`px-3 py-3 border-b border-border flex-shrink-0 ${isCollapsed ? "flex items-center justify-center" : "space-y-2.5"}`}>
-      {/* Child selector */}
       {isCollapsed ? (
         <ChildSelector collapsed />
       ) : (
@@ -274,28 +295,39 @@ export default function AppSidebar() {
 
         {/* Mobile context */}
         <div className="px-4 py-3 border-b border-border flex-shrink-0 space-y-2.5">
-          <ChildSelector />
-          <div className="flex items-center gap-2 flex-wrap">
-            {isHydrated && selectedSoundId && (
-              <span className="inline-flex items-center px-2 py-0.5 rounded-full bg-primary/10 text-primary text-xs font-bold">
-                เสียง {selectedSoundId}
+          {isProfRole ? (
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-medium text-text-muted">
+                {isSchoolAdmin(user) ? "ผู้ดูแลโรงเรียน" : "ครูผู้สอน"}
               </span>
-            )}
-            {isHydrated && stars > 0 && (
-              <Link href="/rewards" className="flex items-center gap-1 text-xs font-bold text-secondary hover:text-secondary/80 transition-colors" aria-label={`ดาวสะสม ${stars} ดาว`}>
-                <StarFilledIcon size={12} />
-                <span>{stars}</span>
-              </Link>
-            )}
-          </div>
-          {isHydrated && currentStage && (
-            <Link
-              href={`/training/${currentStage.slug}`}
-              onClick={() => setMobileOpen(false)}
-              className="flex items-center justify-center gap-1.5 w-full px-3 py-2 rounded-xl bg-primary text-white text-xs font-semibold hover:bg-primary/90 transition-all active:scale-[0.97]"
-            >
-              ฝึกต่อ
-            </Link>
+              <ThemeToggle />
+            </div>
+          ) : (
+            <>
+              <ChildSelector />
+              <div className="flex items-center gap-2 flex-wrap">
+                {isHydrated && selectedSoundId && (
+                  <span className="inline-flex items-center px-2 py-0.5 rounded-full bg-primary/10 text-primary text-xs font-bold">
+                    เสียง {selectedSoundId}
+                  </span>
+                )}
+                {isHydrated && stars > 0 && (
+                  <Link href="/rewards" className="flex items-center gap-1 text-xs font-bold text-secondary hover:text-secondary/80 transition-colors" aria-label={`ดาวสะสม ${stars} ดาว`}>
+                    <StarFilledIcon size={12} />
+                    <span>{stars}</span>
+                  </Link>
+                )}
+              </div>
+              {isHydrated && currentStage && (
+                <Link
+                  href={`/training/${currentStage.slug}`}
+                  onClick={() => setMobileOpen(false)}
+                  className="flex items-center justify-center gap-1.5 w-full px-3 py-2 rounded-xl bg-primary text-white text-xs font-semibold hover:bg-primary/90 transition-all active:scale-[0.97]"
+                >
+                  ฝึกต่อ
+                </Link>
+              )}
+            </>
           )}
         </div>
 

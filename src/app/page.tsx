@@ -44,34 +44,22 @@ function LandingNav() {
           <span className="font-bold text-base text-text">Speech Adventure</span>
         </div>
 
-        {/* Nav links */}
-        <div className="flex items-center gap-1">
+        {/* Nav actions */}
+        <div className="flex items-center gap-1.5">
+          <ThemeToggle />
+          <div className="w-px h-5 bg-border mx-1.5" aria-hidden="true" />
           <Link
-            href="/onboarding"
-            className="text-sm font-medium text-text-muted hover:text-text px-3 py-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-white/8 transition-all hidden sm:block"
-          >
-            ตั้งค่า
-          </Link>
-          <Link
-            href="/training"
+            href="/auth/signin"
             className="text-sm font-medium text-text-muted hover:text-text px-3 py-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-white/8 transition-all"
           >
-            เริ่มฝึก
+            เข้าสู่ระบบ
           </Link>
           <Link
-            href="/progress"
-            className="text-sm font-medium text-text-muted hover:text-text px-3 py-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-white/8 transition-all hidden sm:block"
+            href="/auth/signup"
+            className="text-sm font-semibold text-white bg-primary px-3 py-1.5 rounded-lg hover:bg-primary/90 transition-all active:scale-[0.97]"
           >
-            ความก้าวหน้า
+            เริ่มต้นฟรี
           </Link>
-          <Link
-            href="/report"
-            className="text-sm font-medium text-text-muted hover:text-text px-3 py-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-white/8 transition-all hidden md:block"
-          >
-            รายงาน
-          </Link>
-          <div className="w-px h-5 bg-border mx-1" aria-hidden="true" />
-          <ThemeToggle />
         </div>
       </div>
     </nav>
@@ -155,9 +143,8 @@ export default function LandingPage() {
 
             {/* Footer links */}
             <div className="flex items-center gap-4">
-              <Link href="/training" className="text-xs text-text-muted hover:text-text transition-colors">เริ่มฝึก</Link>
-              <Link href="/progress" className="text-xs text-text-muted hover:text-text transition-colors">ความก้าวหน้า</Link>
-              <Link href="/report" className="text-xs text-text-muted hover:text-text transition-colors">รายงาน</Link>
+              <Link href="/auth/signin" className="text-xs text-text-muted hover:text-text transition-colors">เข้าสู่ระบบ</Link>
+              <Link href="/auth/signup" className="text-xs text-text-muted hover:text-text transition-colors">สมัครสมาชิก</Link>
               <span className="text-xs text-text-muted">Prototype v1.0 · 2026</span>
             </div>
           </div>
