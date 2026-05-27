@@ -4,24 +4,44 @@ import { useState, useCallback } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import AppShell from "@/components/layout/AppShell";
+import ThemeToggle from "@/components/ui/ThemeToggle";
 import CloudSyncPreview from "@/components/sync/CloudSyncPreview";
 import {
   InviteNewMemberSection,
   SentInvitesSection,
   ChildAccessSection,
 } from "@/components/layout/InviteSection";
-import { useAuth } from "@/hooks/useAuth";
+import { useAuth, isParent, isTeacher, isSchoolAdmin } from "@/hooks/useAuth";
 import { useChildAccess } from "@/hooks/useChildAccess";
 import { useInvitations } from "@/hooks/useInvitations";
 import { useCurrentChildAccess } from "@/hooks/useCurrentChildAccess";
 import { ACCESS_ROLE_LABELS } from "@/types/childAccess";
 import { INVITATION_ROLE_LABELS } from "@/types/invitations";
+import { isSupabaseConfigured } from "@/lib/supabase/client";
+
+// ── Role display helpers ──────────────────────────────────────────────────────
+
+const ROLE_LABELS: Record<string, string> = {
+  parent:      "ผู้ปกครอง",
+  teacher:     "ครูผู้สอน",
+  school_admin:"ผู้ดูแลโรงเรียน",
+  therapist:   "นักบำบัด",
+};
+
+function roleBadgeClass(role: string): string {
+  switch (role) {
+    case "teacher":      return "bg-violet-500/10 text-violet-700 dark:text-violet-300";
+    case "school_admin": return "bg-amber-500/10 text-amber-700 dark:text-amber-300";
+    case "therapist":    return "bg-emerald-500/10 text-emerald-700 dark:text-emerald-300";
+    default:             return "bg-primary/10 text-primary";
+  }
+}
 
 // ── Icons ─────────────────────────────────────────────────────────────────────
 
-function UserCircleIcon() {
+function UserCircleIcon({ size = 18 }: { size?: number }) {
   return (
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
       <path d="M18 20a6 6 0 0 0-12 0" />
       <circle cx="12" cy="10" r="4" />
       <circle cx="12" cy="12" r="10" />
@@ -39,12 +59,29 @@ function LogOutIcon() {
   );
 }
 
-function LogInIcon() {
+function ChevronRightIcon() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M9 18l6-6-6-6" />
+    </svg>
+  );
+}
+
+function BuildingIcon({ size = 16 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
+      <rect x="9" y="13" width="6" height="9" />
+      <path d="M9 9h.01M15 9h.01" />
+    </svg>
+  );
+}
+
+function LinkIcon() {
   return (
     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4" />
-      <polyline points="10 17 15 12 10 7" />
-      <line x1="15" y1="12" x2="3" y2="12" />
+      <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" />
+      <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" />
     </svg>
   );
 }
@@ -60,15 +97,16 @@ function SectionHeader({ title, description }: { title: string; description?: st
   );
 }
 
-function SkeletonBlock({ className = "" }: { className?: string }) {
-  return <div className={`rounded-lg bg-border/60 animate-pulse ${className}`} aria-hidden="true" />;
-}
+// ── Account Card (authenticated) ──────────────────────────────────────────────
 
-// ── Account section ───────────────────────────────────────────────────────────
-
-function AccountSection() {
-  const { user, isAuthenticated, isLoading, signOut } = useAuth();
+function AccountCard() {
+  const { user, signOut } = useAuth();
   const [signingOut, setSigningOut] = useState(false);
+
+  const role = user?.role ?? "parent";
+  const label = ROLE_LABELS[role] ?? role;
+  const badgeClass = roleBadgeClass(role);
+  const isCloud = isSupabaseConfigured();
 
   async function handleSignOut() {
     setSigningOut(true);
@@ -76,89 +114,118 @@ function AccountSection() {
     setSigningOut(false);
   }
 
-  if (isLoading) {
-    return (
-      <div className="bg-surface border border-border rounded-xl px-4 py-4 flex items-center gap-3">
-        <SkeletonBlock className="w-9 h-9 rounded-full flex-shrink-0" />
-        <div className="space-y-2 flex-1">
-          <SkeletonBlock className="h-3.5 w-40" />
-          <SkeletonBlock className="h-3 w-24" />
-        </div>
-      </div>
-    );
-  }
+  if (!user) return null;
 
-  if (isAuthenticated && user) {
-    return (
-      <div className="bg-surface border border-border rounded-xl divide-y divide-border">
-        {/* Signed-in row */}
-        <div className="flex items-center gap-3 px-4 py-3.5">
-          <div className="w-9 h-9 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0 text-primary">
-            <UserCircleIcon />
-          </div>
-          <div className="flex-1 min-w-0">
-            <p className="text-sm font-semibold text-text truncate">{user.email || "ผู้ใช้งาน"}</p>
-            <p className="text-xs text-success mt-0.5">เข้าสู่ระบบแล้ว</p>
-          </div>
-        </div>
-        {/* Sign-out row */}
-        <div className="px-4 py-3">
-          <button
-            type="button"
-            onClick={handleSignOut}
-            disabled={signingOut}
-            className="flex items-center gap-2 text-sm font-medium text-error hover:text-error/80 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-          >
-            <LogOutIcon />
-            {signingOut ? "กำลังออกจากระบบ…" : "ออกจากระบบ"}
-          </button>
-        </div>
-      </div>
-    );
-  }
-
-  // Not signed in
   return (
     <div className="bg-surface border border-border rounded-xl divide-y divide-border">
-      <div className="flex items-center gap-3 px-4 py-3.5">
-        <div className="w-9 h-9 rounded-full bg-border/60 flex items-center justify-center flex-shrink-0 text-text-muted">
-          <UserCircleIcon />
+      {/* User info */}
+      <div className="flex items-center gap-3 px-4 py-4">
+        <div className={`w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 ${badgeClass}`}>
+          <UserCircleIcon size={20} />
         </div>
-        <div className="flex-1">
-          <p className="text-sm font-medium text-text-muted">ยังไม่ได้เข้าสู่ระบบ</p>
-          <p className="text-xs text-text-muted/70 mt-0.5">เข้าสู่ระบบเพื่อซิงค์ข้อมูลไปยัง Cloud</p>
+        <div className="flex-1 min-w-0">
+          <p className="text-sm font-semibold text-text truncate">{user.email}</p>
+          <div className="flex items-center gap-2 mt-1 flex-wrap">
+            <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${badgeClass}`}>
+              {label}
+            </span>
+            {isCloud ? (
+              <span className="inline-flex items-center gap-1 text-xs text-success">
+                <span className="w-1.5 h-1.5 rounded-full bg-success flex-shrink-0" aria-hidden="true" />
+                เชื่อมต่อ Cloud
+              </span>
+            ) : (
+              <span className="text-xs text-text-muted">โหมดออฟไลน์</span>
+            )}
+          </div>
         </div>
       </div>
-      <div className="flex items-center gap-3 px-4 py-3">
-        <Link
-          href="/auth/signin"
-          className="inline-flex items-center gap-1.5 text-sm font-semibold text-primary hover:text-primary/80 transition-colors"
+      {/* Sign out */}
+      <div className="px-4 py-3">
+        <button
+          type="button"
+          onClick={handleSignOut}
+          disabled={signingOut}
+          className="flex items-center gap-2 text-sm font-medium text-error hover:text-error/80 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
         >
-          <LogInIcon />
-          เข้าสู่ระบบ
-        </Link>
-        <span className="text-border">·</span>
-        <Link
-          href="/auth/signup"
-          className="text-sm text-text-muted hover:text-text transition-colors"
-        >
-          สมัครสมาชิก
-        </Link>
+          <LogOutIcon />
+          {signingOut ? "กำลังออกจากระบบ…" : "ออกจากระบบ"}
+        </button>
       </div>
     </div>
   );
 }
 
-// ── Received invite lookup ─────────────────────────────────────────────────────
+// ── Local mode card (anonymous user) ─────────────────────────────────────────
 
-function LinkIcon() {
+function LocalModeCard() {
   return (
-    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" />
-      <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" />
-    </svg>
+    <div className="bg-surface border border-border rounded-xl px-4 py-4 flex items-start gap-3">
+      <div className="w-9 h-9 rounded-full bg-border/50 flex items-center justify-center flex-shrink-0 text-text-muted mt-0.5">
+        <UserCircleIcon />
+      </div>
+      <div className="flex-1">
+        <p className="text-sm font-semibold text-text">โหมดออฟไลน์</p>
+        <p className="text-xs text-text-muted mt-0.5">
+          ข้อมูลถูกบันทึกไว้ในอุปกรณ์นี้เท่านั้น
+          {" "}
+          <Link href="/auth/signup" className="text-primary hover:text-primary/80 font-medium transition-colors">
+            สมัครสมาชิก
+          </Link>
+          {" "}หรือ{" "}
+          <Link href="/auth/signin" className="text-primary hover:text-primary/80 font-medium transition-colors">
+            เข้าสู่ระบบ
+          </Link>
+          {" "}เพื่อซิงค์ข้อมูลไปยัง Cloud
+        </p>
+      </div>
+    </div>
   );
 }
+
+// ── Appearance ────────────────────────────────────────────────────────────────
+
+function AppearanceSection() {
+  return (
+    <div className="bg-surface border border-border rounded-xl divide-y divide-border">
+      <div className="flex items-center justify-between px-4 py-3.5">
+        <div>
+          <p className="text-sm font-medium text-text">ธีมแอป</p>
+          <p className="text-xs text-text-muted mt-0.5">เลือกโหมดสว่างหรือมืด</p>
+        </div>
+        <ThemeToggle />
+      </div>
+    </div>
+  );
+}
+
+// ── School admin shortcut ─────────────────────────────────────────────────────
+
+function SchoolManagementCard() {
+  return (
+    <div className="bg-surface border border-border rounded-xl overflow-hidden">
+      <Link
+        href="/school"
+        className="flex items-center justify-between px-4 py-4 hover:bg-gray-50 dark:hover:bg-white/5 transition-colors group"
+      >
+        <div className="flex items-center gap-3">
+          <div className="w-9 h-9 rounded-xl bg-amber-500/10 flex items-center justify-center text-amber-700 dark:text-amber-300 flex-shrink-0">
+            <BuildingIcon size={17} />
+          </div>
+          <div>
+            <p className="text-sm font-semibold text-text">จัดการโรงเรียน</p>
+            <p className="text-xs text-text-muted mt-0.5">ดูและจัดการองค์กร ห้องเรียน และครู</p>
+          </div>
+        </div>
+        <span className="text-text-muted group-hover:text-text transition-colors flex-shrink-0">
+          <ChevronRightIcon />
+        </span>
+      </Link>
+    </div>
+  );
+}
+
+// ── Received invite lookup ────────────────────────────────────────────────────
 
 function ReceivedInviteSection() {
   const router = useRouter();
@@ -217,7 +284,7 @@ function ReceivedInviteSection() {
   );
 }
 
-// ── Received invitations (pending invites addressed to me) ────────────────────
+// ── Pending received invitations ──────────────────────────────────────────────
 
 function PendingReceivedInvites() {
   const router = useRouter();
@@ -256,7 +323,7 @@ function PendingReceivedInvites() {
   );
 }
 
-// ── Received grants (child access shared to current user) ─────────────────────
+// ── Received grants ───────────────────────────────────────────────────────────
 
 function ReceivedGrantsSection() {
   const { receivedGrants } = useChildAccess();
@@ -276,9 +343,7 @@ function ReceivedGrantsSection() {
             <p className="text-sm font-semibold text-text truncate">
               {grant.childSnapshot?.name ?? grant.childId}
             </p>
-            <p className="text-xs text-text-muted">
-              {ACCESS_ROLE_LABELS[grant.role]}
-            </p>
+            <p className="text-xs text-text-muted">{ACCESS_ROLE_LABELS[grant.role]}</p>
           </div>
           <span className="text-xs px-2 py-0.5 rounded-full bg-success/10 text-success border border-success/20 flex-shrink-0">
             ใช้งานอยู่
@@ -292,7 +357,13 @@ function ReceivedGrantsSection() {
 // ── Page ──────────────────────────────────────────────────────────────────────
 
 export default function SettingsPage() {
+  const { user } = useAuth();
   const { isOwner, isSharedChild } = useCurrentChildAccess();
+
+  // Anonymous (local mode) defaults to parent flow
+  const isParentUser = !user || isParent(user);
+  const isTeacherUser = !!user && isTeacher(user);
+  const isAdminUser   = !!user && isSchoolAdmin(user);
 
   return (
     <AppShell>
@@ -301,98 +372,140 @@ export default function SettingsPage() {
         {/* Page title */}
         <div>
           <h1 className="text-xl font-bold text-text">ตั้งค่า</h1>
-          <p className="text-sm text-text-muted mt-1">จัดการบัญชีและการเชื่อมต่อ Cloud</p>
+          <p className="text-sm text-text-muted mt-1">จัดการบัญชีและการตั้งค่าแอป</p>
         </div>
 
-        {/* Account section */}
+        {/* ── Account ───────────────────────────────────────────────────── */}
         <section>
-          <SectionHeader
-            title="บัญชีผู้ใช้"
-            description="สถานะการเข้าสู่ระบบสำหรับการซิงค์ข้อมูลกับ Supabase"
-          />
-          <AccountSection />
+          <SectionHeader title="บัญชีผู้ใช้" />
+          {user ? <AccountCard /> : <LocalModeCard />}
         </section>
 
-        {/* Cloud sync section */}
+        {/* ── Appearance ────────────────────────────────────────────────── */}
         <section>
-          <SectionHeader
-            title="ซิงค์ข้อมูลไปยัง Cloud"
-            description="แสดงตัวอย่างการย้ายข้อมูลจากอุปกรณ์นี้ไปยัง Supabase — ยังไม่มีการเปลี่ยนแปลงข้อมูลจริง"
-          />
-          <div className="bg-surface border border-border rounded-xl p-5">
-            <CloudSyncPreview />
-          </div>
+          <SectionHeader title="การแสดงผล" />
+          <AppearanceSection />
         </section>
 
-        {/* 1–3. Owner-only: invite, access management, sent invites */}
-        {isOwner ? (
+        {/* ── School admin sections ─────────────────────────────────────── */}
+        {isAdminUser && (
           <>
-            {/* 1. Invite new member */}
             <section>
-              <SectionHeader
-                title="เชิญสมาชิกใหม่"
-                description="เชิญผู้ปกครอง ครู หรือนักบำบัดเข้ามาดูพัฒนาการของเด็ก"
-              />
-              <div className="bg-surface border border-border rounded-xl p-5">
-                <InviteNewMemberSection />
-              </div>
+              <SectionHeader title="การจัดการโรงเรียน" />
+              <SchoolManagementCard />
             </section>
-
-            {/* 2. Active child access — grouped by child */}
             <section>
               <SectionHeader
-                title="สมาชิกที่เข้าถึงเด็กได้"
-                description="จัดการสิทธิ์การเข้าถึงของสมาชิกแต่ละคนต่อเด็กแต่ละคน"
+                title="คำเชิญและสิทธิ์ที่ได้รับ"
+                description="ตอบรับคำเชิญเข้าร่วมองค์กรหรือห้องเรียน"
               />
-              <div className="bg-surface border border-border rounded-xl p-5">
-                <ChildAccessSection />
-              </div>
-            </section>
-
-            {/* 3. Sent invitations history */}
-            <section>
-              <SectionHeader
-                title="คำเชิญที่ส่งแล้ว"
-                description="ประวัติคำเชิญและสถานะการตอบรับ"
-              />
-              <div className="bg-surface border border-border rounded-xl p-5">
-                <SentInvitesSection />
+              <div className="bg-surface border border-border rounded-xl p-5 space-y-4">
+                <PendingReceivedInvites />
+                <ReceivedInviteSection />
               </div>
             </section>
           </>
-        ) : isSharedChild ? (
+        )}
+
+        {/* ── Teacher sections ──────────────────────────────────────────── */}
+        {isTeacherUser && (
           <section>
-            <SectionHeader title="การจัดการสิทธิ์" />
-            <div className="bg-surface border border-border rounded-xl px-4 py-5 flex items-start gap-3">
-              <div className="w-8 h-8 rounded-lg bg-info/10 flex items-center justify-center flex-shrink-0 mt-0.5">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#5BA4CF" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                  <circle cx="12" cy="12" r="10" />
-                  <line x1="12" y1="8" x2="12" y2="12" />
-                  <line x1="12" y1="16" x2="12.01" y2="16" />
-                </svg>
-              </div>
-              <div>
-                <p className="text-sm font-semibold text-text">คุณมีสิทธิ์ดูเท่านั้น</p>
-                <p className="text-xs text-text-muted mt-0.5">การเชิญสมาชิกและจัดการสิทธิ์ทำได้เฉพาะเจ้าของโปรไฟล์เด็ก</p>
-              </div>
+            <SectionHeader
+              title="คำเชิญและสิทธิ์ที่ได้รับ"
+              description="ตอบรับคำเชิญและดูสิทธิ์การเข้าถึงเด็กที่ได้รับ"
+            />
+            <div className="bg-surface border border-border rounded-xl p-5 space-y-4">
+              <PendingReceivedInvites />
+              <ReceivedInviteSection />
+              <ReceivedGrantsSection />
             </div>
           </section>
-        ) : null}
+        )}
 
-        {/* Received invitations / grants (for current user) */}
-        <section>
-          <SectionHeader
-            title="คำเชิญที่ได้รับ"
-            description="ตอบรับคำเชิญจากผู้ปกครอง ครู หรือนักบำบัดท่านอื่น"
-          />
-          <div className="bg-surface border border-border rounded-xl p-5 space-y-4">
-            <PendingReceivedInvites />
-            <ReceivedInviteSection />
-            <ReceivedGrantsSection />
-          </div>
-        </section>
+        {/* ── Parent sections ───────────────────────────────────────────── */}
+        {isParentUser && (
+          <>
+            {/* Cloud sync */}
+            <section>
+              <SectionHeader
+                title="ซิงค์ข้อมูลไปยัง Cloud"
+                description="ย้ายข้อมูลจากอุปกรณ์นี้ไปยัง Supabase — ยังไม่มีการเปลี่ยนแปลงข้อมูลจริง"
+              />
+              <div className="bg-surface border border-border rounded-xl p-5">
+                <CloudSyncPreview />
+              </div>
+            </section>
 
-        {/* App info section */}
+            {/* Owner: invite management */}
+            {isOwner ? (
+              <>
+                <section>
+                  <SectionHeader
+                    title="เชิญสมาชิกใหม่"
+                    description="เชิญผู้ปกครอง ครู หรือนักบำบัดเข้ามาดูพัฒนาการของเด็ก"
+                  />
+                  <div className="bg-surface border border-border rounded-xl p-5">
+                    <InviteNewMemberSection />
+                  </div>
+                </section>
+
+                <section>
+                  <SectionHeader
+                    title="สมาชิกที่เข้าถึงเด็กได้"
+                    description="จัดการสิทธิ์การเข้าถึงของสมาชิกแต่ละคน"
+                  />
+                  <div className="bg-surface border border-border rounded-xl p-5">
+                    <ChildAccessSection />
+                  </div>
+                </section>
+
+                <section>
+                  <SectionHeader
+                    title="คำเชิญที่ส่งแล้ว"
+                    description="ประวัติคำเชิญและสถานะการตอบรับ"
+                  />
+                  <div className="bg-surface border border-border rounded-xl p-5">
+                    <SentInvitesSection />
+                  </div>
+                </section>
+              </>
+            ) : isSharedChild ? (
+              <section>
+                <SectionHeader title="การจัดการสิทธิ์" />
+                <div className="bg-surface border border-border rounded-xl px-4 py-5 flex items-start gap-3">
+                  <div className="w-8 h-8 rounded-lg bg-info/10 flex items-center justify-center flex-shrink-0 mt-0.5">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#5BA4CF" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                      <circle cx="12" cy="12" r="10" />
+                      <line x1="12" y1="8" x2="12" y2="12" />
+                      <line x1="12" y1="16" x2="12.01" y2="16" />
+                    </svg>
+                  </div>
+                  <div>
+                    <p className="text-sm font-semibold text-text">คุณมีสิทธิ์ดูเท่านั้น</p>
+                    <p className="text-xs text-text-muted mt-0.5">
+                      การเชิญสมาชิกและจัดการสิทธิ์ทำได้เฉพาะเจ้าของโปรไฟล์เด็ก
+                    </p>
+                  </div>
+                </div>
+              </section>
+            ) : null}
+
+            {/* Received invitations */}
+            <section>
+              <SectionHeader
+                title="คำเชิญที่ได้รับ"
+                description="ตอบรับคำเชิญจากผู้ปกครอง ครู หรือนักบำบัดท่านอื่น"
+              />
+              <div className="bg-surface border border-border rounded-xl p-5 space-y-4">
+                <PendingReceivedInvites />
+                <ReceivedInviteSection />
+                <ReceivedGrantsSection />
+              </div>
+            </section>
+          </>
+        )}
+
+        {/* ── App info ──────────────────────────────────────────────────── */}
         <section>
           <SectionHeader title="เกี่ยวกับแอป" />
           <div className="bg-surface border border-border rounded-xl divide-y divide-border">
@@ -402,7 +515,9 @@ export default function SettingsPage() {
             </div>
             <div className="flex items-center justify-between px-4 py-3">
               <span className="text-sm text-text-muted">ข้อมูลจัดเก็บที่</span>
-              <span className="text-sm font-medium text-text">localStorage</span>
+              <span className="text-sm font-medium text-text">
+                {isSupabaseConfigured() ? "Supabase Cloud" : "localStorage"}
+              </span>
             </div>
             <div className="flex items-center justify-between px-4 py-3">
               <span className="text-sm text-text-muted">Storage Provider</span>
