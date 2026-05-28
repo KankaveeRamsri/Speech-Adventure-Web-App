@@ -133,6 +133,21 @@ export default function AttemptDetailDrawer({ attempt, linkedSession, onClose, o
             <p className="text-lg font-bold text-text">{attempt.promptText}</p>
           </div>
 
+          {/* Transcript (AI heard) */}
+          {attempt.transcript && (
+            <div className="bg-bg dark:bg-white/5 border border-border rounded-xl p-4">
+              <p className="text-xs text-text-muted mb-1">ที่ AI ได้ยิน</p>
+              <p className="text-base font-medium text-text">&ldquo;{attempt.transcript}&rdquo;</p>
+              <p className="text-xs text-text-muted mt-1.5">
+                {attempt.confidence >= 0.8
+                  ? "ฟังได้ชัดเจน"
+                  : attempt.confidence >= 0.55
+                  ? "ค่อนข้างชัด"
+                  : "เสียงยังไม่ชัด ลองอัดใหม่อีกครั้ง"}
+              </p>
+            </div>
+          )}
+
           {/* Stats grid */}
           <div className="grid grid-cols-2 gap-3">
             <DetailMetricCard
@@ -142,7 +157,7 @@ export default function AttemptDetailDrawer({ attempt, linkedSession, onClose, o
             />
             <DetailMetricCard
               label="ความแม่นยำ"
-              value={`${attempt.confidence}%`}
+              value={`${Math.round(attempt.confidence * 100)}%`}
               valueColor="#6C63FF"
             />
             <DetailMetricCard
@@ -197,6 +212,29 @@ export default function AttemptDetailDrawer({ attempt, linkedSession, onClose, o
             <div className="bg-primary/8 border border-primary/15 rounded-xl p-4">
               <p className="text-xs font-semibold text-primary mb-1.5">คำแนะนำ</p>
               <p className="text-sm text-text leading-relaxed">{attempt.recommendation}</p>
+            </div>
+          )}
+
+          {/* Practice tip */}
+          {attempt.practiceTip && (
+            <div className="bg-success/8 border border-success/20 rounded-xl p-4">
+              <p className="text-xs font-semibold text-success mb-1.5">เคล็ดลับการฝึก</p>
+              <p className="text-sm text-text leading-relaxed">{attempt.practiceTip}</p>
+            </div>
+          )}
+
+          {/* Detected issues */}
+          {attempt.detectedIssues && attempt.detectedIssues.length > 0 && (
+            <div className="bg-warning/8 border border-warning/20 rounded-xl p-4">
+              <p className="text-xs font-semibold text-warning mb-2">ปัญหาที่ AI ตรวจพบ</p>
+              <ul className="space-y-1">
+                {attempt.detectedIssues.map((issue, i) => (
+                  <li key={i} className="flex items-start gap-2 text-sm text-text">
+                    <span className="text-warning flex-shrink-0 mt-0.5 font-bold">·</span>
+                    {issue}
+                  </li>
+                ))}
+              </ul>
             </div>
           )}
 

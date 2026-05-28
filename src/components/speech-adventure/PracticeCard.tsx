@@ -68,6 +68,9 @@ function buildAttempt(
     recommendation: evalResult.recommendation,
     starsEarned: computeStars(evalResult.score),
     createdAt: evalResult.createdAt,
+    transcript: evalResult.transcript,
+    practiceTip: evalResult.practiceTip,
+    detectedIssues: evalResult.detectedIssues?.length ? evalResult.detectedIssues : undefined,
   };
 }
 

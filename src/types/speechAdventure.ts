@@ -126,6 +126,12 @@ export interface PracticeAttempt {
   createdAt: string;
   /** Supabase Storage path set after a successful audio upload (Phase 35+). */
   audioPath?: string;
+  /** AI transcript of the spoken audio. Populated by OpenAI provider. */
+  transcript?: string;
+  /** Short practice tip from AI evaluation. */
+  practiceTip?: string;
+  /** Issues detected by AI evaluation (e.g. mispronunciation patterns). */
+  detectedIssues?: string[];
 }
 
 export interface SpeechProgress {

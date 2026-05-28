@@ -1,10 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import Link from "next/link";
 import ChildProfileCard from "@/components/speech-adventure/ChildProfileCard";
-import RecentAttemptsList from "@/components/speech-adventure/RecentAttemptsList";
 import StageProgressCard from "@/components/speech-adventure/StageProgressCard";
+import PermissionBanner from "@/components/ui/PermissionBanner";
 import ObservationNoteList from "@/components/observations/ObservationNoteList";
 import AppShell from "@/components/layout/AppShell";
 import SessionDetailDrawer from "@/components/details/SessionDetailDrawer";
@@ -70,6 +70,15 @@ function formatThaiDate(): string {
   });
 }
 
+function formatShortDate(iso: string | null): string {
+  if (!iso) return "—";
+  try {
+    return new Date(iso).toLocaleDateString("th-TH", { day: "numeric", month: "short" });
+  } catch {
+    return "—";
+  }
+}
+
 // ─── Tabs ───────────────────────────────────────────────────────────────────────
 
 const TABS = [
@@ -86,10 +95,10 @@ type TabId = (typeof TABS)[number]["id"];
 
 export default function ProgressDashboardPage() {
   const { progress: progressRepo, observations: obsRepo } = useRepositories();
-  const { progress, summary, clearProgressForChild, getStageStatus, getStageAttempts, isHydrated } =
+  const { progress, summary, attempts, clearProgressForChild, getStageStatus, getStageAttempts, isHydrated } =
     useSpeechProgress();
   const { profile, hasProfile } = useChildProfile();
-  const { isOwner, isSharedChild, canEditChild, canExportReport } = useCurrentChildAccess();
+  const { isOwner, isSharedChild, canEditChild, canExportReport, canViewProgress } = useCurrentChildAccess();
   const { notes, addNote, updateNote, deleteNote, clearNotes } = useObservationNotes();
 
   const [activeTab, setActiveTab] = useState<TabId>("overview");
@@ -97,6 +106,7 @@ export default function ProgressDashboardPage() {
   const [showDemoConfirm, setShowDemoConfirm] = useState(false);
   const [selectedSession, setSelectedSession] = useState<PracticeSession | null>(null);
   const [selectedAttempt, setSelectedAttempt] = useState<PracticeAttempt | null>(null);
+  const [filterStageId, setFilterStageId] = useState<string | null>(null);
 
   // ── Derived data ──────────────────────────────────────────────────────────────
 
@@ -134,6 +144,31 @@ export default function ProgressDashboardPage() {
 
   // Latest observation note
   const latestNote = notes.length > 0 ? notes[notes.length - 1] : null;
+
+  // ── Attempt history derived data ──────────────────────────────────────────────
+
+  const sortedAttempts = useMemo(
+    () => [...attempts].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()),
+    [attempts],
+  );
+
+  const stagesWithAttempts = useMemo(() => {
+    const stageIds = new Set(attempts.map((a) => a.stageId));
+    return mockTrainingStages.filter((s) => stageIds.has(s.id));
+  }, [attempts]);
+
+  const displayedAttempts = useMemo(
+    () => (filterStageId ? sortedAttempts.filter((a) => a.stageId === filterStageId) : sortedAttempts),
+    [sortedAttempts, filterStageId],
+  );
+
+  const attemptStats = useMemo(() => {
+    if (attempts.length === 0) return null;
+    const best = Math.max(...attempts.map((a) => a.score));
+    const avg = Math.round(attempts.reduce((s, a) => s + a.score, 0) / attempts.length);
+    const lastDate = sortedAttempts[0]?.createdAt ?? null;
+    return { total: attempts.length, best, avg, lastDate };
+  }, [attempts, sortedAttempts]);
 
   // Recent sessions for sidebar preview (last 3)
   const recentSessionsPreview = summary.recentSessions.slice(0, 3);
@@ -572,12 +607,168 @@ export default function ProgressDashboardPage() {
         <div className="max-w-4xl mx-auto px-4 sm:px-6 py-6 space-y-5">
           <div>
             <h2 className="text-xl font-bold text-text">ประวัติการฝึก</h2>
-            <p className="text-sm text-text-muted mt-0.5">คลิกที่แถวเพื่อดูรายละเอียด</p>
+            <p className="text-sm text-text-muted mt-0.5">
+              {profile?.name ?? "น้อง"} · คลิกที่แถวเพื่อดูรายละเอียด
+            </p>
           </div>
-          <RecentAttemptsList
-            attempts={summary.recentAttempts}
-            onAttemptClick={setSelectedAttempt}
-          />
+
+          {!canViewProgress ? (
+            <PermissionBanner
+              message="คุณไม่มีสิทธิ์ดูประวัติการฝึก"
+              hint="ติดต่อผู้ดูแลเด็กเพื่อขอสิทธิ์ canViewProgress"
+            />
+          ) : (
+            <>
+              {/* Summary stats */}
+              {attemptStats && (
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                  <div className="bg-surface border border-border rounded-xl p-4 text-center">
+                    <p className="text-2xl font-bold text-info leading-none">{attemptStats.total}</p>
+                    <p className="text-xs text-text-muted mt-1">ครั้งทั้งหมด</p>
+                  </div>
+                  <div className="bg-surface border border-border rounded-xl p-4 text-center">
+                    <p className="text-2xl font-bold text-success leading-none">{attemptStats.best}%</p>
+                    <p className="text-xs text-text-muted mt-1">คะแนนสูงสุด</p>
+                  </div>
+                  <div className="bg-surface border border-border rounded-xl p-4 text-center">
+                    <p className="text-2xl font-bold text-primary leading-none">{attemptStats.avg}%</p>
+                    <p className="text-xs text-text-muted mt-1">คะแนนเฉลี่ย</p>
+                  </div>
+                  <div className="bg-surface border border-border rounded-xl p-4 text-center">
+                    <p className="text-lg font-bold text-text leading-none">{formatShortDate(attemptStats.lastDate)}</p>
+                    <p className="text-xs text-text-muted mt-1">ฝึกล่าสุด</p>
+                  </div>
+                </div>
+              )}
+
+              {/* Stage filter chips */}
+              {stagesWithAttempts.length > 1 && (
+                <div className="flex gap-2 overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+                  <button
+                    type="button"
+                    onClick={() => setFilterStageId(null)}
+                    className={`flex-shrink-0 px-3 py-1.5 rounded-full text-xs font-medium transition-all ${
+                      !filterStageId
+                        ? "bg-primary text-white shadow-sm"
+                        : "bg-bg dark:bg-white/5 text-text-muted border border-border hover:border-primary/30 hover:text-text"
+                    }`}
+                  >
+                    ทั้งหมด ({attempts.length})
+                  </button>
+                  {stagesWithAttempts.map((stage) => {
+                    const count = attempts.filter((a) => a.stageId === stage.id).length;
+                    const isActive = filterStageId === stage.id;
+                    return (
+                      <button
+                        key={stage.id}
+                        type="button"
+                        onClick={() => setFilterStageId(isActive ? null : stage.id)}
+                        className={`flex-shrink-0 px-3 py-1.5 rounded-full text-xs font-medium transition-all ${
+                          isActive
+                            ? "text-white shadow-sm"
+                            : "bg-bg dark:bg-white/5 text-text-muted border border-border hover:border-primary/30 hover:text-text"
+                        }`}
+                        style={isActive ? { backgroundColor: stage.accentColor } : undefined}
+                      >
+                        {stage.icon} {stage.name} ({count})
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+
+              {/* Attempt list */}
+              {displayedAttempts.length === 0 ? (
+                <div className="bg-surface border border-border rounded-xl p-8 text-center">
+                  <div className="w-12 h-12 rounded-xl bg-gray-100 dark:bg-white/8 flex items-center justify-center mx-auto mb-3">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#94A3B8" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                      <polyline points="14 2 14 8 20 8" />
+                      <line x1="16" y1="13" x2="8" y2="13" />
+                      <line x1="16" y1="17" x2="8" y2="17" />
+                    </svg>
+                  </div>
+                  <p className="text-sm font-medium text-text mb-1">ยังไม่มีประวัติการฝึก</p>
+                  <p className="text-xs text-text-muted mb-4">
+                    {filterStageId ? "ไม่มีการฝึกในระดับที่เลือก" : "เริ่มฝึกเพื่อเห็นความก้าวหน้าของน้อง"}
+                  </p>
+                  {!filterStageId && (
+                    <Link
+                      href="/training"
+                      className="inline-flex items-center gap-2 bg-primary text-white font-semibold px-5 py-2.5 rounded-xl text-sm hover:bg-primary/90 transition-all"
+                    >
+                      ไปฝึกเลย
+                    </Link>
+                  )}
+                </div>
+              ) : (
+                <div className="bg-surface border border-border rounded-xl overflow-hidden">
+                  <div className="divide-y divide-border">
+                    {displayedAttempts.map((attempt) => {
+                      const attemptStage = mockTrainingStages.find((s) => s.id === attempt.stageId);
+                      return (
+                        <button
+                          key={attempt.id}
+                          type="button"
+                          onClick={() => setSelectedAttempt(attempt)}
+                          className="w-full flex items-center gap-3 px-4 py-3.5 text-left hover:bg-bg dark:hover:bg-white/3 transition-all active:scale-[0.99]"
+                        >
+                          {/* Score badge */}
+                          <div
+                            className={`w-10 h-10 rounded-xl flex items-center justify-center text-xs font-bold flex-shrink-0 ${
+                              attempt.score >= 70
+                                ? "bg-success/12 text-success"
+                                : attempt.score >= 50
+                                ? "bg-warning/12 text-warning"
+                                : "bg-secondary/12 text-secondary"
+                            }`}
+                          >
+                            {attempt.score}%
+                          </div>
+
+                          {/* Content */}
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-start justify-between gap-2">
+                              <p className="font-semibold text-text text-sm truncate">{attempt.promptText}</p>
+                              <span className="text-secondary text-xs flex-shrink-0">
+                                {"★".repeat(attempt.starsEarned)}
+                              </span>
+                            </div>
+                            <p className="text-xs text-text-muted mt-0.5">
+                              {attemptStage?.name ?? attempt.stageId}
+                              {" · "}เสียง {attempt.targetSound}
+                              {" · "}{formatShortDate(attempt.createdAt)}
+                            </p>
+                          </div>
+
+                          {/* Status badge */}
+                          <span
+                            className={`text-xs px-2 py-0.5 rounded-full flex-shrink-0 ${
+                              attempt.status === "passed"
+                                ? "bg-success/12 text-success"
+                                : attempt.status === "almost"
+                                ? "bg-warning/12 text-warning"
+                                : "bg-secondary/12 text-secondary"
+                            }`}
+                          >
+                            {attempt.status === "passed" ? "ผ่าน" : attempt.status === "almost" ? "เกือบ" : "ฝึกเพิ่ม"}
+                          </span>
+
+                          <svg
+                            width="14" height="14" viewBox="0 0 24 24" fill="none"
+                            stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"
+                            className="text-text-muted flex-shrink-0 ml-1" aria-hidden="true"
+                          >
+                            <path d="M9 18l6-6-6-6" />
+                          </svg>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+            </>
+          )}
           <div className="pb-4" />
         </div>
       )}
@@ -789,7 +980,7 @@ export default function ProgressDashboardPage() {
       {/* ── Detail Drawers (rendered outside tab panels) ── */}
       <SessionDetailDrawer
         session={selectedSession}
-        allAttempts={progress.attempts}
+        allAttempts={attempts}
         onClose={() => setSelectedSession(null)}
         onAttemptClick={(attempt) => setSelectedAttempt(attempt)}
       />
