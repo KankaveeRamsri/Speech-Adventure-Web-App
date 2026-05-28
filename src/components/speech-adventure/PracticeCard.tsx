@@ -277,12 +277,33 @@ export default function PracticeCard({
             style={{ backgroundColor: `${accentColor}06`, borderColor: `${accentColor}20` }}
           >
             <p className="font-semibold text-text">{evalResult.feedback}</p>
-            {evalResult.recommendation && (
-              <p className="text-text-muted">{evalResult.recommendation}</p>
+            {(evalResult.practiceTip ?? evalResult.recommendation) && (
+              <p className="text-text-muted">
+                {evalResult.practiceTip ?? evalResult.recommendation}
+              </p>
             )}
             {evalResult.transcript && (
               <p className="text-xs text-text-muted pt-1 border-t border-border/50">
                 ที่ได้ยิน: &ldquo;{evalResult.transcript}&rdquo;
+                {" · "}
+                <span className={
+                  evalResult.confidence >= 0.8
+                    ? "text-success"
+                    : evalResult.confidence >= 0.55
+                    ? "text-info"
+                    : "text-warning"
+                }>
+                  {evalResult.confidence >= 0.8
+                    ? "ฟังได้ชัด"
+                    : evalResult.confidence >= 0.55
+                    ? "ค่อนข้างชัด"
+                    : "เสียงยังไม่ชัด ลองอัดใหม่อีกครั้ง"}
+                </span>
+              </p>
+            )}
+            {!evalResult.transcript && !evalResult.isMock && (
+              <p className="text-xs text-warning pt-1 border-t border-border/50">
+                เสียงยังไม่ชัด ลองอัดใหม่อีกครั้ง
               </p>
             )}
             {evalResult.isMock && usesRecorder(item.type) && (

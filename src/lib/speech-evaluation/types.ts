@@ -31,8 +31,18 @@ export interface SpeechEvaluationResult {
   status: EvaluationStatus;
   feedback: string;
   recommendation?: string;
+  practiceTip?: string;
   transcript?: string;
   detectedIssues?: string[];
+  /** How closely the transcript matches the expected text (0-100). OpenAI only. */
+  transcriptMatchScore?: number;
+  /** How clearly the target consonant was produced (0-100). OpenAI only. */
+  targetSoundScore?: number;
+  /** Overall audio clarity (0-100). OpenAI only. */
+  clarityScore?: number;
+  /** Whether the transcript was judged reliable enough for scoring. OpenAI only. */
+  transcriptReliable?: boolean;
+  transcriptReliabilityReason?: string;
   isMock: boolean;
   provider: SpeechEvaluationProvider;
   createdAt: string;
