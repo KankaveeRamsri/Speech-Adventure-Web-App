@@ -5,6 +5,8 @@ import type { RecordingState } from "@/types/speechAdventure";
 interface Props {
   state: RecordingState;
   durationMs: number;
+  liveRecordingMs: number;
+  volumeLevel: number;
   errorMessage: string | null;
   onStartRecording: () => void;
   onStopRecording: () => void;
@@ -54,9 +56,13 @@ function SparkleIcon() {
   );
 }
 
+const VOLUME_BAR_SCALES = [0.5, 0.8, 1, 0.9, 0.7, 1, 0.75, 0.45];
+
 export default function AudioRecorder({
   state,
   durationMs,
+  liveRecordingMs,
+  volumeLevel,
   errorMessage,
   onStartRecording,
   onStopRecording,
@@ -103,16 +109,44 @@ export default function AudioRecorder({
             ? "กดหยุดเมื่อพูดเสร็จ"
             : state === "requesting_permission"
             ? "กำลังขอสิทธิ์ไมโครโฟน..."
+            : state === "processing"
+            ? "กำลังวิเคราะห์เสียง..."
             : "กดเพื่อบันทึกเสียง"}
         </span>
+
+        {/* Pre-recording tips */}
+        {canRecord && (
+          <div className="flex items-center justify-center gap-2 text-xs text-text-muted/70 flex-wrap">
+            <span>🎤 พูดใกล้ไมค์</span>
+            <span aria-hidden="true">·</span>
+            <span>พูดให้ชัด 1–3 วินาที</span>
+            <span aria-hidden="true">·</span>
+            <span>รอไฟขึ้นแล้วค่อยพูด</span>
+          </div>
+        )}
       </div>
 
       {/* ── Recording indicator ── */}
       {isRecording && (
-        <div className="flex justify-center animate-slide-up">
+        <div className="flex flex-col items-center gap-2 animate-slide-up">
           <div className="inline-flex items-center gap-2 bg-error/10 text-error border border-error/20 px-4 py-2 rounded-full text-sm font-medium">
             <span className="w-2 h-2 bg-error rounded-full animate-pulse flex-shrink-0" />
             กำลังบันทึก... พูดให้ชัดและสบายใจ
+            <span className="font-mono tabular-nums ml-1">{formatDuration(liveRecordingMs)}</span>
+          </div>
+
+          {/* Volume bars */}
+          <div className="flex items-end justify-center gap-0.5" style={{ height: "24px" }}>
+            {VOLUME_BAR_SCALES.map((scale, i) => (
+              <div
+                key={i}
+                className="w-1.5 rounded-full bg-error transition-[height] duration-100"
+                style={{
+                  height: `${Math.max(3, Math.round((volumeLevel / 100) * 22 * scale))}px`,
+                  opacity: Math.max(0.25, volumeLevel / 100),
+                }}
+              />
+            ))}
           </div>
         </div>
       )}
@@ -144,13 +178,13 @@ export default function AudioRecorder({
             <button
               onClick={onClearRecording}
               className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-bg dark:bg-white/5 text-text-muted border border-border font-semibold text-sm hover:bg-gray-100 dark:hover:bg-white/10 transition-all active:scale-[0.98]"
-              aria-label="บันทึกใหม่"
+              aria-label="อัดใหม่"
             >
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                 <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" />
                 <path d="M3 3v5h5" />
               </svg>
-              บันทึกใหม่
+              อัดใหม่
             </button>
 
             <button
@@ -170,7 +204,7 @@ export default function AudioRecorder({
         </div>
       )}
 
-      {/* ── Error state ── */}
+      {/* ── Error state (permission / hardware errors) ── */}
       {hasError && errorMessage && (
         <div className="animate-slide-up flex justify-center">
           <div className="bg-secondary/10 border border-secondary/20 text-secondary px-5 py-3 rounded-xl text-center">

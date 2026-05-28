@@ -3,6 +3,8 @@ import { NextResponse } from "next/server";
 import { evaluateSpeech } from "@/lib/speech-evaluation/evaluateSpeech";
 import type { SpeechEvaluationInput } from "@/lib/speech-evaluation/types";
 
+const MAX_AUDIO_BUFFER_BYTES = 10 * 1024 * 1024; // 10 MB
+
 function isNonEmptyString(v: unknown): v is string {
   return typeof v === "string" && v.trim().length > 0;
 }
@@ -70,6 +72,21 @@ export async function POST(request: NextRequest) {
   }
 
   const { fields, audioBuffer, audioMimeType } = parsed;
+
+  if (audioBuffer !== undefined) {
+    if (audioBuffer.length === 0) {
+      return NextResponse.json(
+        { error: "ไม่พบเสียงในไฟล์ที่ส่งมา กรุณาลองบันทึกใหม่" },
+        { status: 400 },
+      );
+    }
+    if (audioBuffer.length > MAX_AUDIO_BUFFER_BYTES) {
+      return NextResponse.json(
+        { error: "ไฟล์เสียงใหญ่เกินไป กรุณาอัดเสียงสั้นลง" },
+        { status: 400 },
+      );
+    }
+  }
 
   const missingStrings = validateStringFields(
     fields as Record<RequiredField, unknown>,

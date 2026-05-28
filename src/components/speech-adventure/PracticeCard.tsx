@@ -4,6 +4,7 @@ import { useState, useCallback } from "react";
 import type { PracticeItem, EvaluationResult, PracticeAttempt } from "@/types/speechAdventure";
 import type { SpeechEvaluationResult } from "@/lib/speech-evaluation/types";
 import { evaluateSpeechViaApi } from "@/lib/speech-evaluation/client";
+import { validateRecordedAudio } from "@/lib/audio/audioQuality";
 import { useAudioRecorder } from "@/hooks/useAudioRecorder";
 import { useAuth } from "@/hooks/useAuth";
 import { useChildProfile } from "@/hooks/useChildProfile";
@@ -120,8 +121,15 @@ export default function PracticeCard({
   }, [recorder]);
 
   const handleEvaluate = useCallback(() => {
-    setIsEvaluating(true);
     setEvaluationError(null);
+
+    const quality = validateRecordedAudio(recorder.blob, { durationMs: recorder.durationMs });
+    if (!quality.ok) {
+      setEvaluationError(quality.message ?? "เสียงไม่ถูกต้อง ลองพูดอีกครั้ง");
+      return;
+    }
+
+    setIsEvaluating(true);
     evaluateSpeechViaApi({
       stageId: item.stageSlug,
       practiceItemId: item.id,
@@ -457,7 +465,9 @@ export default function PracticeCard({
                   <AudioRecorder
                     state={isEvaluating ? "processing" : recorder.state}
                     durationMs={recorder.durationMs}
-                    errorMessage={evaluationError ?? recorder.errorMessage}
+                    liveRecordingMs={recorder.liveRecordingMs}
+                    volumeLevel={recorder.volumeLevel}
+                    errorMessage={recorder.errorMessage}
                     onStartRecording={handleStartRecording}
                     onStopRecording={handleStopRecording}
                     onPlayRecording={recorder.playRecording}
@@ -469,6 +479,21 @@ export default function PracticeCard({
                     <p className="text-center text-sm text-text-muted animate-pulse mt-2">
                       กำลังวิเคราะห์เสียง...
                     </p>
+                  )}
+                  {!isEvaluating && evaluationError && recorder.state === "recorded" && (
+                    <div className="flex justify-center mt-2 animate-slide-up">
+                      <div className="bg-warning/10 border border-warning/20 text-warning px-4 py-2.5 rounded-xl text-center max-w-xs">
+                        <p className="text-sm font-medium">{evaluationError}</p>
+                        <p className="text-xs text-text-muted mt-1">กด &ldquo;อัดใหม่&rdquo; เพื่อลองอีกครั้ง</p>
+                      </div>
+                    </div>
+                  )}
+                  {!isEvaluating && evaluationError && recorder.state !== "recorded" && (
+                    <div className="flex justify-center mt-2 animate-slide-up">
+                      <div className="bg-secondary/10 border border-secondary/20 text-secondary px-4 py-2.5 rounded-xl text-center max-w-xs">
+                        <p className="text-sm font-medium">{evaluationError}</p>
+                      </div>
+                    </div>
                   )}
                 </>
               ) : (
