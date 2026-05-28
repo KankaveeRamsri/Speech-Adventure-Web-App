@@ -156,10 +156,16 @@ export class SupabaseProgressRepository implements IProgressRepository {
   // ── Write — attempts ──────────────────────────────────────────────────────
 
   async addAttempt(attempt: PracticeAttempt): Promise<SpeechProgress> {
+    // Capture the pre-optimistic snapshot up-front so a save failure can
+    // restore the exact previous state (attempts + updatedAt). Reading
+    // this._progress AFTER calling _setProgress(next) would have already
+    // overwritten the reference.
+    const prevProgress = this._progress;
+
     // Optimistic update first so the UI is responsive regardless of DB outcome.
     const next: SpeechProgress = {
-      ...this._progress,
-      attempts: [...this._progress.attempts, attempt],
+      ...prevProgress,
+      attempts: [...prevProgress.attempts, attempt],
       updatedAt: new Date().toISOString(),
     };
     this._setProgress(next);
@@ -176,18 +182,21 @@ export class SupabaseProgressRepository implements IProgressRepository {
       return this._progress;
     }
 
+    if (process.env.NODE_ENV !== "production") {
+      console.debug(
+        "[SupabaseProgressRepository] addAttempt:",
+        { childId, sessionId: attempt.sessionId, targetSound: attempt.targetSound, stageId: attempt.stageId },
+      );
+    }
+
     const { error } = await this.client
       .from("practice_attempts")
       .insert({ ...domainToDbAttempt(attempt), child_id: childId });
 
     if (error) {
       warnRepo("SupabaseProgressRepository.addAttempt", new QueryError("practice_attempts", "insert", error));
-      // Revert optimistic update
-      this._setProgress({
-        ...next,
-        attempts: next.attempts.filter((a) => a.id !== attempt.id),
-        updatedAt: this._progress.updatedAt,
-      });
+      // Revert to the exact pre-optimistic snapshot.
+      this._setProgress(prevProgress);
     }
 
     return this._progress;
@@ -356,9 +365,12 @@ export class SupabaseProgressRepository implements IProgressRepository {
       status: "active",
     };
 
+    // Capture pre-optimistic state for clean rollback on save failure.
+    const prevProgress = this._progress;
+
     const next: SpeechProgress = {
-      ...this._progress,
-      sessions: [...this._progress.sessions, newSession],
+      ...prevProgress,
+      sessions: [...prevProgress.sessions, newSession],
       updatedAt: now,
     };
     this._setProgress(next);
@@ -373,6 +385,13 @@ export class SupabaseProgressRepository implements IProgressRepository {
       return newSession;
     }
 
+    if (process.env.NODE_ENV !== "production") {
+      console.debug(
+        "[SupabaseProgressRepository] startSession:",
+        { childId, stageId: newSession.stageId, targetSound: newSession.targetSound },
+      );
+    }
+
     const { data, error } = await this.client
       .from("practice_sessions")
       .insert({ ...domainToDbSession(newSession), child_id: childId })
@@ -381,11 +400,8 @@ export class SupabaseProgressRepository implements IProgressRepository {
 
     if (error) {
       warnRepo("SupabaseProgressRepository.startSession", new QueryError("practice_sessions", "insert", error));
-      // Revert
-      this._setProgress({
-        ...next,
-        sessions: next.sessions.filter((s) => s.id !== newSession.id),
-      });
+      // Revert to pre-optimistic snapshot
+      this._setProgress(prevProgress);
       return newSession;
     }
 
@@ -640,9 +656,30 @@ export class SupabaseProgressRepository implements IProgressRepository {
       updatedAt: new Date().toISOString(),
     };
 
+    if (process.env.NODE_ENV !== "production") {
+      console.debug(
+        "[SupabaseProgressRepository] _hydrate complete:",
+        { childId: profile.id, attempts: attempts.length, sessions: sessions.length },
+      );
+    }
+
     this._hydrated = true;
     this._notifyProgress();
     this._notifySound();
+  }
+
+  /** Dev-only state inspector. Avoid coupling production logic to this. */
+  public dumpDebugState(): Record<string, unknown> {
+    return {
+      hydrated: this._hydrated,
+      childId: this._childId,
+      selectedChildIdOverride: this._selectedChildIdOverride,
+      localScopeUserId: this._localScopeUserId,
+      hydrateGen: this._hydrateGen,
+      attempts: this._progress.attempts.length,
+      sessions: this._progress.sessions.length,
+      selectedSoundId: this._selectedSoundId,
+    };
   }
 
   /**

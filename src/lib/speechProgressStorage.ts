@@ -53,6 +53,12 @@ export function setScope(userId: string | null): void {
   tryMigrateLegacy();
   initializeIfNeeded();
   initializeSoundIfNeeded();
+  if (process.env.NODE_ENV !== "production") {
+    console.debug(
+      "[speechProgressStorage] setScope:",
+      { userId, attempts: currentProgress.attempts.length, sessions: currentProgress.sessions.length },
+    );
+  }
   notifyListeners();
   soundListeners.forEach((fn) => fn());
 }

@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useMemo, useSyncExternalStore } from "react";
+import { useCallback, useEffect, useMemo, useSyncExternalStore } from "react";
 import type {
   SpeechProgress,
   PracticeAttempt,
@@ -75,11 +75,20 @@ export function useSpeechProgress() {
     [progress.sessions, activeChildId],
   );
 
-  const summary: ProgressSummary = calculateProgressSummary({
-    ...progress,
-    attempts: filteredAttempts,
-    sessions: filteredSessions,
-  });
+  // Memoized so consumers receive a stable reference between renders.
+  // Without this, every render produced a fresh `summary` object whose
+  // recentAttempts/recentSessions arrays were new — invalidating downstream
+  // useMemo deps and causing unnecessary re-renders + visual flicker on
+  // refresh/child-switch transitions.
+  const summary: ProgressSummary = useMemo(
+    () =>
+      calculateProgressSummary({
+        ...progress,
+        attempts: filteredAttempts,
+        sessions: filteredSessions,
+      }),
+    [progress, filteredAttempts, filteredSessions],
+  );
 
   const addAttempt = useCallback((attempt: PracticeAttempt) => {
     // repo.addAttempt persists and notifies listeners, which triggers
@@ -115,6 +124,16 @@ export function useSpeechProgress() {
       r.setSelectedChildId(childId);
     }
   }, [repo]);
+
+  // Auto-sync the active child to the progress repository whenever the
+  // selected child changes. Previously this was only called explicitly from
+  // ChildSelector / teacher page — any other code path that changed the
+  // selected child (programmatic navigation, deep link, shared-child fallback)
+  // would leave the progress repo hydrating the wrong child's data.
+  useEffect(() => {
+    if (!activeChildId) return;
+    switchChildProgress(activeChildId);
+  }, [activeChildId, switchChildProgress]);
 
   const getStageStatus = useCallback(
     (stageId: string, targetSoundId?: string): StageStatus => {
@@ -161,6 +180,40 @@ export function useSpeechProgress() {
     [],
   );
 
+  // Dev-only diagnostic dump — wired to window.dumpProgressState() so it can
+  // be invoked from the browser console while reproducing persistence bugs.
+  // Does NOT log audio blobs, secrets, or auth tokens.
+  const dumpProgressState = useCallback(() => {
+    const attemptsByChild = new Map<string, number>();
+    const sessionsByChild = new Map<string, number>();
+    for (const a of progress.attempts) {
+      attemptsByChild.set(a.childId, (attemptsByChild.get(a.childId) ?? 0) + 1);
+    }
+    for (const s of progress.sessions) {
+      sessionsByChild.set(s.childId, (sessionsByChild.get(s.childId) ?? 0) + 1);
+    }
+    return {
+      selectedChildId: activeChildId,
+      selectedSoundId,
+      filteredAttempts: filteredAttempts.length,
+      filteredSessions: filteredSessions.length,
+      totalAttempts: progress.attempts.length,
+      totalSessions: progress.sessions.length,
+      attemptsByChild: Object.fromEntries(attemptsByChild),
+      sessionsByChild: Object.fromEntries(sessionsByChild),
+      providerMode: process.env.NEXT_PUBLIC_STORAGE_PROVIDER ?? "local",
+    };
+  }, [activeChildId, selectedSoundId, filteredAttempts.length, filteredSessions.length, progress.attempts, progress.sessions]);
+
+  useEffect(() => {
+    if (process.env.NODE_ENV === "production") return;
+    if (typeof window === "undefined") return;
+    (window as unknown as { dumpProgressState?: () => unknown }).dumpProgressState = dumpProgressState;
+    return () => {
+      delete (window as unknown as { dumpProgressState?: () => unknown }).dumpProgressState;
+    };
+  }, [dumpProgressState]);
+
   return {
     progress,
     summary,
@@ -181,5 +234,6 @@ export function useSpeechProgress() {
     getActiveSessionForStage,
     getSessionById,
     switchChildProgress,
+    dumpProgressState,
   };
 }
