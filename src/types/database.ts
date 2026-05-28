@@ -32,6 +32,7 @@ export type DbChildProfile = {
   nickname: string | null;
   grade_level: string | null;
   parent_email_pending: string | null;
+  archived_at: string | null;
 };
 
 // ── practice_sessions ─────────────────────────────────────────────────────────
