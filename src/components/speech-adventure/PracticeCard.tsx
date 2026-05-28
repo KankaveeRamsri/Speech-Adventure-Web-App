@@ -92,6 +92,8 @@ export default function PracticeCard({
   const [result, setResult] = useState<EvaluationResult | null>(null);
   const [evalResult, setEvalResult] = useState<SpeechEvaluationResult | null>(null);
   const [savedAttempt, setSavedAttempt] = useState<PracticeAttempt | null>(null);
+  const [isEvaluating, setIsEvaluating] = useState(false);
+  const [evaluationError, setEvaluationError] = useState<string | null>(null);
 
   const handleListen = () => {
     setPhase("listening");
@@ -113,10 +115,13 @@ export default function PracticeCard({
     setResult(null);
     setEvalResult(null);
     setSavedAttempt(null);
+    setEvaluationError(null);
     setPhase("idle");
   }, [recorder]);
 
   const handleEvaluate = useCallback(() => {
+    setIsEvaluating(true);
+    setEvaluationError(null);
     evaluateSpeechViaApi({
       stageId: item.stageSlug,
       practiceItemId: item.id,
@@ -124,12 +129,17 @@ export default function PracticeCard({
       promptText: item.target,
       itemType: item.type,
       durationMs: recorder.durationMs,
+      audioBlob: recorder.blob ?? undefined,
     }).then((ev) => {
       setEvalResult(ev);
       setResult(toUIResult(ev));
       setPhase("evaluated");
+    }).catch(() => {
+      setEvaluationError("ยังประเมินเสียงไม่ได้ กรุณาลองใหม่อีกครั้ง");
+    }).finally(() => {
+      setIsEvaluating(false);
     });
-  }, [item, targetSound, recorder.durationMs]);
+  }, [item, targetSound, recorder.durationMs, recorder.blob]);
 
   const handleAccept = useCallback(async () => {
     if (!evalResult) return;
@@ -270,9 +280,14 @@ export default function PracticeCard({
             {evalResult.recommendation && (
               <p className="text-text-muted">{evalResult.recommendation}</p>
             )}
-            {usesRecorder(item.type) && (
+            {evalResult.transcript && (
               <p className="text-xs text-text-muted pt-1 border-t border-border/50">
-                ผลประเมินนี้เป็นตัวอย่าง (Mock) ระบบ AI จริงยังไม่พร้อมใช้งาน
+                ที่ได้ยิน: &ldquo;{evalResult.transcript}&rdquo;
+              </p>
+            )}
+            {evalResult.isMock && usesRecorder(item.type) && (
+              <p className="text-xs text-text-muted pt-1 border-t border-border/50">
+                ผลประเมินนี้เป็นตัวอย่าง (Mock)
               </p>
             )}
           </div>
@@ -417,17 +432,24 @@ export default function PracticeCard({
 
               {/* Recorder controls — gated by canStartPractice */}
               {canStartPractice ? (
-                <AudioRecorder
-                  state={recorder.state}
-                  durationMs={recorder.durationMs}
-                  errorMessage={recorder.errorMessage}
-                  onStartRecording={handleStartRecording}
-                  onStopRecording={handleStopRecording}
-                  onPlayRecording={recorder.playRecording}
-                  onClearRecording={handleRetry}
-                  onEvaluate={handleEvaluate}
-                  accentColor={accentColor}
-                />
+                <>
+                  <AudioRecorder
+                    state={isEvaluating ? "processing" : recorder.state}
+                    durationMs={recorder.durationMs}
+                    errorMessage={evaluationError ?? recorder.errorMessage}
+                    onStartRecording={handleStartRecording}
+                    onStopRecording={handleStopRecording}
+                    onPlayRecording={recorder.playRecording}
+                    onClearRecording={handleRetry}
+                    onEvaluate={handleEvaluate}
+                    accentColor={accentColor}
+                  />
+                  {isEvaluating && (
+                    <p className="text-center text-sm text-text-muted animate-pulse mt-2">
+                      กำลังวิเคราะห์เสียง...
+                    </p>
+                  )}
+                </>
               ) : (
                 <PermissionBanner
                   message="คุณมีสิทธิ์ดูเท่านั้น ไม่สามารถบันทึกเสียงได้"
