@@ -12,6 +12,7 @@ import { useCurrentChildAccess } from "@/hooks/useCurrentChildAccess";
 import { uploadPracticeAudio } from "@/lib/storage/supabase/audioStorage";
 import { isSupabaseConfigured } from "@/lib/supabase/client";
 import AudioRecorder from "./AudioRecorder";
+import SampleAudioButton from "./SampleAudioButton";
 import EvaluationResultCard from "./EvaluationResultCard";
 import RewardBadge from "./RewardBadge";
 import SessionSummaryCard from "./SessionSummaryCard";
@@ -98,11 +99,6 @@ export default function PracticeCard({
   const [savedAttempt, setSavedAttempt] = useState<PracticeAttempt | null>(null);
   const [isEvaluating, setIsEvaluating] = useState(false);
   const [evaluationError, setEvaluationError] = useState<string | null>(null);
-
-  const handleListen = () => {
-    setPhase("listening");
-    setTimeout(() => setPhase("idle"), 2000);
-  };
 
   const handleStartRecording = useCallback(() => {
     setPhase("recording");
@@ -433,33 +429,15 @@ export default function PracticeCard({
           {usesRecorder(item.type) && (
             <>
               <div className="flex justify-center mb-5">
-                <button
-                  onClick={handleListen}
+                <SampleAudioButton
+                  expectedText={item.target}
+                  targetSound={targetSound}
+                  stageId={item.stageSlug}
                   disabled={
-                    phase === "listening" ||
                     recorder.state === "recording" ||
                     recorder.state === "requesting_permission"
                   }
-                  className={`flex flex-col items-center gap-1.5 px-6 py-3.5 rounded-xl transition-all text-sm font-medium ${
-                    phase === "listening"
-                      ? "bg-info/15 text-info animate-pulse-gentle border border-info/25"
-                      : "bg-bg dark:bg-white/5 border border-border text-text-muted hover:text-text hover:border-primary/30"
-                  } disabled:opacity-50 disabled:cursor-not-allowed`}
-                  aria-label="ฟังเสียงตัวอย่าง"
-                >
-                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                    <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" />
-                    {phase === "listening" ? (
-                      <>
-                        <path d="M15.54 8.46a5 5 0 0 1 0 7.07" />
-                        <path d="M19.07 4.93a10 10 0 0 1 0 14.14" />
-                      </>
-                    ) : (
-                      <path d="M15.54 8.46a5 5 0 0 1 0 7.07" />
-                    )}
-                  </svg>
-                  {phase === "listening" ? "กำลังเล่นเสียง..." : "ฟังเสียงตัวอย่าง"}
-                </button>
+                />
               </div>
 
               {/* Recorder controls — gated by canStartPractice */}
