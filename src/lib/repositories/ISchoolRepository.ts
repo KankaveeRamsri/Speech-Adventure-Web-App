@@ -6,6 +6,7 @@ import type {
   CreateOrganizationInput,
   CreateClassroomInput,
   UserDisplayInfo,
+  StudentParentLinkInfo,
 } from "@/types/school";
 import type { ValidatedImportRow, ImportResult } from "@/types/schoolImport";
 
@@ -78,6 +79,33 @@ export interface ISchoolRepository {
    * Practice data is NOT deleted.
    */
   archiveStudent(childId: string): Promise<void>;
+
+  // ── Parent linking (Phase 15) ─────────────────────────────────────────────────
+
+  /**
+   * Returns parent-link status for every student in a classroom.
+   * Combines child_profiles.parent_email_pending with the latest parent invitation per child.
+   */
+  listStudentParentLinks(classroomId: string, organizationId: string): Promise<StudentParentLinkInfo[]>;
+
+  /**
+   * Creates a pending parent invitation for the child if one does not already exist.
+   * Idempotent: re-importing the same parent email will not create a duplicate pending invite.
+   * Returns the invitation id and token.
+   */
+  ensureParentInvitationForChild(
+    childId: string,
+    parentEmail: string,
+    invitedBy: string,
+    inviterEmail?: string,
+  ): Promise<{ id: string; token: string }>;
+
+  /**
+   * Revokes all active parent invitations and guardian child_access for a student.
+   * Calls the revoke_parent_link_for_child SECURITY DEFINER RPC.
+   * Practice data is NOT deleted.
+   */
+  revokeParentLink(childId: string): Promise<void>;
 
   // ── Scope ─────────────────────────────────────────────────────────────────────
   setScope(userId: string | null): void;

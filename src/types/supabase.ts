@@ -181,6 +181,10 @@ export interface Database {
         Args: { p_child_id: string };
         Returns: void;
       };
+      revoke_parent_link_for_child: {
+        Args: { p_child_id: string };
+        Returns: void;
+      };
     };
     Enums: {
       session_status: DbSessionStatus;

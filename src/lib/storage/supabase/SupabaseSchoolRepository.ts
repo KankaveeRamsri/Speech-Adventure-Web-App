@@ -8,8 +8,11 @@ import type {
   CreateOrganizationInput,
   CreateClassroomInput,
   UserDisplayInfo,
+  ParentLinkStatus,
+  StudentParentLinkInfo,
 } from "@/types/school";
 import type { ValidatedImportRow, ImportResult, ImportRowResult } from "@/types/schoolImport";
+import { INVITATION_EXPIRY_DAYS } from "@/types/invitations";
 import type { SupabaseClient } from "@/lib/supabase/client";
 import type { Database } from "@/types/supabase";
 import { QueryError, warnRepo } from "./errors";
@@ -374,6 +377,9 @@ export class SupabaseSchoolRepository implements ISchoolRepository {
     const classroomMap = new Map(classrooms.map((c) => [c.name, c]));
     const results: ImportRowResult[] = [];
 
+    const { data: { user: currentUser } } = await this.client.auth.getUser();
+    const inviterEmail = currentUser?.email ?? undefined;
+
     for (const row of rows) {
       // Skip rows that cannot be imported
       if (row.status === "error") {
@@ -430,6 +436,21 @@ export class SupabaseSchoolRepository implements ISchoolRepository {
           }
         }
 
+        // Create parent invitation if parent_email provided
+        if (row.parentEmail) {
+          try {
+            await this.ensureParentInvitationForChild(
+              profile.id,
+              row.parentEmail,
+              creatorUserId,
+              inviterEmail,
+            );
+          } catch (invErr) {
+            warnRepo("SupabaseSchoolRepository.importStudents:parentInvite",
+              invErr instanceof Error ? invErr : new Error(String(invErr)));
+          }
+        }
+
         results.push({ rowNumber: row.rowNumber, status: "created" });
       } catch (e) {
         results.push({
@@ -483,6 +504,134 @@ export class SupabaseSchoolRepository implements ISchoolRepository {
     // Remove from local cache so UI updates immediately
     this._classroomStudents = this._classroomStudents.filter((s) => s.childId !== childId);
     this._notify();
+  }
+
+  // ── Parent linking (Phase 15) ─────────────────────────────────────────────────
+
+  async listStudentParentLinks(classroomId: string, organizationId: string): Promise<StudentParentLinkInfo[]> {
+    const classroomStudents = this._classroomStudents.filter((s) => s.classroomId === classroomId);
+    const childIds = classroomStudents.map((s) => s.childId);
+    if (childIds.length === 0) return [];
+
+    const [profilesRes, invitationsRes] = await Promise.all([
+      this.client
+        .from("child_profiles")
+        .select("id, name, nickname, student_code, parent_email_pending")
+        .in("id", childIds)
+        .eq("organization_id", organizationId),
+      this.client
+        .from("invitations")
+        .select("id, child_id, email, status, token")
+        .in("child_id", childIds)
+        .eq("role", "parent")
+        .order("created_at", { ascending: false }),
+    ]);
+
+    if (profilesRes.error) {
+      warnRepo("SupabaseSchoolRepository.listStudentParentLinks:profiles",
+        new QueryError("child_profiles", "select", profilesRes.error));
+      return [];
+    }
+
+    // Map childId → best invitation (pending > accepted > revoked)
+    const priority = (s: string) => (s === "pending" ? 3 : s === "accepted" ? 2 : 1);
+    const invMap = new Map<string, { id: string; token: string; status: string }>();
+    for (const inv of (invitationsRes.data ?? [])) {
+      if (!inv.child_id) continue;
+      const existing = invMap.get(inv.child_id);
+      if (!existing || priority(inv.status) > priority(existing.status)) {
+        invMap.set(inv.child_id, { id: inv.id, token: inv.token, status: inv.status });
+      }
+    }
+
+    return (profilesRes.data ?? []).map((p) => {
+      const inv = invMap.get(p.id);
+      const parentEmail = (p as { parent_email_pending?: string | null }).parent_email_pending ?? null;
+
+      let parentLinkStatus: ParentLinkStatus;
+      if (!parentEmail) {
+        parentLinkStatus = "no_parent_email";
+      } else if (!inv) {
+        parentLinkStatus = "missing_invite";
+      } else {
+        parentLinkStatus = inv.status as ParentLinkStatus;
+      }
+
+      return {
+        childId:         p.id,
+        name:            (p as { name: string }).name,
+        nickname:        (p as { nickname?: string | null }).nickname ?? null,
+        studentCode:     (p as { student_code?: string | null }).student_code ?? null,
+        parentEmail,
+        parentLinkStatus,
+        invitationId:    inv?.id ?? null,
+        invitationToken: inv?.token ?? null,
+      };
+    });
+  }
+
+  async ensureParentInvitationForChild(
+    childId: string,
+    parentEmail: string,
+    invitedBy: string,
+    inviterEmail?: string,
+  ): Promise<{ id: string; token: string }> {
+    const email = parentEmail.trim().toLowerCase();
+
+    // Check for existing pending invitation
+    const { data: existing } = await this.client
+      .from("invitations")
+      .select("id, token")
+      .eq("child_id", childId)
+      .eq("email", email)
+      .eq("role", "parent")
+      .eq("status", "pending")
+      .maybeSingle();
+
+    if (existing) return { id: existing.id, token: existing.token };
+
+    const id = crypto.randomUUID();
+    const token = crypto.randomUUID();
+    const expiresAt = new Date(
+      Date.now() + INVITATION_EXPIRY_DAYS * 24 * 60 * 60 * 1000,
+    ).toISOString();
+
+    const { error } = await this.client.from("invitations").insert({
+      id,
+      email,
+      role: "parent",
+      child_id:      childId,
+      invited_by:    invitedBy,
+      inviter_email: inviterEmail ?? null,
+      token,
+      status:        "pending",
+      expires_at:    expiresAt,
+    });
+
+    if (error) {
+      // Race condition: another insert beat us — fetch the winner
+      const { data: raceWinner } = await this.client
+        .from("invitations")
+        .select("id, token")
+        .eq("child_id", childId)
+        .eq("email", email)
+        .eq("role", "parent")
+        .eq("status", "pending")
+        .maybeSingle();
+      if (raceWinner) return { id: raceWinner.id, token: raceWinner.token };
+      warnRepo("SupabaseSchoolRepository.ensureParentInvitationForChild",
+        new QueryError("invitations", "insert", error));
+      throw new Error(error.message);
+    }
+
+    return { id, token };
+  }
+
+  async revokeParentLink(childId: string): Promise<void> {
+    const { error } = await this.client.rpc("revoke_parent_link_for_child", {
+      p_child_id: childId,
+    });
+    if (error) throw new Error(error.message);
   }
 
   public setScope(_userId: string | null): void {

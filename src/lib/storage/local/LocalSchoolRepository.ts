@@ -10,6 +10,7 @@ import type {
   CreateOrganizationInput,
   CreateClassroomInput,
   UserDisplayInfo,
+  StudentParentLinkInfo,
 } from "@/types/school";
 import type { ValidatedImportRow, ImportResult, ImportRowResult } from "@/types/schoolImport";
 
@@ -317,6 +318,25 @@ export class LocalSchoolRepository implements ISchoolRepository {
   }
 
   async archiveStudent(_childId: string): Promise<void> {
+    // Not implemented in local/demo mode — no-op
+  }
+
+  // ── Parent linking (Phase 15) — not available in local/demo mode ──────────────
+
+  async listStudentParentLinks(_classroomId: string, _organizationId: string): Promise<StudentParentLinkInfo[]> {
+    return [];
+  }
+
+  async ensureParentInvitationForChild(
+    _childId: string,
+    _parentEmail: string,
+    _invitedBy: string,
+    _inviterEmail?: string,
+  ): Promise<{ id: string; token: string }> {
+    return { id: _id(), token: _id() };
+  }
+
+  async revokeParentLink(_childId: string): Promise<void> {
     // Not implemented in local/demo mode — no-op
   }
 

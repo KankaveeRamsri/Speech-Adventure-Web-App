@@ -1,9 +1,11 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import type { Classroom, UserDisplayInfo } from "@/types/school";
+import { useCallback, useEffect, useState } from "react";
+import type { Classroom, UserDisplayInfo, StudentParentLinkInfo, ParentLinkStatus } from "@/types/school";
+import { PARENT_LINK_STATUS_LABELS } from "@/types/school";
 import { useSchool } from "@/hooks/useSchool";
 import { useChildProfile } from "@/hooks/useChildProfile";
+import { useAuth } from "@/hooks/useAuth";
 
 interface Props {
   classroom: Classroom;
@@ -36,6 +38,42 @@ function SearchIcon() {
   );
 }
 
+function CopyIcon() {
+  return (
+    <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
+      <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
+    </svg>
+  );
+}
+
+function LinkIcon() {
+  return (
+    <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" />
+      <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" />
+    </svg>
+  );
+}
+
+// ── Parent link status badge ───────────────────────────────────────────────────
+
+const PARENT_STATUS_CLASSES: Record<ParentLinkStatus, string> = {
+  no_parent_email: "bg-border/40 text-text-muted border-border/60",
+  missing_invite:  "bg-warning/8 text-warning border-warning/20",
+  pending:         "bg-warning/10 text-warning border-warning/20",
+  accepted:        "bg-success/10 text-success border-success/20",
+  revoked:         "bg-error/8 text-error/70 border-error/20",
+};
+
+function ParentStatusBadge({ status }: { status: ParentLinkStatus }) {
+  return (
+    <span className={`inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] font-semibold border ${PARENT_STATUS_CLASSES[status]}`}>
+      {PARENT_LINK_STATUS_LABELS[status]}
+    </span>
+  );
+}
+
 // ── Panel ─────────────────────────────────────────────────────────────────────
 
 export default function ClassroomManagementPanel({ classroom, onClose }: Props) {
@@ -50,11 +88,23 @@ export default function ClassroomManagementPanel({ classroom, onClose }: Props) 
     resolveUserDisplays,
     resolveStudentProfiles,
     archiveStudent,
+    listStudentParentLinks,
+    ensureParentInvitationForChild,
+    revokeParentLink,
   } = useSchool();
   const { profiles, sharedProfiles } = useChildProfile();
+  const { user } = useAuth();
 
   const students = listChildrenForClassroom(classroom.id);
   const teachers = listTeachersForClassroom(classroom.id);
+
+  // ── Parent link state ─────────────────────────────────────────────────────────
+  const [parentLinks, setParentLinks] = useState<StudentParentLinkInfo[]>([]);
+  const [copiedToken, setCopiedToken] = useState<string | null>(null);
+  const [createInviteBusy, setCreateInviteBusy] = useState<string | null>(null); // childId
+  const [revokeParentBusy, setRevokeParentBusy] = useState<string | null>(null); // childId
+  const [confirmRevokeParentId, setConfirmRevokeParentId] = useState<string | null>(null);
+  const [parentLinkError, setParentLinkError] = useState<string | null>(null);
 
   // ── Student name resolution ───────────────────────────────────────────────────
   // Primary: resolve directly from child_profiles via school repo (works for imported students)
@@ -71,6 +121,19 @@ export default function ClassroomManagementPanel({ classroom, onClose }: Props) 
     return () => { cancelled = true; };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [studentIdsKey]);
+
+  const refreshParentLinks = useCallback(() => {
+    let cancelled = false;
+    listStudentParentLinks(classroom.id, classroom.organizationId)
+      .then((links) => { if (!cancelled) setParentLinks(links); })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [classroom.id, classroom.organizationId, studentIdsKey]);
+
+  useEffect(() => {
+    return refreshParentLinks();
+  }, [refreshParentLinks]);
 
   // In-memory profile fallback (for local mode / same-user children)
   const allProfiles = [...profiles, ...sharedProfiles];
@@ -171,6 +234,44 @@ export default function ClassroomManagementPanel({ classroom, onClose }: Props) 
   async function handleRemoveStudent(childId: string) {
     try { await removeChild(classroom.id, childId); } catch { /* silent */ }
   }
+
+  function copyInviteLink(token: string) {
+    const url = `${window.location.origin}/invite/accept?token=${token}`;
+    void navigator.clipboard.writeText(url).then(() => {
+      setCopiedToken(token);
+      setTimeout(() => setCopiedToken(null), 2000);
+    });
+  }
+
+  async function handleCreateParentInvite(info: StudentParentLinkInfo) {
+    if (!info.parentEmail || !user) return;
+    setCreateInviteBusy(info.childId);
+    setParentLinkError(null);
+    try {
+      await ensureParentInvitationForChild(info.childId, info.parentEmail, user.id, user.email ?? undefined);
+      refreshParentLinks();
+    } catch (err) {
+      setParentLinkError(err instanceof Error ? err.message : "สร้างคำเชิญไม่สำเร็จ");
+    } finally {
+      setCreateInviteBusy(null);
+    }
+  }
+
+  async function handleRevokeParentLink(childId: string) {
+    setRevokeParentBusy(childId);
+    setParentLinkError(null);
+    try {
+      await revokeParentLink(childId);
+      setConfirmRevokeParentId(null);
+      refreshParentLinks();
+    } catch (err) {
+      setParentLinkError(err instanceof Error ? err.message : "ถอนสิทธิ์ไม่สำเร็จ");
+    } finally {
+      setRevokeParentBusy(null);
+    }
+  }
+
+  const parentLinkMap = new Map(parentLinks.map((l) => [l.childId, l]));
 
   const [confirmArchiveId, setConfirmArchiveId] = useState<string | null>(null);
   const [archiveBusy, setArchiveBusy] = useState(false);
@@ -316,59 +417,134 @@ export default function ClassroomManagementPanel({ classroom, onClose }: Props) 
               นักเรียน ({students.length})
             </p>
 
+            {parentLinkError && (
+              <p className="text-xs text-error mb-2">{parentLinkError}</p>
+            )}
+
             {students.length > 0 ? (
               <ul className="space-y-2 mb-3">
-                {students.map((s) => (
-                  <li key={s.childId} className="rounded-xl border border-border bg-black/[0.03] dark:bg-white/[0.03] overflow-hidden">
-                    <div className="flex items-center justify-between gap-2 px-3 py-2">
-                      <span className="text-xs text-text truncate min-w-0">
-                        {getStudentDisplay(s.childId)}
-                      </span>
-                      <div className="flex items-center gap-1 flex-shrink-0">
-                        <button
-                          onClick={() => handleRemoveStudent(s.childId)}
-                          className="text-xs text-text-muted hover:text-text transition-colors px-2 py-1 rounded-lg hover:bg-black/5 dark:hover:bg-white/10"
-                        >
-                          นำออกจากห้อง
-                        </button>
-                        <button
-                          onClick={() => { setConfirmArchiveId(s.childId); setArchiveError(""); }}
-                          className="text-xs text-error/70 hover:text-error transition-colors px-2 py-1 rounded-lg hover:bg-error/5"
-                        >
-                          ลบนักเรียน
-                        </button>
-                      </div>
-                    </div>
+                {students.map((s) => {
+                  const parentInfo = parentLinkMap.get(s.childId);
+                  const canRevoke = parentInfo && (parentInfo.parentLinkStatus === "pending" || parentInfo.parentLinkStatus === "accepted");
+                  const canCreate = parentInfo?.parentLinkStatus === "missing_invite" && parentInfo.parentEmail;
+                  const hasToken  = parentInfo?.invitationToken && (parentInfo.parentLinkStatus === "pending" || parentInfo.parentLinkStatus === "accepted");
 
-                    {confirmArchiveId === s.childId && (
-                      <div className="px-3 pb-3 pt-0 border-t border-border/50 bg-error/5">
-                        <p className="text-xs text-text mt-2 mb-2">
-                          ต้องการลบนักเรียนคนนี้ออกจากระบบโรงเรียนหรือไม่?{" "}
-                          <span className="text-text-muted">ข้อมูลการฝึกจะไม่ถูกลบทันที</span>
-                        </p>
-                        {archiveError && (
-                          <p className="text-xs text-error mb-2">{archiveError}</p>
-                        )}
-                        <div className="flex gap-2">
+                  return (
+                    <li key={s.childId} className="rounded-xl border border-border bg-black/[0.03] dark:bg-white/[0.03] overflow-hidden">
+                      {/* Student name row */}
+                      <div className="flex items-center justify-between gap-2 px-3 py-2">
+                        <span className="text-xs text-text truncate min-w-0">
+                          {getStudentDisplay(s.childId)}
+                        </span>
+                        <div className="flex items-center gap-1 flex-shrink-0">
                           <button
-                            onClick={() => handleArchiveStudent(s.childId)}
-                            disabled={archiveBusy}
-                            className="px-3 py-1.5 rounded-lg bg-error text-white text-xs font-semibold hover:bg-error/90 transition-all disabled:opacity-50"
+                            onClick={() => handleRemoveStudent(s.childId)}
+                            className="text-xs text-text-muted hover:text-text transition-colors px-2 py-1 rounded-lg hover:bg-black/5 dark:hover:bg-white/10"
                           >
-                            {archiveBusy ? "กำลังลบ…" : "ยืนยันลบ"}
+                            นำออกจากห้อง
                           </button>
                           <button
-                            onClick={() => { setConfirmArchiveId(null); setArchiveError(""); }}
-                            disabled={archiveBusy}
-                            className="px-3 py-1.5 rounded-lg border border-border text-text-muted text-xs hover:text-text hover:bg-black/5 dark:hover:bg-white/10 transition-all disabled:opacity-50"
+                            onClick={() => { setConfirmArchiveId(s.childId); setArchiveError(""); }}
+                            className="text-xs text-error/70 hover:text-error transition-colors px-2 py-1 rounded-lg hover:bg-error/5"
                           >
-                            ยกเลิก
+                            ลบนักเรียน
                           </button>
                         </div>
                       </div>
-                    )}
-                  </li>
-                ))}
+
+                      {/* Parent link row */}
+                      {parentInfo && (
+                        <div className="px-3 pb-2 border-t border-border/40 pt-1.5">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="text-[10px] font-medium text-text-muted">ผู้ปกครอง</span>
+                            <ParentStatusBadge status={parentInfo.parentLinkStatus} />
+                            {parentInfo.parentEmail && (
+                              <span className="text-[10px] text-text-muted truncate max-w-[120px]">
+                                {parentInfo.parentEmail}
+                              </span>
+                            )}
+                            {/* Copy link */}
+                            {hasToken && (
+                              <button
+                                onClick={() => copyInviteLink(parentInfo.invitationToken!)}
+                                className="flex items-center gap-0.5 text-[10px] text-primary hover:text-primary/80 transition-colors"
+                              >
+                                <CopyIcon />
+                                {copiedToken === parentInfo.invitationToken ? "คัดลอกแล้ว" : "คัดลอกลิงก์"}
+                              </button>
+                            )}
+                            {/* Create invite */}
+                            {canCreate && (
+                              <button
+                                onClick={() => void handleCreateParentInvite(parentInfo)}
+                                disabled={createInviteBusy === s.childId}
+                                className="flex items-center gap-0.5 text-[10px] text-secondary hover:text-secondary/80 transition-colors disabled:opacity-50"
+                              >
+                                <LinkIcon />
+                                {createInviteBusy === s.childId ? "กำลังสร้าง…" : "สร้างคำเชิญ"}
+                              </button>
+                            )}
+                            {/* Revoke */}
+                            {canRevoke && confirmRevokeParentId !== s.childId && (
+                              <button
+                                onClick={() => { setConfirmRevokeParentId(s.childId); setParentLinkError(null); }}
+                                className="text-[10px] text-error/70 hover:text-error transition-colors"
+                              >
+                                ถอนสิทธิ์
+                              </button>
+                            )}
+                            {confirmRevokeParentId === s.childId && (
+                              <span className="flex items-center gap-1">
+                                <button
+                                  onClick={() => void handleRevokeParentLink(s.childId)}
+                                  disabled={revokeParentBusy === s.childId}
+                                  className="text-[10px] px-2 py-0.5 rounded bg-error text-white hover:bg-error/90 transition-all disabled:opacity-50"
+                                >
+                                  {revokeParentBusy === s.childId ? "…" : "ยืนยัน"}
+                                </button>
+                                <button
+                                  onClick={() => setConfirmRevokeParentId(null)}
+                                  disabled={revokeParentBusy === s.childId}
+                                  className="text-[10px] px-2 py-0.5 rounded border border-border text-text-muted hover:text-text transition-all disabled:opacity-50"
+                                >
+                                  ยกเลิก
+                                </button>
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      )}
+
+                      {confirmArchiveId === s.childId && (
+                        <div className="px-3 pb-3 pt-0 border-t border-border/50 bg-error/5">
+                          <p className="text-xs text-text mt-2 mb-2">
+                            ต้องการลบนักเรียนคนนี้ออกจากระบบโรงเรียนหรือไม่?{" "}
+                            <span className="text-text-muted">ข้อมูลการฝึกจะไม่ถูกลบทันที</span>
+                          </p>
+                          {archiveError && (
+                            <p className="text-xs text-error mb-2">{archiveError}</p>
+                          )}
+                          <div className="flex gap-2">
+                            <button
+                              onClick={() => handleArchiveStudent(s.childId)}
+                              disabled={archiveBusy}
+                              className="px-3 py-1.5 rounded-lg bg-error text-white text-xs font-semibold hover:bg-error/90 transition-all disabled:opacity-50"
+                            >
+                              {archiveBusy ? "กำลังลบ…" : "ยืนยันลบ"}
+                            </button>
+                            <button
+                              onClick={() => { setConfirmArchiveId(null); setArchiveError(""); }}
+                              disabled={archiveBusy}
+                              className="px-3 py-1.5 rounded-lg border border-border text-text-muted text-xs hover:text-text hover:bg-black/5 dark:hover:bg-white/10 transition-all disabled:opacity-50"
+                            >
+                              ยกเลิก
+                            </button>
+                          </div>
+                        </div>
+                      )}
+                    </li>
+                  );
+                })}
               </ul>
             ) : (
               <p className="text-xs text-text-muted italic mb-3">ยังไม่มีนักเรียน</p>

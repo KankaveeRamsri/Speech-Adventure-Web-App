@@ -10,6 +10,7 @@ import type {
   CreateOrganizationInput,
   CreateClassroomInput,
   UserDisplayInfo,
+  StudentParentLinkInfo,
 } from "@/types/school";
 
 // Module-level stable refs required by useSyncExternalStore
@@ -104,6 +105,29 @@ export function useSchool() {
     return school.archiveStudent(childId);
   }
 
+  async function listStudentParentLinks(
+    classroomId: string,
+    organizationId: string,
+  ): Promise<StudentParentLinkInfo[]> {
+    if (!school) return [];
+    return school.listStudentParentLinks(classroomId, organizationId);
+  }
+
+  async function ensureParentInvitationForChild(
+    childId: string,
+    parentEmail: string,
+    invitedBy: string,
+    inviterEmail?: string,
+  ): Promise<{ id: string; token: string }> {
+    if (!school) throw new Error("School repository not available");
+    return school.ensureParentInvitationForChild(childId, parentEmail, invitedBy, inviterEmail);
+  }
+
+  async function revokeParentLink(childId: string): Promise<void> {
+    if (!school) throw new Error("School repository not available");
+    return school.revokeParentLink(childId);
+  }
+
   return {
     organizations,
     listClassrooms,
@@ -120,5 +144,8 @@ export function useSchool() {
     resolveUserDisplays,
     resolveStudentProfiles,
     archiveStudent,
+    listStudentParentLinks,
+    ensureParentInvitationForChild,
+    revokeParentLink,
   };
 }

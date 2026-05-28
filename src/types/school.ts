@@ -71,6 +71,34 @@ export const ORG_TYPE_LABELS: Record<OrganizationType, string> = {
   clinic: "คลินิก",
 };
 
+// ── Parent linking (Phase 15) ─────────────────────────────────────────────────
+
+export type ParentLinkStatus =
+  | "no_parent_email"
+  | "pending"
+  | "accepted"
+  | "revoked"
+  | "missing_invite";
+
+export interface StudentParentLinkInfo {
+  childId: string;
+  name: string;
+  nickname: string | null;
+  studentCode: string | null;
+  parentEmail: string | null;
+  parentLinkStatus: ParentLinkStatus;
+  invitationId: string | null;
+  invitationToken: string | null;
+}
+
+export const PARENT_LINK_STATUS_LABELS: Record<ParentLinkStatus, string> = {
+  no_parent_email: "ยังไม่มีอีเมลผู้ปกครอง",
+  pending:         "รอตอบรับ",
+  accepted:        "ตอบรับแล้ว",
+  revoked:         "ยกเลิกแล้ว",
+  missing_invite:  "ยังไม่ได้สร้างคำเชิญ",
+};
+
 export const ORG_MEMBER_ROLE_LABELS: Record<OrgMemberRole, string> = {
   owner: "เจ้าของ",
   admin: "ผู้ดูแลระบบ",
