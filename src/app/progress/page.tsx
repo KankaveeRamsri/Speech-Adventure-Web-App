@@ -14,7 +14,8 @@ import { useSpeechProgress } from "@/hooks/useSpeechProgress";
 import { useChildProfile } from "@/hooks/useChildProfile";
 import { useCurrentChildAccess } from "@/hooks/useCurrentChildAccess";
 import { useObservationNotes } from "@/hooks/useObservationNotes";
-import { mockChildProfile, mockTrainingStages } from "@/data/speechAdventureMockData";
+import { mockChildProfile, mockTrainingStages, mockTargetSounds } from "@/data/speechAdventureMockData";
+import { getSoundSummary, type SoundSummary } from "@/lib/progressUtils";
 import {
   DEMO_PROGRESS,
   DEMO_OBSERVATIONS,
@@ -107,6 +108,7 @@ export default function ProgressDashboardPage() {
   const [selectedSession, setSelectedSession] = useState<PracticeSession | null>(null);
   const [selectedAttempt, setSelectedAttempt] = useState<PracticeAttempt | null>(null);
   const [filterStageId, setFilterStageId] = useState<string | null>(null);
+  const [selectedSoundFilter, setSelectedSoundFilter] = useState<string | null>(null);
 
   // ── Derived data ──────────────────────────────────────────────────────────────
 
@@ -121,13 +123,13 @@ export default function ProgressDashboardPage() {
   };
 
   const stageData = mockTrainingStages.map((stage) => {
-    const status = getStageStatus(stage.id);
-    const attempts = getStageAttempts(stage.id);
-    const sorted = [...attempts].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
-    const bestScore = attempts.length > 0 ? Math.max(...attempts.map((a) => a.score)) : null;
+    const status = getStageStatus(stage.id, selectedSoundFilter ?? undefined);
+    const stageAttempts = getStageAttempts(stage.id, selectedSoundFilter ?? undefined);
+    const sorted = [...stageAttempts].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+    const bestScore = stageAttempts.length > 0 ? Math.max(...stageAttempts.map((a) => a.score)) : null;
     const latestScore = sorted.length > 0 ? sorted[0].score : null;
-    const liveStarsEarned = Math.min(attempts.reduce((sum, a) => sum + a.starsEarned, 0), stage.starsTotal);
-    return { ...stage, status, attemptCount: attempts.length, bestScore, latestScore, starsEarned: liveStarsEarned };
+    const liveStarsEarned = Math.min(stageAttempts.reduce((sum, a) => sum + a.starsEarned, 0), stage.starsTotal);
+    return { ...stage, status, attemptCount: stageAttempts.length, bestScore, latestScore, starsEarned: liveStarsEarned };
   });
 
   const completedCount = stageData.filter((s) => s.status === "completed").length;
@@ -145,6 +147,13 @@ export default function ProgressDashboardPage() {
   // Latest observation note
   const latestNote = notes.length > 0 ? notes[notes.length - 1] : null;
 
+  // ── Per-sound summaries ───────────────────────────────────────────────────────
+
+  const soundSummaries = useMemo<SoundSummary[]>(
+    () => mockTargetSounds.map((s) => getSoundSummary(attempts, s.id)),
+    [attempts],
+  );
+
   // ── Attempt history derived data ──────────────────────────────────────────────
 
   const sortedAttempts = useMemo(
@@ -153,22 +162,34 @@ export default function ProgressDashboardPage() {
   );
 
   const stagesWithAttempts = useMemo(() => {
-    const stageIds = new Set(attempts.map((a) => a.stageId));
+    const relevant = selectedSoundFilter
+      ? attempts.filter((a) => a.targetSound === selectedSoundFilter)
+      : attempts;
+    const stageIds = new Set(relevant.map((a) => a.stageId));
     return mockTrainingStages.filter((s) => stageIds.has(s.id));
-  }, [attempts]);
+  }, [attempts, selectedSoundFilter]);
 
-  const displayedAttempts = useMemo(
-    () => (filterStageId ? sortedAttempts.filter((a) => a.stageId === filterStageId) : sortedAttempts),
-    [sortedAttempts, filterStageId],
-  );
+  const displayedAttempts = useMemo(() => {
+    let list = [...attempts].sort(
+      (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
+    );
+    if (selectedSoundFilter) list = list.filter((a) => a.targetSound === selectedSoundFilter);
+    if (filterStageId) list = list.filter((a) => a.stageId === filterStageId);
+    return list;
+  }, [attempts, selectedSoundFilter, filterStageId]);
 
   const attemptStats = useMemo(() => {
-    if (attempts.length === 0) return null;
-    const best = Math.max(...attempts.map((a) => a.score));
-    const avg = Math.round(attempts.reduce((s, a) => s + a.score, 0) / attempts.length);
-    const lastDate = sortedAttempts[0]?.createdAt ?? null;
-    return { total: attempts.length, best, avg, lastDate };
-  }, [attempts, sortedAttempts]);
+    const pool = selectedSoundFilter
+      ? attempts.filter((a) => a.targetSound === selectedSoundFilter)
+      : attempts;
+    if (pool.length === 0) return null;
+    const best = Math.max(...pool.map((a) => a.score));
+    const avg = Math.round(pool.reduce((s, a) => s + a.score, 0) / pool.length);
+    const lastDate =
+      sortedAttempts.find((a) => !selectedSoundFilter || a.targetSound === selectedSoundFilter)
+        ?.createdAt ?? null;
+    return { total: pool.length, best, avg, lastDate };
+  }, [attempts, selectedSoundFilter, sortedAttempts]);
 
   // Recent sessions for sidebar preview (last 3)
   const recentSessionsPreview = summary.recentSessions.slice(0, 3);
@@ -199,6 +220,11 @@ export default function ProgressDashboardPage() {
     void progressRepo.replaceProgress(DEMO_PROGRESS);
     void obsRepo.replaceNotes(DEMO_OBSERVATIONS);
     setShowDemoConfirm(false);
+  };
+
+  const handleSoundFilter = (soundId: string | null) => {
+    setSelectedSoundFilter(soundId);
+    setFilterStageId(null);
   };
 
   // ─────────────────────────────────────────────────────────────────────────────
@@ -312,6 +338,152 @@ export default function ProgressDashboardPage() {
                 </section>
               )}
 
+              {/* ── Sound filter + per-sound summary ── */}
+              {isHydrated && (
+                <section aria-label="เสียงที่ฝึก">
+                  <div className="flex items-center justify-between mb-3">
+                    <p className="text-xs font-semibold text-text-muted uppercase tracking-wider">เสียงที่ฝึก</p>
+                    {selectedSoundFilter && (
+                      <button
+                        type="button"
+                        onClick={() => handleSoundFilter(null)}
+                        className="text-xs text-primary font-medium hover:text-primary/80 transition-colors"
+                      >
+                        ดูทั้งหมด
+                      </button>
+                    )}
+                  </div>
+
+                  {/* Sound filter chips */}
+                  <div className="flex gap-2 mb-4 overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+                    <button
+                      type="button"
+                      onClick={() => handleSoundFilter(null)}
+                      className={`flex-shrink-0 px-3 py-1.5 rounded-full text-xs font-medium transition-all ${
+                        !selectedSoundFilter
+                          ? "bg-primary text-white shadow-sm"
+                          : "bg-bg dark:bg-white/5 text-text-muted border border-border hover:border-primary/30 hover:text-text"
+                      }`}
+                    >
+                      ทั้งหมด
+                    </button>
+                    {mockTargetSounds.map((sound) => (
+                      <button
+                        key={sound.id}
+                        type="button"
+                        onClick={() => handleSoundFilter(sound.id)}
+                        className={`flex-shrink-0 px-3 py-1.5 rounded-full text-xs font-medium transition-all ${
+                          selectedSoundFilter === sound.id
+                            ? "bg-primary text-white shadow-sm"
+                            : "bg-bg dark:bg-white/5 text-text-muted border border-border hover:border-primary/30 hover:text-text"
+                        }`}
+                      >
+                        เสียง {sound.label} · {sound.description}
+                      </button>
+                    ))}
+                  </div>
+
+                  {/* Per-sound cards — shown when "ทั้งหมด" is selected */}
+                  {!selectedSoundFilter && (
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                      {soundSummaries.map((s) => {
+                        const soundMeta = mockTargetSounds.find((m) => m.id === s.soundId);
+                        const statusLabel: Record<string, string> = {
+                          good: "ทำได้ดีมาก",
+                          improving: "กำลังดีขึ้น",
+                          needs_practice: "ควรฝึกเพิ่ม",
+                          not_started: "ยังไม่เริ่ม",
+                        };
+                        const statusClass: Record<string, string> = {
+                          good: "text-success",
+                          improving: "text-info",
+                          needs_practice: "text-secondary",
+                          not_started: "text-text-muted",
+                        };
+                        const dotClass: Record<string, string> = {
+                          good: "bg-success",
+                          improving: "bg-info",
+                          needs_practice: "bg-secondary",
+                          not_started: "bg-gray-300 dark:bg-white/20",
+                        };
+                        return (
+                          <button
+                            key={s.soundId}
+                            type="button"
+                            onClick={() => handleSoundFilter(s.soundId)}
+                            className="bg-surface border border-border rounded-xl p-4 text-left hover:border-primary/40 hover:shadow-sm transition-all active:scale-[0.98]"
+                          >
+                            <div className="flex items-start justify-between mb-2">
+                              <span className="text-3xl font-bold text-primary leading-none">
+                                {s.soundId}
+                              </span>
+                              <span className={`w-2 h-2 rounded-full mt-1.5 flex-shrink-0 ${dotClass[s.status]}`} />
+                            </div>
+                            <p className="text-xs text-text-muted mb-2 leading-tight">
+                              {soundMeta?.description ?? s.soundId}
+                            </p>
+                            {s.status !== "not_started" ? (
+                              <>
+                                <p className="text-lg font-bold text-text leading-none">{s.averageScore}%</p>
+                                <p className="text-xs text-text-muted mt-0.5">{s.totalAttempts} ครั้ง</p>
+                                <p className={`text-xs font-medium mt-1.5 ${statusClass[s.status]}`}>
+                                  {statusLabel[s.status]}
+                                </p>
+                              </>
+                            ) : (
+                              <p className="text-xs text-text-muted mt-1">ยังไม่เริ่มฝึก</p>
+                            )}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
+
+                  {/* Single sound summary — shown when a sound is selected */}
+                  {selectedSoundFilter && (() => {
+                    const s = soundSummaries.find((x) => x.soundId === selectedSoundFilter);
+                    const soundMeta = mockTargetSounds.find((m) => m.id === selectedSoundFilter);
+                    if (!s) return null;
+                    return (
+                      <div className="bg-primary/6 border border-primary/20 rounded-xl p-4">
+                        <div className="flex items-center gap-3 mb-3">
+                          <span className="text-4xl font-bold text-primary leading-none">{s.soundId}</span>
+                          <div>
+                            <p className="text-sm font-semibold text-text">{soundMeta?.description ?? s.soundId}</p>
+                            {s.status !== "not_started" ? (
+                              <p className="text-xs text-text-muted">{s.totalAttempts} ครั้ง · ฝึกล่าสุด {formatShortDate(s.lastPracticedAt)}</p>
+                            ) : (
+                              <p className="text-xs text-text-muted">ยังไม่มีประวัติการฝึกเสียงนี้</p>
+                            )}
+                          </div>
+                        </div>
+                        {s.status !== "not_started" ? (
+                          <div className="grid grid-cols-2 gap-2">
+                            <div className="bg-surface rounded-xl p-3 text-center border border-border">
+                              <p className="text-xl font-bold text-success leading-none">{s.averageScore}%</p>
+                              <p className="text-xs text-text-muted mt-1">คะแนนเฉลี่ย</p>
+                            </div>
+                            <div className="bg-surface rounded-xl p-3 text-center border border-border">
+                              <p className="text-xl font-bold text-info leading-none">{s.bestScore}%</p>
+                              <p className="text-xs text-text-muted mt-1">คะแนนดีที่สุด</p>
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="text-center py-2">
+                            <Link
+                              href="/training"
+                              className="inline-flex items-center gap-2 bg-primary text-white font-semibold px-5 py-2 rounded-xl text-sm hover:bg-primary/90 transition-all"
+                            >
+                              เริ่มฝึกเสียงนี้
+                            </Link>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })()}
+                </section>
+              )}
+
               {/* Next Best Action card */}
               {isHydrated && (
                 <section aria-label="ขั้นต่อไปที่แนะนำ">
@@ -398,7 +570,16 @@ export default function ProgressDashboardPage() {
 
               {/* Stage progress */}
               <section className="bg-surface border border-border rounded-xl p-5" aria-label="ความคืบหน้าในแต่ละระดับ">
-                <p className="text-xs font-semibold text-text-muted uppercase tracking-wider mb-4">ความคืบหน้าในแต่ละระดับ</p>
+                <div className="flex items-center gap-2 mb-4">
+                  <p className="text-xs font-semibold text-text-muted uppercase tracking-wider">
+                    ความคืบหน้าในแต่ละระดับ
+                  </p>
+                  {selectedSoundFilter && (
+                    <span className="text-xs font-bold text-primary bg-primary/10 px-2 py-0.5 rounded-full">
+                      เสียง {selectedSoundFilter}
+                    </span>
+                  )}
+                </div>
                 <div className="space-y-2">
                   {stageData.map((stage) => (
                     <StageProgressCard
@@ -619,6 +800,24 @@ export default function ProgressDashboardPage() {
             />
           ) : (
             <>
+              {/* Sound filter banner */}
+              {selectedSoundFilter ? (
+                <div className="flex items-center gap-2">
+                  <p className="text-sm text-text-muted">กรองตามเสียง:</p>
+                  <button
+                    type="button"
+                    onClick={() => handleSoundFilter(null)}
+                    className="inline-flex items-center gap-1.5 px-3 py-1 bg-primary/10 text-primary rounded-full text-sm font-medium hover:bg-primary/20 transition-colors"
+                  >
+                    เสียง {selectedSoundFilter}
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                      <line x1="18" y1="6" x2="6" y2="18" />
+                      <line x1="6" y1="6" x2="18" y2="18" />
+                    </svg>
+                  </button>
+                </div>
+              ) : null}
+
               {/* Summary stats */}
               {attemptStats && (
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
@@ -653,10 +852,13 @@ export default function ProgressDashboardPage() {
                         : "bg-bg dark:bg-white/5 text-text-muted border border-border hover:border-primary/30 hover:text-text"
                     }`}
                   >
-                    ทั้งหมด ({attempts.length})
+                    ทั้งหมด ({attemptStats?.total ?? 0})
                   </button>
                   {stagesWithAttempts.map((stage) => {
-                    const count = attempts.filter((a) => a.stageId === stage.id).length;
+                    const count = (selectedSoundFilter
+                      ? attempts.filter((a) => a.targetSound === selectedSoundFilter && a.stageId === stage.id)
+                      : attempts.filter((a) => a.stageId === stage.id)
+                    ).length;
                     const isActive = filterStageId === stage.id;
                     return (
                       <button
@@ -688,16 +890,24 @@ export default function ProgressDashboardPage() {
                       <line x1="16" y1="17" x2="8" y2="17" />
                     </svg>
                   </div>
-                  <p className="text-sm font-medium text-text mb-1">ยังไม่มีประวัติการฝึก</p>
+                  <p className="text-sm font-medium text-text mb-1">
+                    {selectedSoundFilter
+                      ? `ยังไม่มีประวัติการฝึกเสียง ${selectedSoundFilter}`
+                      : "ยังไม่มีประวัติการฝึก"}
+                  </p>
                   <p className="text-xs text-text-muted mb-4">
-                    {filterStageId ? "ไม่มีการฝึกในระดับที่เลือก" : "เริ่มฝึกเพื่อเห็นความก้าวหน้าของน้อง"}
+                    {filterStageId
+                      ? "ไม่มีการฝึกในระดับที่เลือก"
+                      : selectedSoundFilter
+                      ? "เริ่มฝึกเสียงนี้เพื่อเห็นความก้าวหน้า"
+                      : "เริ่มฝึกเพื่อเห็นความก้าวหน้าของน้อง"}
                   </p>
                   {!filterStageId && (
                     <Link
                       href="/training"
                       className="inline-flex items-center gap-2 bg-primary text-white font-semibold px-5 py-2.5 rounded-xl text-sm hover:bg-primary/90 transition-all"
                     >
-                      ไปฝึกเลย
+                      {selectedSoundFilter ? `เริ่มฝึกเสียง ${selectedSoundFilter}` : "ไปฝึกเลย"}
                     </Link>
                   )}
                 </div>
