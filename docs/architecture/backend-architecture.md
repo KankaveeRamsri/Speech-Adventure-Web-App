@@ -1,96 +1,45 @@
 # Backend Architecture
 
-## Current State: localStorage Only
-
-Speech Adventure ยังไม่มี backend จริง ข้อมูลทั้งหมดอยู่ใน browser localStorage 4 key:
-
-| localStorage Key | Domain | Size Limit Risk |
-|---|---|---|
-| `speech-adventure-progress-v1` | attempts + sessions | สูง (grows unbounded) |
-| `speech-adventure-profile-v1` | child profile | ต่ำ |
-| `speech-adventure-observations-v1` | therapist notes | ปานกลาง |
-| `speech-adventure-selected-sound-v1` | UI preference | ต่ำมาก |
-
-**ข้อจำกัดหลักของ localStorage:**
-- ไม่รองรับหลายอุปกรณ์ / multi-user
-- 5–10 MB limit ต่อ origin — attempts สะสมโตเรื่อยๆ
-- ไม่มี auth — ใครก็ clear ได้
-- ไม่รองรับ therapist dashboard หรือ analytics กลาง
+**Current status (2026-05-29):** Supabase auth + storage implemented. localStorage is still the default provider. Speech evaluation and sample audio use OpenAI or mock.
 
 ---
 
-## Proposed Backend: Supabase (Modular Monolith)
+## Storage Providers
 
-### Decision: Modular Monolith First
+| Provider | When used |
+|---|---|
+| `local` (default) | dev, demo, any deployment without Supabase |
+| `supabase` | production — requires env vars |
+| `hybrid` | planned; currently behaves like `supabase` |
 
-เลือก Modular Monolith ก่อน Microservices เพราะ:
-- ทีมเล็ก, product ยังอยู่ช่วง validation
-- Next.js API Routes รองรับ modular structure ได้ดี
-- Supabase Edge Functions เป็น escape hatch ถ้าต้องการ isolate ในอนาคต
-- ง่ายต่อการ extract boundary ออกเมื่อ traffic / complexity เพิ่ม
+Set via `NEXT_PUBLIC_STORAGE_PROVIDER` in `.env.local`.
 
-### Service Boundaries (เตรียมไว้แต่ยังไม่แยก)
-
-```
-┌─────────────────────────────────────────────────────────┐
-│                    Next.js App                          │
-│                                                         │
-│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐  │
-│  │   Identity   │  │   Progress   │  │ Observations │  │
-│  │   (Supabase  │  │   Service    │  │   Service    │  │
-│  │    Auth)     │  │              │  │              │  │
-│  └──────────────┘  └──────────────┘  └──────────────┘  │
-│                                                         │
-│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐  │
-│  │   Speech     │  │    Audio     │  │  Analytics   │  │
-│  │  Evaluation  │  │  Processing  │  │   Service    │  │
-│  │  (stub→AI)   │  │  (future)    │  │  (future)    │  │
-│  └──────────────┘  └──────────────┘  └──────────────┘  │
-└─────────────────────────────────────────────────────────┘
-              │
-     Supabase PostgreSQL + Storage + Auth
-```
-
-### Future Microservice-Ready Boundaries
-
-แต่ละ boundary ด้านล่างสามารถ extract เป็น standalone service ได้เมื่อถึงเวลา:
-
-| Boundary | เหตุผลที่ extract | Trigger |
-|---|---|---|
-| **Speech Evaluation** | ต้องการ GPU / ML infra แยก, latency SLA ต่างกัน | เมื่อใช้ real AI model |
-| **Audio Processing** | storage-intensive, อาจต้อง transcode/compress | เมื่อ store audio จริง |
-| **ML Inference** | ต้องการ model versioning, A/B testing | เมื่อ train custom Thai phoneme model |
-| **Analytics** | read-heavy, aggregation queries, BI tools | เมื่อ therapist dashboard ซับซ้อน |
-
-### API Route Structure (Next.js)
+### localStorage Keys (user-scoped)
 
 ```
-app/api/
-├── auth/                    # Supabase Auth callbacks
-├── speech/
-│   └── evaluate/route.ts    # ← มีอยู่แล้ว (stub)
-├── progress/
-│   ├── route.ts             # GET/POST attempts+sessions
-│   └── [childId]/route.ts   # GET child progress
-├── profiles/
-│   └── route.ts             # GET/PUT child profile
-└── observations/
-    └── route.ts             # CRUD observation notes
+speech-adventure-progress-{userId}-v1   attempts + sessions
+speech-adventure-profiles-{userId}-v1   child profiles list
+speech-adventure-selected-{userId}-v1   selected child ID
+speech-adventure-sound-{userId}-v1      selected target sound
 ```
 
-### Data Access Pattern
+Legacy unscopeded keys are migrated on first use.
+
+---
+
+## Service Boundaries
 
 ```
-React Component
-    │
-    ▼
-Hook (useSpeechProgress, useChildProfile, ...)
-    │  useSyncExternalStore
-    ▼
-Repository Interface (IProgressRepository)
-    │
-    ├── LocalStorageProgressRepository   ← ปัจจุบัน
-    └── SupabaseProgressRepository       ← เป้าหมาย
+┌─────────────────────────────────────────────────────────────┐
+│  Next.js App                                                │
+│                                                             │
+│  Identity (Supabase Auth)   Progress Service               │
+│  Child Profile Service      Observations Service           │
+│  Speech Evaluation          Sample Audio / TTS             │
+│  School/Classroom           Invitation / Child Access      │
+└─────────────────────────────────────────────────────────────┘
+         │
+Supabase PostgreSQL + Storage + Auth
 ```
 
 ---
@@ -98,30 +47,107 @@ Repository Interface (IProgressRepository)
 ## Speech Evaluation Architecture
 
 ```
-AudioRecorder (Blob)
+AudioRecorder → Blob
     │
-    ▼
-evaluateSpeech(input: SpeechEvaluationInput)
+    ▼  POST /api/speech/evaluate  (multipart)
     │
-    ├── ACTIVE_PROVIDER = "mock"  → mockEvaluator.ts (ปัจจุบัน)
-    └── ACTIVE_PROVIDER = "api"   → POST /api/speech/evaluate
-                                      │
-                                      ├── Thai ASR (e.g. NECTEC, Whisper-TH)
-                                      ├── Phoneme alignment
-                                      └── Scoring engine
+    ▼  evaluateSpeech(input)  [src/lib/speech-evaluation/]
+    │
+    ├── SPEECH_EVALUATION_PROVIDER=mock (default)
+    │       → MockSpeechEvaluationProvider
+    │
+    └── SPEECH_EVALUATION_PROVIDER=openai
+            → OpenAISpeechEvaluationProvider
+                 ├── Whisper transcription
+                 ├── Thai target sound rubric (targetSoundRubric.ts)
+                 ├── Transcript reliability check
+                 └── Scoring via Chat Completion
 ```
 
-**ไม่ต้องเปลี่ยน interface** เมื่อ swap provider — `SpeechEvaluationResult` คงเดิม
+- `OPENAI_API_KEY` is server-side only (no `NEXT_PUBLIC_`)
+- Fallback to mock if key missing or provider throws
+
+### Key files
+- `src/lib/speech-evaluation/service.ts` — provider selection + fallback
+- `src/lib/speech-evaluation/evaluateSpeech.ts` — public entry point
+- `src/lib/speech-evaluation/providers/openai.ts` — OpenAI implementation
+- `src/lib/speech-evaluation/providers/mock.ts` — mock implementation
+- `src/lib/speech-evaluation/targetSoundRubric.ts` — ก/ค/ต/ช rubrics
+- `src/lib/speech-evaluation/types.ts` — SpeechEvaluationInput/Result
+- `src/app/api/speech/evaluate/route.ts` — API route
 
 ---
 
-## Non-Functional Requirements
+## Sample Audio / TTS Architecture
 
-| Concern | Target |
+```
+SampleAudioButton → GET /api/audio/sample
+    │
+    ▼  generateSampleAudio(input)  [src/lib/sample-audio/]
+    │
+    ├── SAMPLE_AUDIO_PROVIDER=mock (default) → browser TTS instructions
+    └── SAMPLE_AUDIO_PROVIDER=openai → OpenAI TTS (tts-1 model)
+         └── in-process cache (Map<cacheKey, result>) — skips re-generation
+```
+
+- `OPENAI_TTS_MODEL` (default: `tts-1`), `OPENAI_TTS_VOICE` (default: `alloy`)
+- Cache is process-lifetime; real audio only (not mock) is cached
+
+### Key files
+- `src/lib/sample-audio/service.ts` — provider selection + cache
+- `src/lib/sample-audio/providers/openai.ts` — OpenAI TTS
+- `src/lib/sample-audio/providers/mock.ts` — returns browser TTS hint
+- `src/app/api/audio/sample/route.ts` — API route
+
+---
+
+## Data Access Pattern
+
+```
+React Component
+    │
+    ▼
+Hook (useSpeechProgress, useChildProfile, …)
+    │  useSyncExternalStore
+    ▼
+Repository Interface (IProgressRepository, IProfileRepository, …)
+    │
+    ├── Local*Repository (default)   src/lib/storage/local/
+    └── Supabase*Repository          src/lib/storage/supabase/
+```
+
+See `repository-pattern.md` for full interface definitions and file list.
+
+---
+
+## API Route Structure
+
+```
+src/app/api/
+├── speech/
+│   └── evaluate/route.ts   POST — AI speech evaluation
+└── audio/
+    └── sample/route.ts     GET  — AI TTS sample audio
+```
+
+---
+
+## Non-Functional Notes
+
+| Concern | Current State |
 |---|---|
-| Auth | Supabase Auth (email/magic link หรือ Google OAuth) |
-| Multi-device sync | Real-time via Supabase Realtime |
-| Offline support | ค้าง localStorage + sync เมื่อกลับมา online |
-| Data privacy | RLS บังคับ per-child isolation (ดู `rls-strategy.md`) |
-| Audio storage | Supabase Storage bucket `audio-recordings/` |
-| Backup/export | ยังคง JSON export ได้ (therapist requirement) |
+| Auth | Supabase Auth (email/password) |
+| Multi-device sync | Cloud read on sign-in; writes go to active provider |
+| Offline | localStorage always available as fallback |
+| Data privacy | RLS per-child isolation (see `rls-strategy.md`) |
+| Audio storage | Supabase Storage `practice-audio` bucket (signed URLs) |
+| Real-time | Not implemented — fetch on sign-in only |
+
+---
+
+## Do Not Break
+
+- `OPENAI_API_KEY` must never be exposed in `NEXT_PUBLIC_` env vars
+- Mock provider fallback must always work (no key needed)
+- Repository interfaces must not change without updating all 2 implementations
+- `useSyncExternalStore` server snapshot must return same reference every call

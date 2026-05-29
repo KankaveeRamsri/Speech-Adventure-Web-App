@@ -1,284 +1,135 @@
 # Repository Pattern
 
-## เหตุผล
-
-ปัจจุบัน hooks (`useSpeechProgress`, `useChildProfile`, `useObservationNotes`) import `*Storage.ts` โดยตรง การ swap ไป Supabase ต้องไม่แก้ไข hook หรือ UI component — แค่เปลี่ยน implementation ที่ inject เข้าไป
+**Current status (2026-05-29):** Fully implemented. 6 repository interfaces with both local and Supabase implementations.
 
 ---
 
-## Interface Definitions
+## Why
 
-### IProgressRepository
-
-```typescript
-// src/lib/repositories/IProgressRepository.ts
-
-import type {
-  SpeechProgress,
-  PracticeAttempt,
-  PracticeSession,
-} from "@/types/speechAdventure";
-
-export interface IProgressRepository {
-  getProgress(): SpeechProgress;
-  getServerProgress(): SpeechProgress;
-  subscribe(callback: () => void): () => void;
-
-  addAttempt(attempt: PracticeAttempt): Promise<SpeechProgress>;
-  replaceProgress(progress: SpeechProgress): Promise<void>;
-  clearProgress(): Promise<void>;
-
-  startSession(input: StartSessionInput): Promise<PracticeSession>;
-  completeSession(sessionId: string): Promise<PracticeSession | null>;
-  abandonSession(sessionId: string): Promise<PracticeSession | null>;
-  getActiveSession(stageId: string): PracticeSession | null;
-
-  getSelectedSoundId(): string;
-  setSelectedSoundId(id: string): Promise<void>;
-  subscribeToSelectedSound(callback: () => void): () => void;
-}
-
-export interface StartSessionInput {
-  childId: string;
-  targetSound: string;
-  stageId: string;
-  totalMissions: number;
-}
-```
+Hooks and UI components never import storage modules directly. Swapping providers (local ↔ Supabase) requires no UI changes.
 
 ---
 
-### IProfileRepository
+## Repository Interfaces
 
-```typescript
-// src/lib/repositories/IProfileRepository.ts
+All in `src/lib/repositories/`:
 
-import type { ChildProfileData } from "@/lib/child-profile/childProfileStorage";
-
-export interface IProfileRepository {
-  getProfile(): ChildProfileData | null;
-  getServerProfile(): ChildProfileData | null;
-  subscribe(callback: () => void): () => void;
-
-  saveProfile(profile: ChildProfileData): Promise<void>;
-  clearProfile(): Promise<void>;
-  replaceProfile(profile: ChildProfileData): Promise<void>;
-}
-```
-
----
-
-### IObservationRepository
-
-```typescript
-// src/lib/repositories/IObservationRepository.ts
-
-import type { ObservationNote } from "@/types/observations";
-
-export interface IObservationRepository {
-  getNotes(childId: string): ObservationNote[];
-  getServerNotes(): ObservationNote[];
-  subscribe(callback: () => void): () => void;
-
-  addNote(note: ObservationNote): Promise<void>;
-  updateNote(id: string, patch: Partial<ObservationNote>): Promise<void>;
-  deleteNote(id: string): Promise<void>;
-}
-```
+| Interface | File | Purpose |
+|---|---|---|
+| `IProgressRepository` | `IProgressRepository.ts` | Attempts, sessions, selected sound |
+| `IProfileRepository` | `IProfileRepository.ts` | Child profiles, multi-child list, selectedChildId |
+| `IObservationRepository` | `IObservationRepository.ts` | Observation notes |
+| `IInvitationRepository` | `IInvitationRepository.ts` | Parent invitation links |
+| `IChildAccessRepository` | `IChildAccessRepository.ts` | Shared-child access records |
+| `ISchoolRepository` | `ISchoolRepository.ts` | School org, classroom, teacher/student |
 
 ---
 
 ## Implementations
 
-### LocalStorage (ปัจจุบัน)
+### Local (localStorage) — default
 
-```typescript
-// src/lib/repositories/LocalStorageProgressRepository.ts
+`src/lib/storage/local/`
 
-import * as storage from "@/lib/speechProgressStorage";
-import type { IProgressRepository } from "./IProgressRepository";
+| Class | File |
+|---|---|
+| `LocalProgressRepository` | `LocalProgressRepository.ts` |
+| `LocalProfileRepository` | `LocalProfileRepository.ts` |
+| `LocalObservationRepository` | `LocalObservationRepository.ts` |
+| `LocalInvitationRepository` | `LocalInvitationRepository.ts` |
+| `LocalChildAccessRepository` | `LocalChildAccessRepository.ts` |
+| `LocalSchoolRepository` | `LocalSchoolRepository.ts` |
 
-export class LocalStorageProgressRepository implements IProgressRepository {
-  getProgress() { return storage.getProgress(); }
-  getServerProgress() { return storage.getServerProgress(); }
-  subscribe(cb: () => void) { return storage.subscribeToProgress(cb); }
+### Supabase
 
-  async addAttempt(attempt) { return storage.addAttempt(attempt); }
-  async replaceProgress(progress) { storage.replaceProgress(progress); }
-  async clearProgress() { storage.clearProgress(); }
+`src/lib/storage/supabase/`
 
-  async startSession(input) { return storage.startPracticeSession(input); }
-  async completeSession(id) { return storage.completePracticeSession(id); }
-  async abandonSession(id) { return storage.abandonPracticeSession(id); }
-  getActiveSession(stageId) { return storage.getActiveSession(stageId); }
+| Class | File |
+|---|---|
+| `SupabaseProgressRepository` | `SupabaseProgressRepository.ts` |
+| `SupabaseProfileRepository` | `SupabaseProfileRepository.ts` |
+| `SupabaseObservationRepository` | `SupabaseObservationRepository.ts` |
+| `SupabaseInvitationRepository` | `SupabaseInvitationRepository.ts` |
+| `SupabaseChildAccessRepository` | `SupabaseChildAccessRepository.ts` |
+| `SupabaseSchoolRepository` | `SupabaseSchoolRepository.ts` |
 
-  getSelectedSoundId() { return storage.getSelectedSoundId(); }
-  async setSelectedSoundId(id) { storage.setSelectedSoundId(id); }
-  subscribeToSelectedSound(cb) { return storage.subscribeToSelectedSound(cb); }
-}
-```
-
-### Supabase (เป้าหมาย Phase 3)
-
-```typescript
-// src/lib/repositories/SupabaseProgressRepository.ts
-// — implement IProgressRepository กับ Supabase client
-// — sync localStorage เป็น optimistic cache
-// — ดู migration-strategy.md Phase 3
-```
-
-### Hybrid (Migration Period)
-
-```typescript
-// src/lib/repositories/HybridProgressRepository.ts
-// — write ไปทั้ง localStorage และ Supabase
-// — read จาก Supabase, fallback localStorage เมื่อ offline
-// — เปิดด้วย NEXT_PUBLIC_STORAGE_BACKEND=hybrid
-```
+Other files in `src/lib/storage/supabase/`:
+- `createSupabaseRepositories.ts` — factory that builds all 6 at once
+- `audioStorage.ts` — audio upload/signed URL service (not a repository)
+- `mappers.ts` — domain ↔ DB row conversion
+- `errors.ts` — Supabase error helpers
 
 ---
 
 ## Provider / DI
 
+```
+src/lib/providers/RepositoryProvider.tsx
+```
+
+- Resolves correct implementation at module init (based on `NEXT_PUBLIC_STORAGE_PROVIDER`)
+- Injects all 6 repositories via React context
+- Watches auth state: calls `rehydrate()` on sign-in, `reset()` on sign-out
+- Local repos are module-level singletons (stable references for useSyncExternalStore)
+
 ```typescript
-// src/lib/repositories/RepositoryProvider.tsx
-"use client";
-
-import { createContext, useContext } from "react";
-import type { IProgressRepository } from "./IProgressRepository";
-import type { IProfileRepository } from "./IProfileRepository";
-import type { IObservationRepository } from "./IObservationRepository";
-import { LocalStorageProgressRepository } from "./LocalStorageProgressRepository";
-import { LocalStorageProfileRepository } from "./LocalStorageProfileRepository";
-import { LocalStorageObservationRepository } from "./LocalStorageObservationRepository";
-
-interface Repositories {
-  progress: IProgressRepository;
-  profile: IProfileRepository;
-  observations: IObservationRepository;
-}
-
-const defaultRepos: Repositories = {
-  progress: new LocalStorageProgressRepository(),
-  profile: new LocalStorageProfileRepository(),
-  observations: new LocalStorageObservationRepository(),
-};
-
-const RepositoryContext = createContext<Repositories>(defaultRepos);
-
-export function RepositoryProvider({
-  children,
-  overrides,
-}: {
-  children: React.ReactNode;
-  overrides?: Partial<Repositories>;
-}) {
-  return (
-    <RepositoryContext.Provider value={{ ...defaultRepos, ...overrides }}>
-      {children}
-    </RepositoryContext.Provider>
-  );
-}
-
-export function useRepositories() {
-  return useContext(RepositoryContext);
-}
+// Access in hooks and components
+const { progress, profile, observations, invitations, childAccess, school } = useRepositories();
 ```
 
 ---
 
-## Hook Refactor
+## IProfileRepository Extensions
 
-Hooks เปลี่ยนจาก import storage module โดยตรง เป็นรับ repository จาก context:
+`IProfileRepository` also exposes multi-child methods:
 
 ```typescript
-// src/hooks/useSpeechProgress.ts (refactored)
-import { useSyncExternalStore } from "react";
-import { useRepositories } from "@/lib/repositories/RepositoryProvider";
-
-export function useSpeechProgress() {
-  const { progress: repo } = useRepositories();
-
-  const data = useSyncExternalStore(
-    repo.subscribe.bind(repo),
-    repo.getProgress.bind(repo),
-    repo.getServerProgress.bind(repo),
-  );
-
-  return {
-    progress: data,
-    addAttempt: repo.addAttempt.bind(repo),
-    startSession: repo.startSession.bind(repo),
-    completeSession: repo.completeSession.bind(repo),
-    // ...
-  };
-}
+listProfiles(): ChildProfileData[]
+getSelectedChildId(): string | null
+setSelectedChildId(id: string): Promise<void>
 ```
 
-**ข้อสำคัญ:** hook API ไม่เปลี่ยน — UI components ไม่ต้องแก้ไข
+These are backed by `childProfileListStorage.ts` in the local implementation.
 
 ---
 
-## Wiring ใน Layout
+## IProgressRepository Key Methods
 
 ```typescript
-// src/app/layout.tsx
-import { RepositoryProvider } from "@/lib/repositories/RepositoryProvider";
-import { createSupabaseRepositories } from "@/lib/repositories/supabaseRepositories";
+// Session management
+startSession(input: StartSessionInput): Promise<PracticeSession>
+completeSession(sessionId: string): Promise<PracticeSession | null>
+abandonSession(sessionId: string): Promise<PracticeSession | null>
+getActiveSession(stageId: string): PracticeSession | null
 
-export default function RootLayout({ children }) {
-  // เลือก implementation ตาม env var หรือ auth state
-  const repos = process.env.NEXT_PUBLIC_STORAGE_BACKEND === "supabase"
-    ? createSupabaseRepositories()
-    : undefined; // default = localStorage
+// Data
+addAttempt(attempt: PracticeAttempt): Promise<SpeechProgress>
+getProgress(): SpeechProgress
+subscribe(cb: () => void): () => void
 
-  return (
-    <html>
-      <body>
-        <RepositoryProvider overrides={repos}>
-          <ThemeProvider>
-            {children}
-          </ThemeProvider>
-        </RepositoryProvider>
-      </body>
-    </html>
-  );
-}
+// Sound
+getSelectedSoundId(): string
+setSelectedSoundId(id: string): Promise<void>
 ```
 
 ---
 
-## Test Strategy
+## Rehydrate / Reset (Supabase only)
 
-```typescript
-// ใน unit tests: inject mock repository
-const mockRepo: IProgressRepository = {
-  getProgress: () => mockProgress,
-  subscribe: (cb) => () => {},
-  addAttempt: jest.fn(),
-  // ...
-};
+Supabase repositories expose two additional methods (duck-typed, not in interface):
 
-render(
-  <RepositoryProvider overrides={{ progress: mockRepo }}>
-    <TrainingPage />
-  </RepositoryProvider>
-);
-```
+| Method | When called | Effect |
+|---|---|---|
+| `rehydrate()` | Sign-in, session restore | Clears hydrate state, fetches fresh from Supabase |
+| `reset()` | Sign-out | Immediately clears cache + notifies subscribers |
 
-ข้อดี: ไม่ต้อง mock localStorage, test เร็วขึ้น, isolate logic ได้ชัดเจน
+`RepositoryProvider` calls these automatically on auth transitions.
 
 ---
 
-## Migration Checklist
+## Do Not Break
 
-- [ ] สร้าง interface files (`I*Repository.ts`) ทั้ง 3
-- [ ] wrap `speechProgressStorage.ts` เป็น `LocalStorageProgressRepository`
-- [ ] wrap `childProfileStorage.ts` เป็น `LocalStorageProfileRepository`
-- [ ] wrap `observationStorage.ts` เป็น `LocalStorageObservationRepository`
-- [ ] สร้าง `RepositoryProvider` context
-- [ ] refactor `useSpeechProgress` → ใช้ repository
-- [ ] refactor `useChildProfile` → ใช้ repository
-- [ ] refactor `useObservationNotes` → ใช้ repository
-- [ ] verify: unit tests ทุกตัวผ่านโดยไม่มี localStorage mock
-- [ ] verify: UI ทุกหน้าทำงานปกติ (smoke test)
+- Never import `*Storage.ts` modules directly from pages or components
+- Never import `Local*Repository` or `Supabase*Repository` directly from UI — use `useRepositories()`
+- Server snapshots in useSyncExternalStore must return **same reference** on every call (no `new []` inside snapshot)
+- `school` repository can be `undefined` in `Repositories` type — always guard with `?.`
