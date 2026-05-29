@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
+import Link from "next/link";
 import { mockTrainingStages } from "@/data/speechAdventureMockData";
 import type { PracticeAttempt, PracticeSession, EvaluationStatus } from "@/types/speechAdventure";
 import DetailMetricCard from "./DetailMetricCard";
@@ -38,14 +39,14 @@ function formatDuration(ms: number): string {
   return seconds > 0 ? `${minutes} นาที ${seconds} วินาที` : `${minutes} นาที`;
 }
 
-const ATTEMPT_STATUS_INFO: Record<EvaluationStatus, { label: string; color: string }> = {
-  passed: { label: "ผ่าน", color: "#4CAF82" },
-  almost: { label: "เกือบผ่าน", color: "#FFB347" },
-  retry: { label: "ต้องฝึกเพิ่ม", color: "#E57373" },
+const ATTEMPT_STATUS_INFO: Record<EvaluationStatus, { label: string; color: string; parentNote: string }> = {
+  passed: { label: "ผ่าน ✓", color: "#4CAF82", parentNote: "น้องออกเสียงได้ดีมาก ลองฝึกระดับต่อไปได้เลย" },
+  almost: { label: "เสียงใกล้เคียงแล้ว", color: "#FFB347", parentNote: "น้องพัฒนาขึ้นแล้ว ลองฝึกซ้ำอีกสักครั้งจะยิ่งดี" },
+  retry: { label: "ลองอีกครั้ง", color: "#FF8A65", parentNote: "ยังไม่เป็นไร ลองฝึกซ้ำอีกครั้งนะคะ การฝึกบ่อยๆ ช่วยได้มากค่ะ" },
 };
 
 export default function AttemptDetailDrawer({ attempt, linkedSession, onClose, onSessionClick }: Props) {
-  const { canViewAudio } = useCurrentChildAccess();
+  const { canViewAudio, canStartPractice } = useCurrentChildAccess();
   useEffect(() => {
     if (!attempt) return;
     document.body.style.overflow = "hidden";
@@ -127,43 +128,82 @@ export default function AttemptDetailDrawer({ attempt, linkedSession, onClose, o
             </span>
           </div>
 
-          {/* Prompt text */}
-          <div className="bg-bg dark:bg-white/5 border border-border rounded-xl p-4">
-            <p className="text-xs text-text-muted mb-1">คำ / ประโยคที่ฝึก</p>
-            <p className="text-lg font-bold text-text">{attempt.promptText}</p>
+          {/* ── Parent-friendly summary ── */}
+          <div className="bg-surface border border-border rounded-xl overflow-hidden">
+            <div className="px-4 py-3 border-b border-border/60">
+              <p className="text-xs font-semibold text-text-muted uppercase tracking-wider">สรุปสำหรับผู้ปกครอง</p>
+            </div>
+            <div className="px-4 py-3 space-y-3">
+              {/* Expected */}
+              <div className="flex gap-3">
+                <span className="text-xs text-text-muted w-28 flex-shrink-0 pt-0.5">โจทย์ที่คาดหวัง</span>
+                <span className="text-sm font-semibold text-text flex-1">
+                  {attempt.promptText}
+                  <span
+                    className="ml-2 text-xs font-bold px-1.5 py-0.5 rounded-full"
+                    style={{ backgroundColor: `${accentColor}18`, color: accentColor }}
+                  >
+                    เสียง {attempt.targetSound}
+                  </span>
+                </span>
+              </div>
+              {/* Heard */}
+              <div className="flex gap-3">
+                <span className="text-xs text-text-muted w-28 flex-shrink-0 pt-0.5">ระบบได้ยินว่า</span>
+                {attempt.transcript ? (
+                  <span className="text-sm text-text flex-1">
+                    &ldquo;{attempt.transcript}&rdquo;
+                    <span className={`ml-2 text-xs font-medium ${
+                      attempt.confidence >= 0.8 ? "text-success" :
+                      attempt.confidence >= 0.55 ? "text-info" : "text-warning"
+                    }`}>
+                      {attempt.confidence >= 0.8 ? "· ชัดเจน" :
+                       attempt.confidence >= 0.55 ? "· ค่อนข้างชัด" : "· เสียงยังไม่ชัด"}
+                    </span>
+                  </span>
+                ) : (
+                  <span className="text-sm text-text-muted flex-1 italic">ไม่มีข้อมูล</span>
+                )}
+              </div>
+              {/* Result */}
+              <div className="flex gap-3">
+                <span className="text-xs text-text-muted w-28 flex-shrink-0 pt-0.5">ผลการฝึก</span>
+                <span className="text-sm font-medium flex-1" style={{ color: statusInfo.color }}>
+                  {statusInfo.label} · {statusInfo.parentNote}
+                </span>
+              </div>
+              {/* Next tip */}
+              {(attempt.practiceTip ?? attempt.recommendation) && (
+                <div className="flex gap-3">
+                  <span className="text-xs text-text-muted w-28 flex-shrink-0 pt-0.5">ควรทำต่อไป</span>
+                  <span className="text-sm text-text flex-1 leading-relaxed">
+                    {attempt.practiceTip ?? attempt.recommendation}
+                  </span>
+                </div>
+              )}
+            </div>
           </div>
 
-          {/* Transcript (AI heard) */}
-          {attempt.transcript && (
-            <div className="bg-bg dark:bg-white/5 border border-border rounded-xl p-4">
-              <p className="text-xs text-text-muted mb-1">ที่ AI ได้ยิน</p>
-              <p className="text-base font-medium text-text">&ldquo;{attempt.transcript}&rdquo;</p>
-              <p className="text-xs text-text-muted mt-1.5">
-                {attempt.confidence >= 0.8
-                  ? "ฟังได้ชัดเจน"
-                  : attempt.confidence >= 0.55
-                  ? "ค่อนข้างชัด"
-                  : "เสียงยังไม่ชัด ลองอัดใหม่อีกครั้ง"}
-              </p>
-            </div>
-          )}
-
-          {/* Stats grid */}
+          {/* Prompt text (compact secondary display) */}
           <div className="grid grid-cols-2 gap-3">
             <DetailMetricCard
               label="คะแนน"
               value={`${attempt.score}%`}
-              valueColor={attempt.score >= 70 ? "#4CAF82" : attempt.score >= 50 ? "#FFB347" : "#E57373"}
-            />
-            <DetailMetricCard
-              label="ความแม่นยำ"
-              value={`${Math.round(attempt.confidence * 100)}%`}
-              valueColor="#6C63FF"
+              valueColor={attempt.score >= 70 ? "#4CAF82" : attempt.score >= 50 ? "#FFB347" : "#FF8A65"}
             />
             <DetailMetricCard
               label="ดาวที่ได้รับ"
               value={attempt.starsEarned > 0 ? `★ ${attempt.starsEarned}` : "—"}
               valueColor="#FFB347"
+            />
+          </div>
+
+          {/* Secondary stats: confidence + duration */}
+          <div className="grid grid-cols-2 gap-3">
+            <DetailMetricCard
+              label="ความแม่นยำเสียง"
+              value={`${Math.round(attempt.confidence * 100)}%`}
+              valueColor="#6C63FF"
             />
             <DetailMetricCard
               label="เวลาที่ใช้"
@@ -185,7 +225,7 @@ export default function AttemptDetailDrawer({ attempt, linkedSession, onClose, o
           </div>
 
           {/* Audio playback — gated by canViewAudio permission */}
-          {attempt.audioPath && (
+          {attempt.audioPath ? (
             canViewAudio ? (
               <AttemptAudioPlayer
                 audioPath={attempt.audioPath}
@@ -193,44 +233,48 @@ export default function AttemptDetailDrawer({ attempt, linkedSession, onClose, o
               />
             ) : (
               <PermissionBanner
-                message="คุณมีสิทธิ์ดูเท่านั้น"
-                hint="ต้องได้รับสิทธิ์จากผู้ดูแลเด็กเพื่อฟังเสียงที่บันทึก"
+                message="ไม่มีสิทธิ์ฟังเสียงบันทึก"
+                hint="ติดต่อเจ้าของโปรไฟล์เด็กเพื่อขอสิทธิ์ canViewAudio"
               />
             )
+          ) : (
+            <div className="bg-bg dark:bg-white/5 border border-border rounded-xl p-4 flex items-center gap-3">
+              <div className="w-9 h-9 rounded-xl bg-border/40 flex items-center justify-center flex-shrink-0">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-text-muted" aria-hidden="true">
+                  <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z" />
+                  <path d="M19 10v2a7 7 0 0 1-14 0v-2" />
+                  <line x1="2" y1="2" x2="22" y2="22" />
+                </svg>
+              </div>
+              <p className="text-sm text-text-muted">ยังไม่มีเสียงบันทึกสำหรับรายการนี้</p>
+            </div>
           )}
 
           {/* Feedback */}
           {attempt.feedback && (
             <div className="bg-info/8 border border-info/20 rounded-xl p-4">
-              <p className="text-xs font-semibold text-info mb-1.5">ผลการประเมิน</p>
+              <p className="text-xs font-semibold text-info mb-1.5">ผลการประเมินจาก AI</p>
               <p className="text-sm text-text leading-relaxed">{attempt.feedback}</p>
             </div>
           )}
 
-          {/* Recommendation */}
-          {attempt.recommendation && (
-            <div className="bg-primary/8 border border-primary/15 rounded-xl p-4">
-              <p className="text-xs font-semibold text-primary mb-1.5">คำแนะนำ</p>
-              <p className="text-sm text-text leading-relaxed">{attempt.recommendation}</p>
-            </div>
-          )}
-
-          {/* Practice tip */}
-          {attempt.practiceTip && (
+          {/* Practice tip — only if differs from recommendation to avoid duplication */}
+          {attempt.practiceTip && attempt.practiceTip !== attempt.recommendation && (
             <div className="bg-success/8 border border-success/20 rounded-xl p-4">
-              <p className="text-xs font-semibold text-success mb-1.5">เคล็ดลับการฝึก</p>
+              <p className="text-xs font-semibold text-success mb-1.5">💡 เคล็ดลับการฝึก</p>
               <p className="text-sm text-text leading-relaxed">{attempt.practiceTip}</p>
             </div>
           )}
 
-          {/* Detected issues */}
+          {/* Detected issues — shown with supportive framing */}
           {attempt.detectedIssues && attempt.detectedIssues.length > 0 && (
             <div className="bg-warning/8 border border-warning/20 rounded-xl p-4">
-              <p className="text-xs font-semibold text-warning mb-2">ปัญหาที่ AI ตรวจพบ</p>
+              <p className="text-xs font-semibold text-warning mb-2">จุดที่ AI สังเกตเห็น</p>
+              <p className="text-xs text-text-muted mb-2">ลองฝึกซ้ำกับจุดเหล่านี้จะช่วยพัฒนาได้มากขึ้นค่ะ</p>
               <ul className="space-y-1">
                 {attempt.detectedIssues.map((issue, i) => (
                   <li key={i} className="flex items-start gap-2 text-sm text-text">
-                    <span className="text-warning flex-shrink-0 mt-0.5 font-bold">·</span>
+                    <span className="text-warning flex-shrink-0 mt-0.5">·</span>
                     {issue}
                   </li>
                 ))}
@@ -292,15 +336,38 @@ export default function AttemptDetailDrawer({ attempt, linkedSession, onClose, o
           </div>
         </div>
 
-        {/* Footer */}
-        <div className="sticky bottom-0 bg-surface border-t border-border p-4">
-          <button
-            type="button"
-            onClick={onClose}
-            className="w-full py-3 rounded-xl border-2 border-border text-text font-semibold text-sm hover:bg-bg dark:hover:bg-white/5 transition-all active:scale-[0.98]"
-          >
-            ปิด
-          </button>
+        {/* Footer — actions */}
+        <div className="sticky bottom-0 bg-surface border-t border-border p-4 space-y-2">
+          {/* "ฝึกอีกครั้ง" — only when canStartPractice and stage is known */}
+          {canStartPractice && stage && (
+            <Link
+              href={`/training/${stage.slug}`}
+              onClick={onClose}
+              className="flex items-center justify-center gap-2 w-full py-3 rounded-xl font-semibold text-sm text-white transition-all active:scale-[0.98] hover:opacity-90"
+              style={{ backgroundColor: accentColor }}
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <polygon points="5 3 19 12 5 21 5 3" />
+              </svg>
+              ฝึกอีกครั้ง
+            </Link>
+          )}
+          <div className="flex gap-2">
+            <Link
+              href="/progress"
+              onClick={onClose}
+              className="flex-1 py-2.5 rounded-xl border border-border text-text-muted font-medium text-sm text-center hover:bg-bg dark:hover:bg-white/5 transition-all active:scale-[0.98]"
+            >
+              ดูความก้าวหน้า
+            </Link>
+            <button
+              type="button"
+              onClick={onClose}
+              className="flex-1 py-2.5 rounded-xl border-2 border-border text-text font-semibold text-sm hover:bg-bg dark:hover:bg-white/5 transition-all active:scale-[0.98]"
+            >
+              ปิด
+            </button>
+          </div>
         </div>
       </div>
     </div>

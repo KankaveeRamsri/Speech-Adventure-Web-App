@@ -126,7 +126,17 @@ These are in `school`/`teacher` routes — not in the parent training flow. Docu
 4. ✅ **LevelCard locked state** — message "ทำด่านก่อนหน้าให้เสร็จก่อน" on all screen sizes; slightly more visible opacity
 5. ✅ **PracticeSessionSummary per-item** — `sessionAttempts?: PracticeAttempt[]` prop; per-item breakdown shows score, promptText, status, stars; training/[stage] page passes `sessionAttempts`
 
-## Next Phase: P5 — (TBD)
+## Phase P5 — Parent Review and Attempt Detail (Done 2026-05-29)
+
+1. ✅ **"สรุปสำหรับผู้ปกครอง" card** — plain-language summary at top: โจทย์, ระบบได้ยินว่า, ผลการฝึก (supportive), ควรทำต่อไป
+2. ✅ **Status labels updated** — "ต้องฝึกเพิ่ม" → "ลองอีกครั้ง", "เกือบผ่าน" → "เสียงใกล้เคียงแล้ว"; with parentNote encouraging message
+3. ✅ **Audio missing state** — shows "ยังไม่มีเสียงบันทึกสำหรับรายการนี้" when no audioPath
+4. ✅ **canViewAudio text** — "ไม่มีสิทธิ์ฟังเสียงบันทึก" (clearer message)
+5. ✅ **Footer CTAs** — "ฝึกอีกครั้ง" (links to training stage, gated by canStartPractice); "ดูความก้าวหน้า"; "ปิด"
+6. ✅ **Detected issues framing** — "จุดที่ AI สังเกตเห็น" + "ลองฝึกซ้ำกับจุดเหล่านี้..." (supportive, not diagnostic)
+7. ✅ **Stats reorganized** — quick 2-card row (score, stars) near top; confidence + duration below audio
+
+## Next Phase: P6 — (TBD)
 
 ---
 
