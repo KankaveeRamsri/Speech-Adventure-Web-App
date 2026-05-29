@@ -141,7 +141,7 @@ export function domainToDbAttempt(
     feedback: attempt.feedback,
     recommendation: attempt.recommendation ?? null,
     stars_earned: attempt.starsEarned,
-    is_mock: true,   // TODO: set false when real AI evaluation is active
+    is_mock: attempt.isMock ?? true,
     audio_path: attempt.audioPath ?? null,
   };
 }

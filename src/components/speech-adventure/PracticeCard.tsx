@@ -72,6 +72,7 @@ function buildAttempt(
     transcript: evalResult.transcript,
     practiceTip: evalResult.practiceTip,
     detectedIssues: evalResult.detectedIssues?.length ? evalResult.detectedIssues : undefined,
+    isMock: evalResult.isMock,
   };
 }
 

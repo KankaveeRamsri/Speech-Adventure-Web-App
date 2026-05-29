@@ -20,7 +20,7 @@ const PARENT_NAV_ITEMS: NavItem[] = [
   { href: "/rewards", label: "รางวัล", icon: "rewards" },
   { href: "/report", label: "รายงาน", icon: "report" },
   { href: "/demo", label: "Showcase", icon: "demo" },
-  { href: "/onboarding", label: "โปรไฟล์", icon: "profile" },
+  { href: "/onboarding?edit=true", label: "โปรไฟล์", icon: "profile" },
   { href: "/settings", label: "ตั้งค่า", icon: "settings" },
 ];
 

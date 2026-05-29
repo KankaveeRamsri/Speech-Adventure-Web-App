@@ -107,7 +107,18 @@ These are in `school`/`teacher` routes — not in the parent training flow. Docu
 4. ✅ **Post-auth chain** — signin/signup → `/training` → `/onboarding` if authenticated + no profile
 5. ✅ **Edit profile link** — onboarding edit mode shows link to `/settings` instead of DataManagerSection
 
-## Next Phase: P3 — (TBD)
+## Phase P3 — Parent Progress Dashboard Accuracy (Done 2026-05-29)
+
+1. ✅ **displaySummary** — progress page computes `displaySummary` from `selectedSoundFilter` (UI state); all overview stats, report, next-action card now respect the sound tab the user is viewing
+2. ✅ **Sessions tab** — uses `allSessions` (all child sessions, no sound filter) + `allSessionsStats`; not scoped to sound
+3. ✅ **Mock footnote** — removed hardcoded note; shows conditionally only if all attempts have `isMock=true` and none have `isMock=false`
+4. ✅ **`isMock` field** — added to `PracticeAttempt` type; saved from `evalResult.isMock` in `buildAttempt`; Supabase mapper uses `attempt.isMock ?? true`
+5. ✅ **Edit profile links** — fixed `/onboarding` → `/onboarding?edit=true` in: `AppSidebar`, `rewards/page.tsx`, `progress/page.tsx`; new-user links (no profile) correctly keep `/onboarding`
+6. ✅ **Per-sound cards** — added "ฝึกต่อ →" / "เริ่มฝึก →" CTA text
+7. ✅ **Current level label** — shows "เสียง X" badge when sound filter is active
+8. ✅ **report tab** — uses `displaySummary.difficultItems`; shows sound filter note when active
+
+## Next Phase: P4 — (TBD)
 
 ---
 

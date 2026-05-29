@@ -132,6 +132,8 @@ export interface PracticeAttempt {
   practiceTip?: string;
   /** Issues detected by AI evaluation (e.g. mispronunciation patterns). */
   detectedIssues?: string[];
+  /** False when evaluated by real AI (OpenAI); true or undefined = mock. */
+  isMock?: boolean;
 }
 
 export interface SpeechProgress {

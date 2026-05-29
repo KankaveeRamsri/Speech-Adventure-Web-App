@@ -16,6 +16,7 @@ import { useCurrentChildAccess } from "@/hooks/useCurrentChildAccess";
 import { useObservationNotes } from "@/hooks/useObservationNotes";
 import { mockChildProfile, mockTrainingStages, mockTargetSounds } from "@/data/speechAdventureMockData";
 import { getSoundSummary, type SoundSummary } from "@/lib/progressUtils";
+import { calculateProgressSummary } from "@/lib/speechProgressStorage";
 import {
   DEMO_PROGRESS,
   DEMO_OBSERVATIONS,
@@ -96,7 +97,7 @@ type TabId = (typeof TABS)[number]["id"];
 
 export default function ProgressDashboardPage() {
   const { progress: progressRepo, observations: obsRepo } = useRepositories();
-  const { progress, summary, attempts, clearProgressForChild, getStageStatus, getStageAttempts, isHydrated } =
+  const { progress, attempts, sessions, clearProgressForChild, getStageStatus, getStageAttempts, isHydrated } =
     useSpeechProgress();
   const { profile, hasProfile } = useChildProfile();
   const { isOwner, isSharedChild, canEditChild, canExportReport, canViewProgress } = useCurrentChildAccess();
@@ -110,6 +111,39 @@ export default function ProgressDashboardPage() {
   const [filterStageId, setFilterStageId] = useState<string | null>(null);
   const [selectedSoundFilter, setSelectedSoundFilter] = useState<string | null>(null);
 
+  // ── displaySummary: scoped by selected child + UI sound filter ──────────────
+  // Uses selectedSoundFilter (null = all sounds) so the overview stats, report,
+  // and "next action" card always match what the user is looking at.
+
+  const displaySummary = useMemo<ProgressSummary>(
+    () =>
+      calculateProgressSummary(
+        { ...progress, attempts, sessions },
+        selectedSoundFilter ?? undefined,
+      ),
+    [progress, attempts, sessions, selectedSoundFilter],
+  );
+
+  // ── All sessions for child — used in sessions tab (no sound filter) ────────
+
+  const allSessions = useMemo(
+    () =>
+      [...sessions]
+        .filter((s) => s.status !== "active")
+        .sort((a, b) => new Date(b.startedAt).getTime() - new Date(a.startedAt).getTime()),
+    [sessions],
+  );
+
+  const allSessionsStats = useMemo(() => {
+    const completed = sessions.filter((s) => s.status === "completed");
+    if (completed.length === 0) return null;
+    return {
+      total: completed.length,
+      avgScore: Math.round(completed.reduce((sum, s) => sum + s.averageScore, 0) / completed.length),
+      totalStars: completed.reduce((sum, s) => sum + s.starsEarned, 0),
+    };
+  }, [sessions]);
+
   // ── Derived data ──────────────────────────────────────────────────────────────
 
   const liveProfile = {
@@ -117,9 +151,9 @@ export default function ProgressDashboardPage() {
     name: profile?.name ?? mockChildProfile.name,
     nickname: profile ? profile.name.split(" ")[0] : mockChildProfile.nickname,
     age: profile?.age ?? mockChildProfile.age,
-    currentStage: summary.currentStageId,
-    totalStars: summary.starsEarned,
-    totalAttempts: summary.totalAttempts,
+    currentStage: displaySummary.currentStageId,
+    totalStars: displaySummary.starsEarned,
+    totalAttempts: displaySummary.totalAttempts,
   };
 
   const stageData = mockTrainingStages.map((stage) => {
@@ -133,16 +167,22 @@ export default function ProgressDashboardPage() {
   });
 
   const completedCount = stageData.filter((s) => s.status === "completed").length;
-  const hasData = isHydrated && summary.totalAttempts > 0;
+  const hasData = isHydrated && displaySummary.totalAttempts > 0;
   const rewardResult = isHydrated ? calculateRewards(progress) : null;
-  const hasReview = isHydrated && summary.reviewScore > 0;
-  const report = generateReport(summary, completedCount);
+  const hasReview = isHydrated && displaySummary.reviewScore > 0;
+  const report = generateReport(displaySummary, completedCount);
   const dateStr = isHydrated ? formatThaiDate() : "";
 
-  // Next best action
+  // Next best action — scoped to selected sound filter
   const currentStageForAction = isHydrated
-    ? mockTrainingStages.find((s) => s.id === summary.currentStageId)
+    ? mockTrainingStages.find((s) => s.id === displaySummary.currentStageId)
     : null;
+
+  // Mock footnote: show only when ALL current attempts are mock (isMock !== false)
+  const hasMockNote =
+    hasData && attempts.length > 0 &&
+    !attempts.some((a) => a.isMock === false) &&
+    attempts.some((a) => a.isMock === true);
 
   // Latest observation note
   const latestNote = notes.length > 0 ? notes[notes.length - 1] : null;
@@ -191,8 +231,8 @@ export default function ProgressDashboardPage() {
     return { total: pool.length, best, avg, lastDate };
   }, [attempts, selectedSoundFilter, sortedAttempts]);
 
-  // Recent sessions for sidebar preview (last 3)
-  const recentSessionsPreview = summary.recentSessions.slice(0, 3);
+  // Recent sessions for sidebar preview (last 3, all sounds)
+  const recentSessionsPreview = allSessions.slice(0, 3);
 
   // ── Handlers ──────────────────────────────────────────────────────────────────
 
@@ -208,7 +248,7 @@ export default function ProgressDashboardPage() {
   };
 
   const handleLoadDemo = () => {
-    if (summary.totalAttempts > 0) {
+    if (attempts.length > 0) {
       setShowDemoConfirm(true);
     } else {
       void progressRepo.replaceProgress(DEMO_PROGRESS);
@@ -268,7 +308,7 @@ export default function ProgressDashboardPage() {
                 </div>
                 {isHydrated && (!isSharedChild || canEditChild) && (
                   <Link
-                    href="/onboarding"
+                    href={hasProfile ? "/onboarding?edit=true" : "/onboarding"}
                     className="flex-shrink-0 text-sm font-medium text-primary hover:text-primary/80 px-3 py-1.5 rounded-xl hover:bg-primary/8 transition-all border border-primary/20"
                   >
                     {hasProfile ? "แก้ไขโปรไฟล์" : "ตั้งค่าโปรไฟล์"}
@@ -277,7 +317,7 @@ export default function ProgressDashboardPage() {
               </div>
 
               {/* Child profile card */}
-              <ChildProfileCard profile={liveProfile} isHydrated={isHydrated} averageScore={summary.averageScore} />
+              <ChildProfileCard profile={liveProfile} isHydrated={isHydrated} averageScore={displaySummary.averageScore} />
 
               {/* Stats grid */}
               {hasData ? (
@@ -287,17 +327,17 @@ export default function ProgressDashboardPage() {
                     <div className="bg-surface border border-border rounded-xl p-4">
                       <p className="text-xs font-medium text-text-muted mb-2">คะแนนเฉลี่ย</p>
                       <p className="text-3xl font-bold text-success leading-none">
-                        {summary.averageScore}<span className="text-sm ml-0.5">%</span>
+                        {displaySummary.averageScore}<span className="text-sm ml-0.5">%</span>
                       </p>
                     </div>
                     <div className="bg-surface border border-border rounded-xl p-4">
                       <p className="text-xs font-medium text-text-muted mb-2">ครั้งที่ฝึก</p>
-                      <p className="text-3xl font-bold text-info leading-none">{summary.totalAttempts}</p>
+                      <p className="text-3xl font-bold text-info leading-none">{displaySummary.totalAttempts}</p>
                     </div>
                     <div className="bg-surface border border-border rounded-xl p-4">
                       <p className="text-xs font-medium text-text-muted mb-2">ดาวที่ได้รับ</p>
                       <p className="text-3xl font-bold text-secondary leading-none">
-                        <span className="text-xl">★</span> {summary.starsEarned}
+                        <span className="text-xl">★</span> {displaySummary.starsEarned}
                       </p>
                     </div>
                     <div className="bg-surface border border-border rounded-xl p-4">
@@ -315,8 +355,8 @@ export default function ProgressDashboardPage() {
                     </div>
                   </div>
                   <div className="mt-3 bg-primary/8 border border-primary/20 rounded-xl px-4 py-3">
-                    <p className="text-xs font-medium text-primary mb-0.5">ระดับปัจจุบัน</p>
-                    <p className="font-semibold text-text">{summary.currentLevel}</p>
+                    <p className="text-xs font-medium text-primary mb-0.5">ระดับปัจจุบัน{selectedSoundFilter ? ` · เสียง ${selectedSoundFilter}` : ""}</p>
+                    <p className="font-semibold text-text">{displaySummary.currentLevel}</p>
                   </div>
                 </section>
               ) : (
@@ -429,9 +469,13 @@ export default function ProgressDashboardPage() {
                                 <p className={`text-xs font-medium mt-1.5 ${statusClass[s.status]}`}>
                                   {statusLabel[s.status]}
                                 </p>
+                                <p className="text-xs font-semibold text-primary mt-2">ฝึกต่อ →</p>
                               </>
                             ) : (
-                              <p className="text-xs text-text-muted mt-1">ยังไม่เริ่มฝึก</p>
+                              <>
+                                <p className="text-xs text-text-muted mt-1">ยังไม่เริ่มฝึก</p>
+                                <p className="text-xs font-semibold text-primary mt-2">เริ่มฝึก →</p>
+                              </>
                             )}
                           </button>
                         );
@@ -535,10 +579,10 @@ export default function ProgressDashboardPage() {
                   <div className="bg-level-pretest/8 border border-level-pretest/20 rounded-xl p-4 text-center">
                     <p className="text-xs font-medium text-level-pretest mb-2">Pre-test</p>
                     <p className="text-4xl font-bold text-level-pretest">
-                      {summary.pretestScore > 0 ? summary.pretestScore : "—"}
+                      {displaySummary.pretestScore > 0 ? displaySummary.pretestScore : "—"}
                     </p>
                     <p className="text-xs text-text-muted mt-1">
-                      {summary.pretestScore > 0 ? "ระดับเสียงเริ่มต้น" : "ยังไม่ได้ทำ"}
+                      {displaySummary.pretestScore > 0 ? "ระดับเสียงเริ่มต้น" : "ยังไม่ได้ทำ"}
                     </p>
                   </div>
                   <div className={`rounded-xl p-4 text-center border ${
@@ -546,16 +590,16 @@ export default function ProgressDashboardPage() {
                   }`}>
                     <p className={`text-xs font-medium mb-2 ${hasReview ? "text-success" : "text-text-muted"}`}>Review</p>
                     <p className={`text-4xl font-bold ${hasReview ? "text-success" : "text-text-muted"}`}>
-                      {hasReview ? summary.reviewScore : "—"}
+                      {hasReview ? displaySummary.reviewScore : "—"}
                     </p>
                     <p className="text-xs text-text-muted mt-1">{hasReview ? "หลังฝึกเสร็จ" : "ยังไม่มีข้อมูล"}</p>
                   </div>
                 </div>
-                {hasReview && summary.improvement > 0 && (
+                {hasReview && displaySummary.improvement > 0 && (
                   <div className="bg-success/8 border border-success/20 rounded-xl p-4 text-center">
                     <p className="text-xs font-medium text-success mb-1">พัฒนาการ</p>
                     <p className="text-3xl font-bold text-success">
-                      +{summary.improvement}<span className="text-base ml-1">คะแนน</span>
+                      +{displaySummary.improvement}<span className="text-base ml-1">คะแนน</span>
                     </p>
                   </div>
                 )}
@@ -660,7 +704,7 @@ export default function ProgressDashboardPage() {
                     </svg>
                   </div>
                   <div className="mt-3 flex items-center gap-2">
-                    <p className="text-lg font-bold text-secondary leading-none">★ {summary.starsEarned}</p>
+                    <p className="text-lg font-bold text-secondary leading-none">★ {displaySummary.starsEarned}</p>
                     <p className="text-xs text-text-muted">ดาวสะสม</p>
                   </div>
                 </Link>
@@ -700,7 +744,7 @@ export default function ProgressDashboardPage() {
             <p className="text-sm text-text-muted mt-0.5">คลิกที่แถวเพื่อดูรายละเอียด</p>
           </div>
 
-          {summary.recentSessions.length === 0 ? (
+          {allSessions.length === 0 ? (
             <div className="bg-surface border border-border rounded-xl p-8 text-center">
               <p className="text-sm font-medium text-text mb-1">ยังไม่มีประวัติเซสชัน</p>
               <p className="text-xs text-text-muted mb-4">เริ่มฝึกเพื่อสร้างเซสชันแรก</p>
@@ -711,7 +755,7 @@ export default function ProgressDashboardPage() {
           ) : (
             <section className="bg-surface border border-border rounded-xl p-5" aria-label="ประวัติเซสชันการฝึก">
               <div className="space-y-2">
-                {summary.recentSessions.map((session) => {
+                {allSessions.map((session) => {
                   const sessionStage = mockTrainingStages.find((s) => s.id === session.stageId);
                   const durationText = session.durationMs
                     ? Math.round(session.durationMs / 60000) > 0
@@ -759,20 +803,18 @@ export default function ProgressDashboardPage() {
                 })}
               </div>
 
-              {summary.totalSessions > 0 && (
+              {allSessionsStats && (
                 <div className="mt-3 grid grid-cols-3 gap-2">
                   <div className="bg-bg dark:bg-white/3 rounded-xl p-3 text-center border border-border">
-                    <p className="text-lg font-bold text-primary">{summary.totalSessions}</p>
+                    <p className="text-lg font-bold text-primary">{allSessionsStats.total}</p>
                     <p className="text-xs text-text-muted">เซสชันทั้งหมด</p>
                   </div>
                   <div className="bg-bg dark:bg-white/3 rounded-xl p-3 text-center border border-border">
-                    <p className="text-lg font-bold text-success">{summary.averageSessionScore}%</p>
+                    <p className="text-lg font-bold text-success">{allSessionsStats.avgScore}%</p>
                     <p className="text-xs text-text-muted">คะแนนเฉลี่ย</p>
                   </div>
                   <div className="bg-bg dark:bg-white/3 rounded-xl p-3 text-center border border-border">
-                    <p className="text-lg font-bold text-secondary">
-                      ★ {summary.recentSessions.reduce((s, sess) => s + sess.starsEarned, 0)}
-                    </p>
+                    <p className="text-lg font-bold text-secondary">★ {allSessionsStats.totalStars}</p>
                     <p className="text-xs text-text-muted">ดาวจากเซสชัน</p>
                   </div>
                 </div>
@@ -1030,7 +1072,7 @@ export default function ProgressDashboardPage() {
           {/* Difficult items */}
           <section className="bg-surface border border-border rounded-xl p-5" aria-label="รายการที่ต้องฝึกเพิ่ม">
             <p className="text-xs font-semibold text-text-muted uppercase tracking-wider mb-4">รายการที่ต้องฝึกเพิ่ม</p>
-            {summary.difficultItems.length === 0 ? (
+            {displaySummary.difficultItems.length === 0 ? (
               <div className="text-center py-4">
                 <p className="text-sm text-text-muted">
                   {hasData ? "ยังไม่มีรายการที่ยาก ทำได้ดีมากค่ะ!" : "เริ่มฝึกเพื่อดูรายการที่ควรฝึกเพิ่ม"}
@@ -1038,7 +1080,7 @@ export default function ProgressDashboardPage() {
               </div>
             ) : (
               <div className="space-y-3">
-                {summary.difficultItems.map((item) => (
+                {displaySummary.difficultItems.map((item) => (
                   <div key={item.practiceItemId} className="flex items-start gap-4 bg-secondary/5 border border-secondary/15 rounded-xl p-4">
                     <div className="flex-shrink-0 w-11 h-11 rounded-xl bg-secondary/12 flex items-center justify-center">
                       <span className="text-xs font-bold text-secondary leading-none">{item.averageScore}%</span>
@@ -1107,9 +1149,16 @@ export default function ProgressDashboardPage() {
               <p className="text-xs font-semibold text-primary mb-1.5">คำแนะนำ</p>
               <p className="text-sm text-text leading-relaxed">{report.recommendation}</p>
             </div>
-            <p className="text-xs text-text-muted text-center mt-4">
-              * ผลประเมินนี้เป็นข้อมูลสาธิต (Mock Evaluation)
-            </p>
+            {hasMockNote && (
+              <p className="text-xs text-text-muted text-center mt-4">
+                * ผลประเมินนี้ใช้ข้อมูลสาธิต — เปิดใช้ OpenAI เพื่อรับผลประเมินจริง
+              </p>
+            )}
+            {selectedSoundFilter && (
+              <p className="text-xs text-primary/70 text-center mt-2">
+                แสดงข้อมูลเสียง {selectedSoundFilter} เท่านั้น
+              </p>
+            )}
           </section>
 
           {/* Demo / Presentation Controls — owner only */}
@@ -1137,7 +1186,7 @@ export default function ProgressDashboardPage() {
             {showDemoConfirm && (
               <div className="bg-surface border border-secondary/30 rounded-xl p-4 mb-4 text-center">
                 <p className="text-sm font-semibold text-text mb-1">แทนที่ข้อมูลปัจจุบันด้วยข้อมูลสาธิต?</p>
-                <p className="text-xs text-text-muted mb-4">ข้อมูลการฝึกที่มีอยู่ {summary.totalAttempts} ครั้งจะถูกแทนที่</p>
+                <p className="text-xs text-text-muted mb-4">ข้อมูลการฝึกที่มีอยู่ {attempts.length} ครั้งจะถูกแทนที่</p>
                 <div className="flex gap-3 justify-center">
                   <button onClick={() => setShowDemoConfirm(false)} className="px-5 py-2 rounded-xl border border-border text-text-muted font-medium text-sm hover:bg-gray-50 dark:hover:bg-white/5 transition-all">ยกเลิก</button>
                   <button onClick={handleConfirmLoadDemo} className="px-5 py-2 rounded-xl bg-primary text-white font-semibold text-sm hover:bg-primary/90 transition-all">โหลดเลย</button>
@@ -1170,7 +1219,7 @@ export default function ProgressDashboardPage() {
                 </button>
                 <button
                   onClick={() => { setShowDemoConfirm(false); setShowResetConfirm(true); }}
-                  disabled={!isHydrated || summary.totalAttempts === 0}
+                  disabled={!isHydrated || attempts.length === 0}
                   className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl border border-error/40 text-error font-semibold text-sm hover:bg-error/8 transition-all active:scale-[0.98] disabled:opacity-40 disabled:cursor-not-allowed"
                 >
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
