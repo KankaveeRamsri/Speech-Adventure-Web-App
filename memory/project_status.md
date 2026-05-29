@@ -99,7 +99,15 @@ These are in `school`/`teacher` routes — not in the parent training flow. Docu
 
 ---
 
-## Next Phase: P2 — (TBD after P1 review)
+## Phase P2 — Parent Onboarding & Route Guard (Done 2026-05-29)
+
+1. ✅ **Onboarding redirect guard** — `/onboarding` redirects to `/training` if profile already exists; `?edit=true` allows editing; uses Suspense + `useSearchParams`
+2. ✅ **DataManagerSection moved to Settings** — removed from onboarding step 4; added as "จัดการข้อมูล" section in `/settings` (parent-only)
+3. ✅ **Training page redirect** — authenticated parent with no profile → `router.replace("/onboarding")` on hydration; anonymous user → large hero CTA (not redirect)
+4. ✅ **Post-auth chain** — signin/signup → `/training` → `/onboarding` if authenticated + no profile
+5. ✅ **Edit profile link** — onboarding edit mode shows link to `/settings` instead of DataManagerSection
+
+## Next Phase: P3 — (TBD)
 
 ---
 

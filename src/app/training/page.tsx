@@ -1,6 +1,8 @@
 "use client";
 
+import { useEffect } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import ChildProfileCard from "@/components/speech-adventure/ChildProfileCard";
 import TargetSoundSelector from "@/components/speech-adventure/TargetSoundSelector";
 import TrainingMap from "@/components/speech-adventure/TrainingMap";
@@ -8,6 +10,7 @@ import AppShell from "@/components/layout/AppShell";
 import { useSpeechProgress } from "@/hooks/useSpeechProgress";
 import { useChildProfile } from "@/hooks/useChildProfile";
 import { useCurrentChildAccess } from "@/hooks/useCurrentChildAccess";
+import { useAuth } from "@/hooks/useAuth";
 import {
   mockChildProfile,
   mockTargetSounds,
@@ -17,6 +20,7 @@ import type { TrainingStage } from "@/types/speechAdventure";
 import { calculateRewards } from "@/lib/rewards/calculateRewards";
 
 export default function TrainingMapPage() {
+  const router = useRouter();
   const {
     progress,
     getStageStatus,
@@ -28,6 +32,16 @@ export default function TrainingMapPage() {
   } = useSpeechProgress();
   const { profile, hasProfile } = useChildProfile();
   const { isSharedChild, canEditChild, canStartPractice } = useCurrentChildAccess();
+  const { isAuthenticated, isLoading: isAuthLoading } = useAuth();
+
+  // Authenticated parent with no child profile → send to onboarding immediately.
+  // Anonymous users are allowed to explore the training map without a profile.
+  useEffect(() => {
+    if (!isHydrated || isAuthLoading) return;
+    if (isAuthenticated && !hasProfile && !isSharedChild) {
+      router.replace("/onboarding");
+    }
+  }, [isHydrated, isAuthLoading, isAuthenticated, hasProfile, isSharedChild, router]);
 
   const activeSoundId = isHydrated ? (selectedSoundId || undefined) : undefined;
 
@@ -57,19 +71,28 @@ export default function TrainingMapPage() {
     <AppShell>
       <div className="max-w-6xl mx-auto px-4 sm:px-6 py-6 space-y-6">
 
-        {/* ── Setup banner ── */}
-        {isHydrated && !hasProfile && !isSharedChild && (
-          <div className="flex items-center justify-between gap-3 bg-info/8 border border-info/25 rounded-xl px-4 py-3">
-            <p className="text-sm text-text">
-              <span className="font-semibold">ยังไม่ได้ตั้งค่าโปรไฟล์</span>
-              <span className="text-text-muted ml-1.5">ตั้งค่าเพื่อบันทึกชื่อและเป้าหมายการฝึก</span>
-            </p>
+        {/* ── No-profile CTA (anonymous users only — authenticated users are redirected above) ── */}
+        {isHydrated && !hasProfile && !isSharedChild && !isAuthenticated && (
+          <div className="bg-primary/5 border border-primary/15 rounded-2xl px-6 py-8 text-center space-y-4">
+            <div
+              className="w-14 h-14 rounded-2xl bg-primary/10 flex items-center justify-center mx-auto text-3xl"
+              aria-hidden="true"
+            >
+              👦
+            </div>
+            <div>
+              <h2 className="text-lg font-bold text-text">เริ่มตั้งค่าโปรไฟล์เด็ก</h2>
+              <p className="text-sm text-text-muted mt-1 leading-relaxed max-w-sm mx-auto">
+                บันทึกชื่อน้อง เลือกเสียงที่ต้องการฝึก และเริ่ม Pre-test เพื่อประเมินระดับ
+              </p>
+            </div>
             <Link
               href="/onboarding"
-              className="flex-shrink-0 text-sm font-semibold text-primary hover:text-primary/80 transition-colors"
+              className="inline-flex items-center gap-2 px-6 py-3 rounded-xl bg-primary text-white font-semibold text-sm hover:bg-primary/90 transition-all shadow-sm shadow-primary/20 active:scale-[0.98]"
             >
-              ตั้งค่า →
+              ตั้งค่าโปรไฟล์เด็ก →
             </Link>
+            <p className="text-xs text-text-muted">หรือเลื่อนลงเพื่อสำรวจแผนที่การฝึก</p>
           </div>
         )}
 
