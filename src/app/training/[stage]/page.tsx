@@ -327,6 +327,7 @@ export default function PracticePage() {
               session={completedSession}
               stage={stage}
               onRetry={handleRetry}
+              sessionAttempts={sessionAttempts}
             />
           ) : (
             <LevelCompletionSummary

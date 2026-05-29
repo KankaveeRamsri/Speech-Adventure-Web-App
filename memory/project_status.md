@@ -118,7 +118,15 @@ These are in `school`/`teacher` routes — not in the parent training flow. Docu
 7. ✅ **Current level label** — shows "เสียง X" badge when sound filter is active
 8. ✅ **report tab** — uses `displaySummary.difficultItems`; shows sound filter note when active
 
-## Next Phase: P4 — (TBD)
+## Phase P4 — Parent Training UX Enhancement (Done 2026-05-29)
+
+1. ✅ **SampleAudioButton prominent** — primary-colored, larger, `onPlayed` callback, helper text "ฟังก่อน แล้วลองพูดตามนะ 🎧"
+2. ✅ **Listen-first nudge** — `hasListenedRef` in PracticeCard; soft blue banner "ลองฟังเสียงตัวอย่างก่อนนะ" if recording starts without listening; dismissable; NOT a block
+3. ✅ **Retry flow** — when `!isPassed`: practiceTip shown in highlighted info box; "ลองอีกครั้ง" is primary button; "บันทึกและต่อไป" is secondary
+4. ✅ **LevelCard locked state** — message "ทำด่านก่อนหน้าให้เสร็จก่อน" on all screen sizes; slightly more visible opacity
+5. ✅ **PracticeSessionSummary per-item** — `sessionAttempts?: PracticeAttempt[]` prop; per-item breakdown shows score, promptText, status, stars; training/[stage] page passes `sessionAttempts`
+
+## Next Phase: P5 — (TBD)
 
 ---
 

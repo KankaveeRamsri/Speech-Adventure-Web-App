@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import type { PracticeSession, TrainingStage } from "@/types/speechAdventure";
+import type { PracticeSession, PracticeAttempt, TrainingStage } from "@/types/speechAdventure";
 import { useObservationNotes } from "@/hooks/useObservationNotes";
 import ObservationNoteForm from "@/components/observations/ObservationNoteForm";
 
@@ -10,6 +10,8 @@ interface Props {
   session: PracticeSession;
   stage: TrainingStage;
   onRetry: () => void;
+  /** Per-item attempt breakdown to show below session stats. */
+  sessionAttempts?: PracticeAttempt[];
 }
 
 function getEncouragingText(avgScore: number): string {
@@ -36,7 +38,7 @@ function computeFilledStars(totalStars: number, totalMissions: number): number {
   return Math.round((totalStars / maxStars) * 3);
 }
 
-export default function PracticeSessionSummary({ session, stage, onRetry }: Props) {
+export default function PracticeSessionSummary({ session, stage, onRetry, sessionAttempts }: Props) {
   const filledStars = computeFilledStars(session.starsEarned, session.totalMissions);
   const durationText = session.durationMs ? formatDuration(session.durationMs) : "—";
   const { addNote, getNotesForTarget } = useObservationNotes(session.childId);
@@ -140,6 +142,60 @@ export default function PracticeSessionSummary({ session, stage, onRetry }: Prop
           ฝึกซ้ำอีกครั้ง
         </button>
       </div>
+
+      {/* ── Per-item breakdown ── */}
+      {sessionAttempts && sessionAttempts.length > 0 && (
+        <div className="bg-surface border border-border rounded-xl overflow-hidden">
+          <div className="px-4 py-3 border-b border-border">
+            <p className="text-sm font-semibold text-text">รายละเอียดแต่ละภารกิจ</p>
+          </div>
+          <div className="divide-y divide-border">
+            {sessionAttempts.map((attempt, idx) => (
+              <div key={attempt.id} className="flex items-center gap-3 px-4 py-3">
+                {/* Number */}
+                <span className="text-xs font-bold text-text-muted w-5 flex-shrink-0">{idx + 1}</span>
+
+                {/* Score badge */}
+                <div
+                  className={`w-10 h-10 rounded-xl flex items-center justify-center text-xs font-bold flex-shrink-0 ${
+                    attempt.score >= 70
+                      ? "bg-success/12 text-success"
+                      : attempt.score >= 50
+                      ? "bg-warning/12 text-warning"
+                      : "bg-secondary/12 text-secondary"
+                  }`}
+                >
+                  {attempt.score}%
+                </div>
+
+                {/* Content */}
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-semibold text-text truncate">{attempt.promptText}</p>
+                  {attempt.feedback && (
+                    <p className="text-xs text-text-muted truncate mt-0.5">{attempt.feedback}</p>
+                  )}
+                </div>
+
+                {/* Status + stars */}
+                <div className="flex flex-col items-end gap-0.5 flex-shrink-0">
+                  <span
+                    className={`text-xs px-1.5 py-0.5 rounded-full font-medium ${
+                      attempt.status === "passed"
+                        ? "bg-success/12 text-success"
+                        : attempt.status === "almost"
+                        ? "bg-warning/12 text-warning"
+                        : "bg-secondary/12 text-secondary"
+                    }`}
+                  >
+                    {attempt.status === "passed" ? "ผ่าน" : attempt.status === "almost" ? "เกือบ" : "ฝึกเพิ่ม"}
+                  </span>
+                  <span className="text-xs text-secondary">{"★".repeat(attempt.starsEarned)}</span>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* ── Session note ── */}
       <div className="bg-surface border border-border rounded-xl overflow-hidden">

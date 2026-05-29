@@ -9,6 +9,8 @@ interface Props {
   stageId: string;
   disabled?: boolean;
   className?: string;
+  /** Called once when audio finishes playing successfully. */
+  onPlayed?: () => void;
 }
 
 // Session-level client cache keyed by "<stageId>::<targetSound>::<text>".
@@ -43,6 +45,7 @@ export default function SampleAudioButton({
   stageId,
   disabled = false,
   className = "",
+  onPlayed,
 }: Props) {
   const [btnState, setBtnState] = useState<BtnState>("ready");
   const audioRef = useRef<HTMLAudioElement | null>(null);
@@ -115,12 +118,13 @@ export default function SampleAudioButton({
       }
 
       setBtnState("ready");
+      onPlayed?.();
     } catch {
       setBtnState("error");
       // Auto-reset so user can retry
       setTimeout(() => setBtnState("ready"), 3000);
     }
-  }, [btnState, expectedText, targetSound, stageId]);
+  }, [btnState, expectedText, targetSound, stageId, onPlayed]);
 
   const label =
     btnState === "loading" ? "กำลังเตรียมเสียง..." :
@@ -132,25 +136,25 @@ export default function SampleAudioButton({
   const isError = btnState === "error";
 
   return (
-    <div className={`flex flex-col items-center gap-1.5 ${className}`}>
+    <div className={`flex flex-col items-center gap-2 ${className}`}>
       <button
         type="button"
         onClick={handleClick}
         disabled={disabled || isActive}
         aria-label={label}
-        className={`flex flex-col items-center gap-1.5 px-6 py-3.5 rounded-xl transition-all text-sm font-medium disabled:cursor-not-allowed ${
+        className={`flex items-center gap-2.5 px-5 py-3 rounded-xl transition-all text-sm font-semibold disabled:cursor-not-allowed shadow-sm active:scale-[0.97] ${
           isError
             ? "bg-error/10 text-error border border-error/20"
             : isActive
-            ? "bg-info/15 text-info animate-pulse-gentle border border-info/25"
-            : "bg-bg dark:bg-white/5 border border-border text-text-muted hover:text-text hover:border-primary/30 disabled:opacity-50"
+            ? "bg-primary/12 text-primary animate-pulse-gentle border border-primary/25"
+            : "bg-primary/10 text-primary border border-primary/25 hover:bg-primary/18 disabled:opacity-50"
         }`}
       >
         <SpeakerIcon animate={isActive} />
         <span>{label}</span>
       </button>
       {btnState === "ready" && (
-        <p className="text-xs text-text-muted/70">ฟังก่อน แล้วลองพูดตามนะ</p>
+        <p className="text-xs font-medium text-primary/70">ฟังก่อน แล้วลองพูดตามนะ 🎧</p>
       )}
     </div>
   );

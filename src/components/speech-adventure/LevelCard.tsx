@@ -19,7 +19,7 @@ export default function LevelCard({ stage, index, canStartPractice = true }: Pro
     <div
       className={`relative bg-surface border rounded-xl transition-all duration-200 ${
         isLocked
-          ? "opacity-40 border-border"
+          ? "opacity-50 border-border/50 bg-bg dark:bg-white/2"
           : isCurrent
           ? "border-l-4 shadow-lg hover:shadow-xl hover:-translate-y-0.5 cursor-default"
           : isCompleted
@@ -165,8 +165,9 @@ export default function LevelCard({ stage, index, canStartPractice = true }: Pro
               </span>
       )}
       {isLocked && (
-        <div className="sm:hidden text-center py-2 text-xs text-text-muted border-t border-border/50 cursor-not-allowed">
-          ยังไม่ปลดล็อค
+        <div className="text-center py-2 text-xs text-text-muted/70 border-t border-border/40 flex items-center justify-center gap-1.5">
+          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><rect x="3" y="11" width="18" height="11" rx="2" /><path d="M7 11V7a5 5 0 0 1 10 0v4" /></svg>
+          ทำด่านก่อนหน้าให้เสร็จก่อน
         </div>
       )}
     </div>
