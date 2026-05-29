@@ -41,7 +41,7 @@ export default function EvaluationResultCard({ result, accentColor }: Props) {
         {/* Stars + message */}
         <div className="flex-1">
           <div className="flex items-center gap-0.5 mb-2">
-            {Array.from({ length: 5 }).map((_, i) => (
+            {Array.from({ length: 3 }).map((_, i) => (
               <span
                 key={i}
                 className={`text-lg leading-none ${i < result.stars ? "text-secondary" : "text-disabled dark:text-white/15"}`}
@@ -50,7 +50,7 @@ export default function EvaluationResultCard({ result, accentColor }: Props) {
                 ★
               </span>
             ))}
-            <span className="text-xs text-text-muted ml-1">({result.stars}/5)</span>
+            <span className="text-xs text-text-muted ml-1">({result.stars}/3)</span>
           </div>
           <p className="font-semibold text-sm" style={{ color: accentColor }}>
             {result.message}

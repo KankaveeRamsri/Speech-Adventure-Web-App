@@ -69,16 +69,22 @@ Build: ✅ passes | tsc: ✅ no errors | lint: ⚠ 11 errors (React compiler war
 
 ---
 
-## Known Issues / Risks (P1 Priority)
+## Phase P1 — Parent Data Integrity (Done 2026-05-29)
 
-1. **Progress summary may not fully scope by targetSound** — `calculateProgressSummary` may include all sounds when it should filter to selected sound
-2. **Active sessions can be abandoned and remain "active"** — no auto-cleanup of stuck sessions
-3. **child-001 legacy/mock ID risk** — hardcoded `child-001` IDs in mock data may cause data integrity issues
-4. **Empty childId risk** — `PracticeCard`/session creation may receive empty childId if profile not yet loaded
-5. **Inconsistent star scale** — star count shown in result UI vs star count saved in attempt may differ
-6. **Onboarding guard** — guard may not reliably redirect unauthenticated users or users without profile
+All 5 data integrity issues fixed:
+
+1. ✅ **targetSound scoping** — `calculateProgressSummary(progress, targetSound?)` accepts optional sound; `useSpeechProgress.summary` is now scoped by `selectedSoundId`; `getStageStatus` already sound-scoped
+2. ✅ **Stale session cleanup** — `_cleanupStaleSessions()` runs on init; sessions > 30 min old auto-abandoned
+3. ✅ **child-001 contained** — confirmed child-001 only in demo/mock display paths, never in session/attempt creation at runtime
+4. ✅ **Empty childId blocked** — `addAttempt` returns early; `startPracticeSession` throws; training page guard prevents session start without profile; shows onboarding CTA
+5. ✅ **Star scale unified** — `toUIResult()` and `computeStars()` both use 1–3 scale; `EvaluationResultCard` shows 3 star slots (/3)
+
+### Remaining / Lower Priority Issues
+
+6. **Onboarding guard** — guard may not reliably redirect unauthenticated users without profile (training map shows banner, practice page shows CTA — OK for now)
 7. **Progress page is large** — may need future splitting for performance
 8. **Parent review/audio playback** — may need polish; only works when Supabase configured
+9. **Supabase stale session cleanup** — not implemented (only local storage cleanup added in P1; Supabase sessions need server-side cleanup)
 
 ---
 
@@ -93,14 +99,7 @@ These are in `school`/`teacher` routes — not in the parent training flow. Docu
 
 ---
 
-## Next Phase: P1 — Parent Data Integrity
-
-Fix the known risks above before adding new features:
-1. Validate childId before session creation in PracticeCard
-2. Audit `calculateProgressSummary` — ensure targetSound scoping
-3. Session cleanup: auto-abandon stale active sessions on page load
-4. Star scale consistency across evaluation result and saved attempt
-5. Onboarding guard reliability (redirect if no profile)
+## Next Phase: P2 — (TBD after P1 review)
 
 ---
 

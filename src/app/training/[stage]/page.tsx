@@ -46,20 +46,27 @@ export default function PracticePage() {
   const [completedSession, setCompletedSession] = useState<PracticeSession | null>(null);
   const sessionStarted = useRef(false);
 
-  // Start a session when the stage loads with content
-  // Guard: only start a session if the user has canStartPractice permission.
+  // Start a session when the stage loads with content.
+  // Guards: must have canStartPractice permission AND a valid child profile ID.
+  // Attempting to start a session without a profile ID would create an
+  // orphaned record with an empty childId.
   useEffect(() => {
-    if (!canStartPractice) return; // viewer — never create a session
+    if (!canStartPractice) return;
     if (!isHydrated || !stage || items.length === 0 || sessionStarted.current) return;
+    if (!profile?.id) return; // no valid profile — skip session creation
     sessionStarted.current = true;
     void (async () => {
-      const session = await startSession({
-        childId: profile?.id ?? "",
-        targetSound: selectedSoundId,
-        stageId: stageSlug,
-        totalMissions: items.length,
-      });
-      setActiveSession(session);
+      try {
+        const session = await startSession({
+          childId: profile.id,
+          targetSound: selectedSoundId,
+          stageId: stageSlug,
+          totalMissions: items.length,
+        });
+        setActiveSession(session);
+      } catch {
+        // startSession throws if childId is empty; safe to ignore here.
+      }
     })();
   }, [canStartPractice, isHydrated, stage, stageSlug, items.length, selectedSoundId, startSession, profile?.id]);
 
@@ -95,23 +102,65 @@ export default function PracticePage() {
   }, [currentIndex]);
 
   const handleRetry = useCallback(() => {
-    if (!canStartPractice) return; // viewers cannot retry
+    if (!canStartPractice) return;
     setCurrentIndex(0);
     setShowCompletion(false);
     setSessionAttempts([]);
     setCompletedSession(null);
-    // Start a new session for retry
     sessionStarted.current = true;
+    if (!profile?.id) return; // no valid profile — skip session creation
     void (async () => {
-      const session = await startSession({
-        childId: profile?.id ?? "",
-        targetSound: selectedSoundId,
-        stageId: stageSlug,
-        totalMissions: items.length,
-      });
-      setActiveSession(session);
+      try {
+        const session = await startSession({
+          childId: profile.id,
+          targetSound: selectedSoundId,
+          stageId: stageSlug,
+          totalMissions: items.length,
+        });
+        setActiveSession(session);
+      } catch {
+        // safe to ignore
+      }
     })();
-  }, [canStartPractice, stageSlug, selectedSoundId, items.length, startSession, profile?.id]);
+  }, [canStartPractice, stageSlug, selectedSoundId, items.length, startSession, profile]);
+
+  /* ── No profile guard: authenticated user needs to complete onboarding ── */
+  if (isHydrated && !profile?.id && canStartPractice) {
+    return (
+      <main className="min-h-screen bg-bg">
+        <nav className="sticky top-0 z-20 bg-surface/90 backdrop-blur-md border-b border-border">
+          <div className="flex items-center justify-between px-6 py-3 max-w-3xl mx-auto">
+            <Link href="/training" className="flex items-center gap-2 text-text-muted hover:text-text transition-colors px-2 py-1 rounded-lg hover:bg-gray-100 dark:hover:bg-white/8">
+              <BackIcon />
+              <span className="text-sm font-medium hidden sm:inline">แผนที่</span>
+            </Link>
+            <h1 className="font-semibold text-text text-sm">{stage?.name ?? stageSlug}</h1>
+            <ThemeToggle />
+          </div>
+        </nav>
+        <div className="max-w-3xl mx-auto px-6 py-16 flex flex-col items-center gap-6 text-center">
+          <div className="w-16 h-16 rounded-2xl bg-primary/10 flex items-center justify-center text-3xl" aria-hidden="true">
+            👦
+          </div>
+          <div>
+            <h2 className="text-xl font-bold text-text mb-2">ยังไม่ได้ตั้งค่าโปรไฟล์เด็ก</h2>
+            <p className="text-sm text-text-muted max-w-sm mx-auto leading-relaxed">
+              กรุณาตั้งค่าโปรไฟล์เด็กก่อนเริ่มฝึก เพื่อให้ระบบบันทึกความก้าวหน้าได้ถูกต้อง
+            </p>
+          </div>
+          <Link
+            href="/onboarding"
+            className="px-6 py-3 rounded-xl bg-primary text-white font-semibold text-sm hover:bg-primary/90 transition-all"
+          >
+            ตั้งค่าโปรไฟล์ →
+          </Link>
+          <Link href="/training" className="text-sm text-text-muted hover:text-text transition-colors">
+            กลับแผนที่
+          </Link>
+        </div>
+      </main>
+    );
+  }
 
   /* ── Permission guard: viewer cannot start practice ── */
   if (isHydrated && !canStartPractice) {

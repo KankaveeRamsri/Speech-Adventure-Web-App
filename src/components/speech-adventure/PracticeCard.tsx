@@ -32,12 +32,12 @@ interface Props {
 
 function toUIResult(evalResult: SpeechEvaluationResult): EvaluationResult {
   const { score, status } = evalResult;
-  const stars = score >= 85 ? 5 : score >= 70 ? 4 : score >= 55 ? 3 : score >= 40 ? 2 : 1;
+  // 1–3 stars matching computeStars — UI and saved value must be identical.
+  const stars = score >= 85 ? 3 : score >= 70 ? 2 : 1;
   const message =
     score >= 85 ? "ยอดเยี่ยม! เก่งมาก!" :
     score >= 70 ? "ดีมาก! ใกล้เก่งแล้ว!" :
-    score >= 55 ? "ดีขึ้นแล้ว! ลองอีกครั้งนะ!" :
-    "พยายามอีกนิดนะ!";
+    "พยายามต่อไปนะ!";
   return { score, maxScore: 100, stars, message, isPassed: status !== "retry" };
 }
 

@@ -82,12 +82,11 @@ export function useSpeechProgress() {
   // refresh/child-switch transitions.
   const summary: ProgressSummary = useMemo(
     () =>
-      calculateProgressSummary({
-        ...progress,
-        attempts: filteredAttempts,
-        sessions: filteredSessions,
-      }),
-    [progress, filteredAttempts, filteredSessions],
+      calculateProgressSummary(
+        { ...progress, attempts: filteredAttempts, sessions: filteredSessions },
+        selectedSoundId || undefined,
+      ),
+    [progress, filteredAttempts, filteredSessions, selectedSoundId],
   );
 
   const addAttempt = useCallback((attempt: PracticeAttempt) => {

@@ -124,11 +124,35 @@ function readFromLocalStorage(): SpeechProgress {
   }
 }
 
+/** Auto-abandon active sessions that started more than 30 min ago.
+ *  Called once on init — mutates currentProgress in place, persists if changed. */
+function _cleanupStaleSessions(): void {
+  const THRESHOLD_MS = 30 * 60 * 1000;
+  const now = Date.now();
+  let hadStale = false;
+  const sessions = currentProgress.sessions.map((s) => {
+    if (s.status !== "active") return s;
+    if (now - new Date(s.startedAt).getTime() < THRESHOLD_MS) return s;
+    hadStale = true;
+    return {
+      ...s,
+      status: "abandoned" as const,
+      endedAt: new Date().toISOString(),
+      durationMs: now - new Date(s.startedAt).getTime(),
+    };
+  });
+  if (hadStale) {
+    currentProgress = { ...currentProgress, sessions, updatedAt: new Date().toISOString() };
+    writeToLocalStorage(currentProgress);
+  }
+}
+
 /** Populate currentProgress from storage exactly once per page load. */
 function initializeIfNeeded(): void {
   if (!isBrowser() || isClientInitialized) return;
   isClientInitialized = true;
   currentProgress = readFromLocalStorage();
+  _cleanupStaleSessions();
 }
 
 function writeToLocalStorage(progress: SpeechProgress): void {
@@ -179,6 +203,12 @@ export function saveProgress(progress: SpeechProgress): void {
 
 /** Add a new attempt, update the in-memory cache, and notify subscribers. */
 export function addAttempt(attempt: PracticeAttempt): SpeechProgress {
+  if (!attempt.childId) {
+    if (process.env.NODE_ENV !== "production") {
+      console.warn("[speechProgressStorage] addAttempt: empty childId — skipped");
+    }
+    return currentProgress;
+  }
   initializeIfNeeded();
 
   // Spread into a fresh object so Object.is() detects the change.
@@ -313,6 +343,9 @@ interface StartSessionInput {
 }
 
 export function startPracticeSession(input: StartSessionInput): PracticeSession {
+  if (!input.childId) {
+    throw new Error("[speechProgressStorage] startPracticeSession: childId is required");
+  }
   initializeIfNeeded();
 
   const session: PracticeSession = {
@@ -506,9 +539,14 @@ export function getStageAttempts(
 // ── Progress summary ──────────────────────────────────────────────────────────
 
 export function calculateProgressSummary(
-  progress: SpeechProgress
+  progress: SpeechProgress,
+  targetSound?: string,
 ): ProgressSummary {
-  const { attempts } = progress;
+  // Scope to a specific sound so stage unlock, scores, and derived stats
+  // all reflect the sound currently being practiced.
+  const attempts = targetSound
+    ? progress.attempts.filter((a) => a.targetSound === targetSound)
+    : progress.attempts;
 
   const totalAttempts = attempts.length;
   const averageScore =
@@ -600,7 +638,9 @@ export function calculateProgressSummary(
     )
     .slice(0, 10);
 
-  const sessions = progress.sessions ?? [];
+  const sessions = targetSound
+    ? (progress.sessions ?? []).filter((s) => s.targetSound === targetSound)
+    : (progress.sessions ?? []);
   const completedSessions = sessions.filter((s) => s.status === "completed");
   const totalSessions = completedSessions.length;
   const averageSessionScore =
