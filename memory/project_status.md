@@ -227,7 +227,28 @@ These are in `school`/`teacher` routes — not in the parent training flow. Docu
 
 ---
 
-## Next Phase: K6 — Phonics Progress Dashboard
+## Phase K6 — Phonics Progress Dashboard (Done 2026-06-01)
+
+1. ✅ **`src/components/phonics/PhonicsProgressDashboard.tsx`** — Self-contained dashboard; uses `usePhonicsProgress` + `useChildProfile` + `useCurrentChildAccess`
+2. ✅ **`src/app/progress/page.tsx`** — Mode-aware early return: `profile.trainingMode === "kindergarten_phonics"` → `PhonicsProgressDashboard`; speech_clarity unchanged
+
+Features:
+- Summary stats: total attempts, completed lessons, avg score, stars
+- Next recommendation card ("วันนี้เรียนอะไรต่อดี") with link to lesson
+- K1–K7 unit cards: status badge, progress bar, CTA (เริ่มเรียน/เรียนต่อ/ดูบทเรียน)
+- Recent attempts (last 6) with score, activity type, status, stars, feedback
+- Empty state with "เริ่มเรียนเสียงไทย" CTA
+- "All completed" celebration state
+
+### K6 Remaining TODOs (for K7+)
+- Per-lesson detail drawer (attempt history per lesson)
+- Supabase `IPhonicsProgressRepository` implementation
+- K3–K7 cascading unlock based on progress
+- Phonics rewards/badge system
+
+---
+
+## Next Phase: K7 — (TBD)
 
 ---
 

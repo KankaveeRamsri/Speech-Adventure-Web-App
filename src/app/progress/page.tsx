@@ -10,6 +10,7 @@ import AppShell from "@/components/layout/AppShell";
 import SessionDetailDrawer from "@/components/details/SessionDetailDrawer";
 import AttemptDetailDrawer from "@/components/details/AttemptDetailDrawer";
 
+import PhonicsProgressDashboard from "@/components/phonics/PhonicsProgressDashboard";
 import { useSpeechProgress } from "@/hooks/useSpeechProgress";
 import { useChildProfile } from "@/hooks/useChildProfile";
 import { useCurrentChildAccess } from "@/hooks/useCurrentChildAccess";
@@ -266,6 +267,15 @@ export default function ProgressDashboardPage() {
     setSelectedSoundFilter(soundId);
     setFilterStageId(null);
   };
+
+  // ── Mode switch: kindergarten phonics dashboard ───────────────────────────────
+  if (isHydrated && profile?.trainingMode === "kindergarten_phonics") {
+    return (
+      <AppShell>
+        <PhonicsProgressDashboard />
+      </AppShell>
+    );
+  }
 
   // ─────────────────────────────────────────────────────────────────────────────
 
