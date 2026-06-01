@@ -136,7 +136,26 @@ These are in `school`/`teacher` routes — not in the parent training flow. Docu
 6. ✅ **Detected issues framing** — "จุดที่ AI สังเกตเห็น" + "ลองฝึกซ้ำกับจุดเหล่านี้..." (supportive, not diagnostic)
 7. ✅ **Stats reorganized** — quick 2-card row (score, stars) near top; confidence + duration below audio
 
-## Next Phase: P6 — (TBD)
+## Phase K1 — Kindergarten Phonics Mode Foundation (Done 2026-06-01)
+
+1. ✅ **TrainingMode type** — `"speech_clarity" | "kindergarten_phonics"` in `childProfileStorage.ts`; re-exported from `domain.ts`
+2. ✅ **ChildProfileData.trainingMode** — required field; Zod schema defaults to `"speech_clarity"` for old profiles (migration-safe)
+3. ✅ **Supabase mapper** — `dbToDomainProfile` hardcodes `trainingMode: "speech_clarity"` (no DB column yet in K1)
+4. ✅ **Onboarding step 3** — new "เลือกโหมดการฝึก" step; speech_clarity → step 4 (sound); kindergarten → skip to step 5 (confirm)
+5. ✅ **TrainingModeTabs component** — `src/components/speech-adventure/TrainingModeTabs.tsx`; 🎯 ฝึกเสียงให้ชัด / 🌟 เรียนเสียงไทย; orange/amber for kindergarten
+6. ✅ **Training page tabs + guard** — shows tabs when hasProfile; kindergarten shows "coming soon" placeholder; speech_clarity renders existing flow unchanged
+7. ✅ **AddChildModal fix** — added `trainingMode: "speech_clarity"` default
+
+### K1 Remaining TODOs (for K2+)
+- Add `training_mode` column to Supabase DB + migration
+- Update `domainToDbProfile` mapper to write `training_mode`
+- Build kindergarten phonics curriculum (phon. items, stages)
+- Build phonics progress storage (separate from speech_progress)
+- Implement "สวนเสียง" journey concept
+
+---
+
+## Next Phase: K2 — (TBD)
 
 ---
 

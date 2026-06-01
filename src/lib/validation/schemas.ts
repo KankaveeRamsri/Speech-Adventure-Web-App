@@ -25,6 +25,7 @@ export const ChildProfileDataSchema = z.object({
   age: z.number().int(),
   targetSound: z.string().default(""),
   trainingGoal: z.string().default(""),
+  trainingMode: z.enum(["speech_clarity", "kindergarten_phonics"]).default("speech_clarity"),
   createdAt: z.string().default(""),
   updatedAt: z.string().default(""),
 });

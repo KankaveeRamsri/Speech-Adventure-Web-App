@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import ChildProfileCard from "@/components/speech-adventure/ChildProfileCard";
 import TargetSoundSelector from "@/components/speech-adventure/TargetSoundSelector";
 import TrainingMap from "@/components/speech-adventure/TrainingMap";
+import TrainingModeTabs from "@/components/speech-adventure/TrainingModeTabs";
 import AppShell from "@/components/layout/AppShell";
 import { useSpeechProgress } from "@/hooks/useSpeechProgress";
 import { useChildProfile } from "@/hooks/useChildProfile";
@@ -17,6 +18,7 @@ import {
   mockTrainingStages,
 } from "@/data/speechAdventureMockData";
 import type { TrainingStage } from "@/types/speechAdventure";
+import type { TrainingMode } from "@/lib/child-profile/childProfileStorage";
 import { calculateRewards } from "@/lib/rewards/calculateRewards";
 
 export default function TrainingMapPage() {
@@ -30,9 +32,16 @@ export default function TrainingMapPage() {
     selectedSoundId,
     setSelectedSound,
   } = useSpeechProgress();
-  const { profile, hasProfile } = useChildProfile();
+  const { profile, hasProfile, saveProfile } = useChildProfile();
   const { isSharedChild, canEditChild, canStartPractice } = useCurrentChildAccess();
   const { isAuthenticated, isLoading: isAuthLoading } = useAuth();
+
+  const activeMode: TrainingMode = profile?.trainingMode ?? "speech_clarity";
+
+  const handleModeChange = (mode: TrainingMode) => {
+    if (!profile) return;
+    void saveProfile({ ...profile, trainingMode: mode });
+  };
 
   // Authenticated parent with no child profile → send to onboarding immediately.
   // Anonymous users are allowed to explore the training map without a profile.
@@ -110,7 +119,7 @@ export default function TrainingMapPage() {
                 เลือกเสียงเป้าหมายและระดับที่ต้องการฝึก
               </p>
             </div>
-            {isHydrated && (
+            {isHydrated && activeMode === "speech_clarity" && (
               <div className="flex items-center gap-4 flex-shrink-0">
                 <div className="text-center hidden sm:block">
                   <p className="font-bold text-primary text-lg leading-none">{completedCount}<span className="text-text-muted text-xs font-normal">/7</span></p>
@@ -142,20 +151,53 @@ export default function TrainingMapPage() {
         {/* ── 2-Column Layout ── */}
         <div className="lg:grid lg:grid-cols-[1fr_320px] lg:gap-6 lg:items-start space-y-6 lg:space-y-0">
 
-          {/* ── Left Column: Sound Selector + Journey Map ── */}
+          {/* ── Left Column: Mode Tabs + Sound Selector + Journey Map ── */}
           <div className="space-y-5 min-w-0">
-            <TargetSoundSelector
-              sounds={mockTargetSounds}
-              selectedId={isHydrated ? selectedSoundId : null}
-              onSelect={setSelectedSound}
-            />
+            {/* Training mode switcher — only show when user has a profile */}
+            {isHydrated && hasProfile && (
+              <TrainingModeTabs
+                activeMode={activeMode}
+                onModeChange={handleModeChange}
+                disabled={!canStartPractice}
+              />
+            )}
 
-            <section>
-              <h2 className="text-sm font-semibold text-text-muted uppercase tracking-wider mb-3 px-1">
-                เส้นทางการฝึก
-              </h2>
-              <TrainingMap stages={liveStages} canStartPractice={canStartPractice} />
-            </section>
+            {activeMode === "speech_clarity" && (
+              <>
+                <TargetSoundSelector
+                  sounds={mockTargetSounds}
+                  selectedId={isHydrated ? selectedSoundId : null}
+                  onSelect={setSelectedSound}
+                />
+
+                <section>
+                  <h2 className="text-sm font-semibold text-text-muted uppercase tracking-wider mb-3 px-1">
+                    เส้นทางการฝึก
+                  </h2>
+                  <TrainingMap stages={liveStages} canStartPractice={canStartPractice} />
+                </section>
+              </>
+            )}
+
+            {activeMode === "kindergarten_phonics" && (
+              <div className="rounded-2xl border-2 border-dashed border-amber-300 dark:border-amber-700 bg-amber-50 dark:bg-amber-950/20 px-6 py-12 text-center space-y-4">
+                <div className="text-5xl" aria-hidden="true">🌟</div>
+                <div>
+                  <h3 className="text-lg font-bold text-amber-700 dark:text-amber-400">
+                    โหมดเรียนเสียงไทยกำลังเตรียมพร้อม
+                  </h3>
+                  <p className="text-sm text-amber-600/80 dark:text-amber-500/80 mt-2 leading-relaxed max-w-sm mx-auto">
+                    เร็ว ๆ นี้: เรียนพยัญชนะ สระ และการประสมเสียง
+                  </p>
+                </div>
+                <button
+                  onClick={() => handleModeChange("speech_clarity")}
+                  className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300 hover:bg-amber-200 dark:hover:bg-amber-800/50 transition-all active:scale-[0.97]"
+                >
+                  ← กลับไปโหมดฝึกเสียงให้ชัด
+                </button>
+              </div>
+            )}
           </div>
 
           {/* ── Right Column: Side Panel ── */}
@@ -178,8 +220,8 @@ export default function TrainingMapPage() {
               )}
             </div>
 
-            {/* Selected Sound Summary */}
-            {isHydrated && selectedSound && (
+            {/* Selected Sound Summary — speech_clarity only */}
+            {isHydrated && activeMode === "speech_clarity" && selectedSound && (
               <div className="flex items-center gap-3 bg-primary/6 border border-primary/15 rounded-xl px-4 py-3">
                 <span
                   className="w-9 h-9 rounded-lg flex items-center justify-center text-lg font-bold text-primary flex-shrink-0"
@@ -196,8 +238,8 @@ export default function TrainingMapPage() {
               </div>
             )}
 
-            {/* Next Best Action */}
-            {isHydrated && currentStage && (
+            {/* Next Best Action — speech_clarity only */}
+            {isHydrated && activeMode === "speech_clarity" && currentStage && (
               <div
                 className="rounded-xl px-4 py-3.5 border"
                 style={{

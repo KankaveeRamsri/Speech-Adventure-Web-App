@@ -108,6 +108,7 @@ export default function AddChildModal({ open, onClose }: AddChildModalProps) {
         age,
         targetSound,
         trainingGoal,
+        trainingMode: "speech_clarity",
         createdAt: now,
         updatedAt: now,
       });

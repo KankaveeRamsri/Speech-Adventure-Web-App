@@ -28,7 +28,7 @@ export type {
 } from "@/types/speechAdventure";
 
 // ── Child profile domain ──────────────────────────────────────────────────────
-export type { ChildProfileData } from "@/lib/child-profile/childProfileStorage";
+export type { ChildProfileData, TrainingMode } from "@/lib/child-profile/childProfileStorage";
 
 // ── Observation domain ────────────────────────────────────────────────────────
 export type {

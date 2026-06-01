@@ -6,8 +6,10 @@ import { useChildProfile } from "@/hooks/useChildProfile";
 import { useSpeechProgress } from "@/hooks/useSpeechProgress";
 import { useAuth, getUserRole } from "@/hooks/useAuth";
 import { mockTargetSounds } from "@/data/speechAdventureMockData";
+import type { TrainingMode } from "@/lib/child-profile/childProfileStorage";
 
-type Step = 1 | 2 | 3 | 4;
+// Steps: 1=Welcome, 2=Name+Age, 3=TrainingMode, 4=TargetSound (speech_clarity only), 5=Confirm
+type Step = 1 | 2 | 3 | 4 | 5;
 
 const GOALS = [
   { id: "daily", label: "ทุกวัน", desc: "วันละ 10–15 นาที สม่ำเสมอ" },
@@ -26,6 +28,11 @@ const ROLE_LABELS: Record<string, string> = {
   teacher: "ครู",
   therapist: "นักบำบัด",
   school_admin: "ผู้ดูแลโรงเรียน",
+};
+
+const MODE_LABELS: Record<TrainingMode, string> = {
+  speech_clarity: "ฝึกเสียงให้ชัด",
+  kindergarten_phonics: "เรียนเสียงไทย",
 };
 
 function BackIcon() {
@@ -54,6 +61,7 @@ function OnboardingContent() {
   const [age, setAge] = useState(5);
   const [targetSound, setTargetSound] = useState("ก");
   const [trainingGoal, setTrainingGoal] = useState("daily");
+  const [trainingMode, setTrainingMode] = useState<TrainingMode>("speech_clarity");
   const [isEdit, setIsEdit] = useState(false);
 
   const { saveProfile: repoSaveProfile, profile: existingProfile } = useChildProfile();
@@ -62,8 +70,6 @@ function OnboardingContent() {
   const role = getUserRole(user);
   const editDetectedRef = useRef(false);
 
-  // If the parent already has a child profile and didn't request edit mode,
-  // send them straight to the training map — nothing to do here.
   useEffect(() => {
     if (!existingProfile) return;
     if (editParam !== "true") {
@@ -71,35 +77,72 @@ function OnboardingContent() {
     }
   }, [existingProfile, editParam, router]);
 
-  // Pre-fill form only when explicitly editing an existing profile.
   useEffect(() => {
     if (editDetectedRef.current || !existingProfile || editParam !== "true") return;
     editDetectedRef.current = true;
     setName(existingProfile.name);
     setAge(existingProfile.age);
-    setTargetSound(existingProfile.targetSound);
+    setTargetSound(existingProfile.targetSound || "ก");
     setTrainingGoal(existingProfile.trainingGoal);
+    setTrainingMode(existingProfile.trainingMode ?? "speech_clarity");
     setIsEdit(true);
     setStep(2);
   }, [existingProfile, editParam]);
 
-  const handleFinish = () => {
+  const advanceFromStep3 = () => {
+    // Skip target-sound step when kindergarten mode selected
+    if (trainingMode === "kindergarten_phonics") {
+      setStep(5);
+    } else {
+      setStep(4);
+    }
+  };
+
+  const handleBack = () => {
+    if (step === 5 && trainingMode === "kindergarten_phonics") {
+      setStep(3);
+    } else {
+      setStep((s) => Math.max(2, s - 1) as Step);
+    }
+  };
+
+  const buildProfile = () => {
     const now = new Date().toISOString();
-    void repoSaveProfile({
+    return {
       id: existingProfile?.id ?? `child-${Date.now()}`,
       name: name.trim(),
       age,
-      targetSound,
+      targetSound: trainingMode === "speech_clarity" ? targetSound : (existingProfile?.targetSound ?? ""),
       trainingGoal,
+      trainingMode,
       createdAt: existingProfile?.createdAt ?? now,
       updatedAt: now,
-    });
-    setSelectedSound(targetSound);
-    router.push(isEdit ? "/training" : "/training/pretest");
+    };
   };
 
-  const totalSteps = 3;
-  const progressStep = (step as number) - 1;
+  const handleFinish = () => {
+    const p = buildProfile();
+    void repoSaveProfile(p);
+    if (trainingMode === "speech_clarity") {
+      setSelectedSound(p.targetSound);
+    }
+    if (isEdit) {
+      router.push("/training");
+    } else if (trainingMode === "speech_clarity") {
+      router.push("/training/pretest");
+    } else {
+      router.push("/training");
+    }
+  };
+
+  // Progress dots shown after welcome step
+  // speech_clarity: steps 2,3,4,5 → dots [2,3,4,5]
+  // kindergarten:   steps 2,3,5   → dots [2,3,5] (dot 4 hidden)
+  const visibleDots =
+    trainingMode === "kindergarten_phonics" ? ([2, 3, 5] as Step[]) : ([2, 3, 4, 5] as Step[]);
+  const totalSteps = visibleDots.length;
+  const currentDotIndex = visibleDots.indexOf(step);
+  const progressStep = currentDotIndex + 1;
 
   return (
     <main className="min-h-screen bg-bg flex flex-col">
@@ -108,7 +151,7 @@ function OnboardingContent() {
         <nav className="sticky top-0 z-20 bg-surface/90 backdrop-blur-md border-b border-border">
           <div className="flex items-center justify-between px-6 py-3 max-w-xl mx-auto">
             <button
-              onClick={() => setStep((s) => Math.max(2, s - 1) as Step)}
+              onClick={handleBack}
               className="flex items-center gap-2 text-text-muted hover:text-text transition-colors px-2 py-1 rounded-lg hover:bg-gray-100 dark:hover:bg-white/8"
             >
               <BackIcon />
@@ -116,7 +159,7 @@ function OnboardingContent() {
             </button>
 
             <div className="flex items-center gap-1.5">
-              {[2, 3, 4].map((s) => (
+              {visibleDots.map((s) => (
                 <div
                   key={s}
                   className={`h-1.5 rounded-full transition-all ${
@@ -302,8 +345,90 @@ function OnboardingContent() {
             </div>
           )}
 
-          {/* ── Step 3: Target Sound ── */}
+          {/* ── Step 3: Training Mode ── */}
           {step === 3 && (
+            <div className="space-y-6">
+              <div>
+                <h2 className="text-2xl font-bold text-text mb-1">เลือกโหมดการฝึก</h2>
+                <p className="text-text-muted">น้องต้องการฝึกแบบไหน?</p>
+              </div>
+
+              <div className="space-y-3">
+                {/* Speech Clarity option */}
+                <button
+                  type="button"
+                  onClick={() => setTrainingMode("speech_clarity")}
+                  className={`w-full flex items-start gap-4 px-5 py-4 rounded-xl border-2 transition-all text-left active:scale-[0.99] ${
+                    trainingMode === "speech_clarity"
+                      ? "border-primary bg-primary/8"
+                      : "border-border bg-surface hover:border-primary/40"
+                  }`}
+                >
+                  <span className={`text-3xl mt-0.5 flex-shrink-0`}>🎯</span>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center justify-between">
+                      <p className={`font-bold text-base ${trainingMode === "speech_clarity" ? "text-primary" : "text-text"}`}>
+                        ฝึกเสียงให้ชัด
+                      </p>
+                      {trainingMode === "speech_clarity" && (
+                        <span className="text-primary flex-shrink-0 ml-2">
+                          <CheckIcon />
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-sm text-text-muted mt-1 leading-relaxed">
+                      เลือกเสียงพยัญชนะที่ต้องการฝึก เช่น ก ค ต ช
+                      ผ่าน 7 ระดับพร้อมการประเมินด้วย AI
+                    </p>
+                  </div>
+                </button>
+
+                {/* Kindergarten Phonics option */}
+                <button
+                  type="button"
+                  onClick={() => setTrainingMode("kindergarten_phonics")}
+                  className={`w-full flex items-start gap-4 px-5 py-4 rounded-xl border-2 transition-all text-left active:scale-[0.99] ${
+                    trainingMode === "kindergarten_phonics"
+                      ? "border-amber-500 bg-amber-500/8"
+                      : "border-border bg-surface hover:border-amber-400/60"
+                  }`}
+                >
+                  <span className="text-3xl mt-0.5 flex-shrink-0">🌟</span>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <p className={`font-bold text-base ${trainingMode === "kindergarten_phonics" ? "text-amber-600 dark:text-amber-400" : "text-text"}`}>
+                          เรียนเสียงไทย
+                        </p>
+                        <span className="px-1.5 py-0.5 bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-400 text-xs font-semibold rounded-full">
+                          เร็ว ๆ นี้
+                        </span>
+                      </div>
+                      {trainingMode === "kindergarten_phonics" && (
+                        <span className="text-amber-500 flex-shrink-0 ml-2">
+                          <CheckIcon />
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-sm text-text-muted mt-1 leading-relaxed">
+                      เรียนพยัญชนะ สระ และการประสมเสียงภาษาไทย
+                      เหมาะสำหรับเด็กอนุบาล
+                    </p>
+                  </div>
+                </button>
+              </div>
+
+              <button
+                onClick={advanceFromStep3}
+                className="w-full bg-primary text-white font-semibold px-8 py-3.5 rounded-xl text-base hover:bg-primary/90 transition-all active:scale-[0.99]"
+              >
+                ถัดไป →
+              </button>
+            </div>
+          )}
+
+          {/* ── Step 4: Target Sound (speech_clarity only) ── */}
+          {step === 4 && (
             <div className="space-y-6">
               <div>
                 <h2 className="text-2xl font-bold text-text mb-1">เลือกเสียงที่ต้องการฝึก</h2>
@@ -341,7 +466,7 @@ function OnboardingContent() {
               </div>
 
               <button
-                onClick={() => setStep(4)}
+                onClick={() => setStep(5)}
                 className="w-full bg-primary text-white font-semibold px-8 py-3.5 rounded-xl text-base hover:bg-primary/90 transition-all active:scale-[0.99]"
               >
                 ถัดไป →
@@ -349,8 +474,8 @@ function OnboardingContent() {
             </div>
           )}
 
-          {/* ── Step 4: Confirmation ── */}
-          {step === 4 && (
+          {/* ── Step 5: Confirmation ── */}
+          {step === 5 && (
             <div className="space-y-6">
               <div>
                 <h2 className="text-2xl font-bold text-text mb-1">
@@ -369,16 +494,24 @@ function OnboardingContent() {
                   <span className="font-semibold text-text">{age} ปี</span>
                 </div>
                 <div className="flex items-center justify-between px-5 py-3.5">
-                  <span className="text-sm text-text-muted">เสียงที่ฝึก</span>
-                  <div className="flex items-center gap-2">
-                    <span className="w-8 h-8 rounded-lg bg-primary/10 text-primary font-bold text-sm flex items-center justify-center">
-                      {targetSound}
-                    </span>
-                    <span className="font-semibold text-text">
-                      {mockTargetSounds.find((s) => s.id === targetSound)?.description}
-                    </span>
-                  </div>
+                  <span className="text-sm text-text-muted">โหมดการฝึก</span>
+                  <span className={`font-semibold ${trainingMode === "kindergarten_phonics" ? "text-amber-600 dark:text-amber-400" : "text-primary"}`}>
+                    {MODE_LABELS[trainingMode]}
+                  </span>
                 </div>
+                {trainingMode === "speech_clarity" && (
+                  <div className="flex items-center justify-between px-5 py-3.5">
+                    <span className="text-sm text-text-muted">เสียงที่ฝึก</span>
+                    <div className="flex items-center gap-2">
+                      <span className="w-8 h-8 rounded-lg bg-primary/10 text-primary font-bold text-sm flex items-center justify-center">
+                        {targetSound}
+                      </span>
+                      <span className="font-semibold text-text">
+                        {mockTargetSounds.find((s) => s.id === targetSound)?.description}
+                      </span>
+                    </div>
+                  </div>
+                )}
                 <div className="flex items-center justify-between px-5 py-3.5">
                   <span className="text-sm text-text-muted">เป้าหมาย</span>
                   <span className="font-semibold text-text">{GOAL_LABELS[trainingGoal]}</span>
@@ -388,8 +521,10 @@ function OnboardingContent() {
               <div className="bg-info/8 border border-info/20 rounded-xl px-4 py-3">
                 <p className="text-sm text-info">
                   {isEdit
-                    ? "การเปลี่ยนเสียงจะไม่ลบประวัติการฝึกเดิม"
-                    : "ระบบจะเริ่ม Pre-test เพื่อประเมินระดับเสียงเริ่มต้น ไม่ต้องกังวล ไม่มีผิดไม่มีถูกค่ะ"}
+                    ? "การเปลี่ยนโหมดหรือเสียงจะไม่ลบประวัติการฝึกเดิม"
+                    : trainingMode === "speech_clarity"
+                    ? "ระบบจะเริ่ม Pre-test เพื่อประเมินระดับเสียงเริ่มต้น ไม่ต้องกังวล ไม่มีผิดไม่มีถูกค่ะ"
+                    : "โหมดเรียนเสียงไทยกำลังเตรียมพร้อม จะเริ่มไปที่แผนที่การฝึกก่อนนะคะ"}
                 </p>
               </div>
 
@@ -397,23 +532,19 @@ function OnboardingContent() {
                 onClick={handleFinish}
                 className="w-full bg-primary text-white font-semibold px-8 py-4 rounded-xl text-base hover:bg-primary/90 transition-all hover:scale-[1.01] active:scale-[0.99] shadow-md shadow-primary/25"
               >
-                {isEdit ? "บันทึกและกลับไปฝึก" : "เริ่ม Pre-test เลย →"}
+                {isEdit
+                  ? "บันทึกและกลับไปฝึก"
+                  : trainingMode === "speech_clarity"
+                  ? "เริ่ม Pre-test เลย →"
+                  : "เริ่มต้น →"}
               </button>
 
-              {!isEdit && (
+              {!isEdit && trainingMode === "speech_clarity" && (
                 <button
                   onClick={() => {
-                    const now = new Date().toISOString();
-                    void repoSaveProfile({
-                      id: existingProfile?.id ?? `child-${Date.now()}`,
-                      name: name.trim(),
-                      age,
-                      targetSound,
-                      trainingGoal,
-                      createdAt: existingProfile?.createdAt ?? now,
-                      updatedAt: now,
-                    });
-                    setSelectedSound(targetSound);
+                    const p = buildProfile();
+                    void repoSaveProfile(p);
+                    setSelectedSound(p.targetSound);
                     router.push("/training");
                   }}
                   className="w-full border border-border text-text-muted hover:text-text hover:border-primary/40 font-medium px-8 py-3 rounded-xl text-sm transition-all active:scale-[0.99]"
@@ -422,7 +553,6 @@ function OnboardingContent() {
                 </button>
               )}
 
-              {/* Data management controls are in Settings → จัดการข้อมูล */}
               {isEdit && (
                 <p className="text-center text-xs text-text-muted">
                   ต้องการส่งออก / นำเข้า / ล้างข้อมูล?{" "}

@@ -8,6 +8,8 @@ import { ChildProfileDataSchema, parseOrNull } from "@/lib/validation";
 
 const STORAGE_KEY = STORAGE_KEYS.PROFILE;
 
+export type TrainingMode = "speech_clarity" | "kindergarten_phonics";
+
 // ── User scope ────────────────────────────────────────────────────────────────
 // null = anonymous scope (reads from STORAGE_KEY:anonymous)
 let _scopeUserId: string | null = null;
@@ -52,6 +54,8 @@ export interface ChildProfileData {
   age: number;
   targetSound: string;
   trainingGoal: string;
+  /** Defaults to "speech_clarity" for all existing profiles. */
+  trainingMode: TrainingMode;
   createdAt: string;
   updatedAt: string;
 }

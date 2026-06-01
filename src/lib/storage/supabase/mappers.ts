@@ -100,6 +100,8 @@ export function dbToDomainProfile(db: DbChildProfile): ChildProfileData {
     age: db.age,
     targetSound: db.target_sound,
     trainingGoal: db.training_goal,
+    // training_mode column not yet in DB (K1 foundation); all Supabase profiles default to speech_clarity.
+    trainingMode: "speech_clarity",
     createdAt: db.created_at,
     updatedAt: db.updated_at,
   };
