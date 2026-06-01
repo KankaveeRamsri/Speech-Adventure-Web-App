@@ -18,9 +18,20 @@ const ACTIVITY_LABELS: Record<PhonicsActivityType, string> = {
 
 // ── Unit status ───────────────────────────────────────────────────────────────
 
-// K1 is always available; K2–K7 locked until progress storage arrives in K4+.
-function getUnitStatus(unit: PhonicsUnit): "available" | "locked" {
-  return unit.order === 1 ? "available" : "locked";
+function isUnitCompleted(unit: PhonicsUnit, completedLessonIds: Set<string>): boolean {
+  return unit.lessons.length > 0 && unit.lessons.every((l) => completedLessonIds.has(l.id));
+}
+
+function getUnitStatus(
+  unit: PhonicsUnit,
+  completedLessonIds: Set<string>,
+  previousUnit: PhonicsUnit | undefined,
+): "available" | "completed" | "locked" {
+  if (isUnitCompleted(unit, completedLessonIds)) return "completed";
+  if (unit.order === 1) return "available";
+  // Unlock when previous unit is completed
+  if (previousUnit && isUnitCompleted(previousUnit, completedLessonIds)) return "available";
+  return "locked";
 }
 
 // ── Total items across all lessons in a unit ───────────────────────────────────
@@ -79,6 +90,8 @@ function ChevronIcon({ open }: { open: boolean }) {
 interface Props {
   /** When false the child is a shared/read-only view — hide start buttons. */
   canStart: boolean;
+  /** Lesson IDs that have been completed (from usePhonicsProgress). */
+  completedLessonIds?: Set<string>;
 }
 
 // ── Lesson panel (shown when an available unit is expanded) ───────────────────
@@ -140,14 +153,15 @@ function UnitCard({
   expanded,
   onToggle,
   canStart,
+  status,
 }: {
   unit: PhonicsUnit;
   expanded: boolean;
   onToggle: () => void;
   canStart: boolean;
+  status: "available" | "completed" | "locked";
 }) {
-  const status = getUnitStatus(unit);
-  const isAvailable = status === "available";
+  const isAvailable = status === "available" || status === "completed";
   const items = totalItems(unit);
 
   return (
@@ -210,7 +224,11 @@ function UnitCard({
 
         {/* Right side: CTA or lock */}
         <div className="flex-shrink-0 ml-1">
-          {isAvailable ? (
+          {status === "completed" ? (
+            <span className="text-xs font-semibold px-2 py-1 rounded-full bg-green-100 dark:bg-green-900/40 text-green-700 dark:text-green-400">
+              ✓ ผ่านแล้ว
+            </span>
+          ) : isAvailable ? (
             canStart ? (
               <div className="flex items-center gap-1.5 text-amber-600 dark:text-amber-400">
                 <span className="text-xs font-semibold hidden sm:inline">
@@ -253,7 +271,7 @@ function UnitCard({
 
 // ── Main component ────────────────────────────────────────────────────────────
 
-export default function PhonicsJourneyMap({ canStart }: Props) {
+export default function PhonicsJourneyMap({ canStart, completedLessonIds = new Set() }: Props) {
   const units = getPhonicsUnits();
   const [expandedUnitId, setExpandedUnitId] = useState<string | null>(null);
 
@@ -269,6 +287,12 @@ export default function PhonicsJourneyMap({ canStart }: Props) {
     setExpandedUnitId((prev) => (prev === unitId ? null : unitId));
   };
 
+  const completedUnitCount = units.filter((u) => isUnitCompleted(u, completedLessonIds)).length;
+  const availableCount = units.filter((u, i) => {
+    const prev = units[i - 1];
+    return getUnitStatus(u, completedLessonIds, prev) !== "locked";
+  }).length;
+
   return (
     <div className="space-y-4">
       {/* Journey header */}
@@ -283,26 +307,33 @@ export default function PhonicsJourneyMap({ canStart }: Props) {
         </div>
         <div className="flex items-center gap-1.5 text-xs text-amber-600 dark:text-amber-400 font-medium">
           <span className="w-2 h-2 rounded-full bg-amber-400 dark:bg-amber-500 inline-block" />
-          เปิดใช้งาน 1/{units.length}
+          {completedUnitCount > 0
+            ? `ผ่านแล้ว ${completedUnitCount}/${units.length}`
+            : `เปิดใช้งาน ${availableCount}/${units.length}`}
         </div>
       </div>
 
       {/* Unit cards */}
       <div className="space-y-2">
-        {units.map((unit) => (
-          <UnitCard
-            key={unit.id}
-            unit={unit}
-            expanded={expandedUnitId === unit.id}
-            onToggle={() => toggleUnit(unit.id)}
-            canStart={canStart}
-          />
-        ))}
+        {units.map((unit, i) => {
+          const prev = units[i - 1];
+          const status = getUnitStatus(unit, completedLessonIds, prev);
+          return (
+            <UnitCard
+              key={unit.id}
+              unit={unit}
+              expanded={expandedUnitId === unit.id}
+              onToggle={() => toggleUnit(unit.id)}
+              canStart={canStart}
+              status={status}
+            />
+          );
+        })}
       </div>
 
       {/* Footer note */}
       <p className="text-xs text-text-muted/60 text-center px-4">
-        หน่วย K2–K7 จะเปิดหลังจากผ่านหน่วยก่อนหน้า
+        หน่วยถัดไปจะเปิดหลังจากผ่านหน่วยก่อนหน้า
       </p>
     </div>
   );

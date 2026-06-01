@@ -25,6 +25,7 @@ export async function evaluateSpeechViaApi(
     if (input.audioUrl) formData.append("audioUrl", input.audioUrl);
     if (input.selectedChoice) formData.append("selectedChoice", input.selectedChoice);
     if (input.childId) formData.append("childId", input.childId);
+    if (input.trainingMode) formData.append("trainingMode", input.trainingMode);
     body = formData;
     // Browser sets Content-Type with boundary automatically for FormData
   } else {
@@ -38,6 +39,7 @@ export async function evaluateSpeechViaApi(
       audioUrl: input.audioUrl,
       selectedChoice: input.selectedChoice,
       childId: input.childId,
+      trainingMode: input.trainingMode,
     });
     headers["Content-Type"] = "application/json";
   }

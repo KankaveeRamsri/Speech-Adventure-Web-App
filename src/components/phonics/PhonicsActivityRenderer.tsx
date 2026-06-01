@@ -4,11 +4,11 @@ import ListenAndChooseActivity from "./ListenAndChooseActivity";
 import SayAfterMeActivity from "./SayAfterMeActivity";
 import BlendSoundsActivity from "./BlendSoundsActivity";
 import WordPracticeActivity from "./WordPracticeActivity";
-import type { PhonicsPracticeItem } from "@/types/phonics";
+import type { PhonicsPracticeItem, PhonicsActivityResult } from "@/types/phonics";
 
 interface Props {
   item: PhonicsPracticeItem;
-  onComplete: (passed: boolean) => void;
+  onComplete: (result: PhonicsActivityResult) => void;
 }
 
 export default function PhonicsActivityRenderer({ item, onComplete }: Props) {
@@ -34,7 +34,7 @@ export default function PhonicsActivityRenderer({ item, onComplete }: Props) {
           <p className="text-xs text-text-muted">type: {(item as { type: string }).type}</p>
           <button
             type="button"
-            onClick={() => onComplete(false)}
+            onClick={() => onComplete({ passed: false, score: 0, status: "retry", feedback: "ข้ามไปก่อน", isMock: true, durationMs: 0 })}
             className="mt-3 px-5 py-2 rounded-xl bg-amber-500 text-white text-sm font-semibold hover:bg-amber-600 active:scale-[0.97]"
           >
             ข้ามไปก่อน

@@ -20,6 +20,7 @@ import {
 import type { TrainingStage } from "@/types/speechAdventure";
 import type { TrainingMode } from "@/lib/child-profile/childProfileStorage";
 import PhonicsJourneyMap from "@/components/phonics/PhonicsJourneyMap";
+import { usePhonicsProgress } from "@/hooks/usePhonicsProgress";
 import { calculateRewards } from "@/lib/rewards/calculateRewards";
 
 export default function TrainingMapPage() {
@@ -38,6 +39,7 @@ export default function TrainingMapPage() {
   const { isAuthenticated, isLoading: isAuthLoading } = useAuth();
 
   const activeMode: TrainingMode = profile?.trainingMode ?? "speech_clarity";
+  const { completedLessonIds } = usePhonicsProgress();
 
   const handleModeChange = (mode: TrainingMode) => {
     if (!profile) return;
@@ -181,7 +183,10 @@ export default function TrainingMapPage() {
             )}
 
             {activeMode === "kindergarten_phonics" && (
-              <PhonicsJourneyMap canStart={canStartPractice} />
+              <PhonicsJourneyMap
+                canStart={canStartPractice}
+                completedLessonIds={completedLessonIds}
+              />
             )}
           </div>
 

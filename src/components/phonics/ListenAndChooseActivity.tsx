@@ -2,17 +2,18 @@
 
 import { useState } from "react";
 import SampleAudioButton from "@/components/speech-adventure/SampleAudioButton";
-import type { PhonicsPracticeItem } from "@/types/phonics";
+import type { PhonicsPracticeItem, PhonicsActivityResult } from "@/types/phonics";
 
 interface Props {
   item: PhonicsPracticeItem;
-  onComplete: (passed: boolean) => void;
+  onComplete: (result: PhonicsActivityResult) => void;
 }
 
 export default function ListenAndChooseActivity({ item, onComplete }: Props) {
   const [selected, setSelected] = useState<string | null>(null);
   const [passed, setPassed] = useState(false);
   const [wrongFlash, setWrongFlash] = useState<string | null>(null);
+  const startTimeRef = useState(() => Date.now())[0];
 
   const handleChoice = (choice: string) => {
     if (passed) return;
@@ -113,7 +114,16 @@ export default function ListenAndChooseActivity({ item, onComplete }: Props) {
       {/* Next button */}
       <button
         type="button"
-        onClick={() => onComplete(true)}
+        onClick={() =>
+          onComplete({
+            passed: true,
+            score: 100,
+            status: "passed",
+            feedback: "ถูกต้องเลย! 🎉",
+            isMock: true,
+            durationMs: Date.now() - startTimeRef,
+          })
+        }
         disabled={!passed}
         className={`w-full py-3.5 rounded-xl text-base font-semibold transition-all active:scale-[0.98] ${
           passed

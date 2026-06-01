@@ -23,6 +23,12 @@ export interface SpeechEvaluationInput {
   selectedChoice?: string;
   childId?: string;
   locale?: string;
+  /**
+   * Optional training mode. When "kindergarten_phonics", providers apply
+   * lighter evaluation (lower thresholds, no therapy wording).
+   * Absent or "speech_clarity" → default Speech Clarity behaviour unchanged.
+   */
+  trainingMode?: string;
 }
 
 export interface SpeechEvaluationResult {

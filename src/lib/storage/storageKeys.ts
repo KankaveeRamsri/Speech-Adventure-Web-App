@@ -55,6 +55,9 @@ export const STORAGE_KEYS = {
   /** School data — unscoped shared key (org-based, accessible across users on same device) */
   SCHOOL: "speech-adventure-school-v1",
 
+  /** Kindergarten Phonics Mode progress — separate from PROGRESS key */
+  PHONICS_PROGRESS: "speech-adventure-phonics-progress-v1",
+
   // ── UI preferences — not cleared on data reset ──────────────────────────────
 
   /** Desktop sidebar collapsed state */
@@ -73,6 +76,7 @@ export const DATA_KEYS = [
   STORAGE_KEYS.SELECTED_CHILD_ID,
   STORAGE_KEYS.OBSERVATIONS,
   STORAGE_KEYS.INVITATIONS,
+  STORAGE_KEYS.PHONICS_PROGRESS,
 ] as const;
 
 /** UI preference keys — preserved on data reset for smoother UX. */

@@ -118,6 +118,9 @@ export async function POST(request: NextRequest) {
       ? (fields.selectedChoice as string)
       : undefined,
     childId: isNonEmptyString(fields.childId) ? (fields.childId as string) : undefined,
+    trainingMode: isNonEmptyString(fields.trainingMode)
+      ? (fields.trainingMode as string)
+      : undefined,
     audioBuffer,
     audioMimeType,
   };

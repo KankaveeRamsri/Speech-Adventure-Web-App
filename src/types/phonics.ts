@@ -81,3 +81,72 @@ export interface PhonicsUnit {
   accentColor: string;
   lessons: PhonicsLesson[];
 }
+
+// ── Progress types ────────────────────────────────────────────────────────────
+
+export type PhonicsAttemptStatus = "passed" | "almost" | "retry";
+
+/** Result returned by an activity component to its parent. */
+export interface PhonicsActivityResult {
+  passed: boolean;
+  score: number;
+  status: PhonicsAttemptStatus;
+  feedback: string;
+  isMock: boolean;
+  durationMs: number;
+}
+
+/** Persisted record of a single practice attempt (one item). */
+export interface PhonicsAttempt {
+  id: string;
+  childId: string;
+  /** Always "kindergarten_phonics" — ensures no mixing with speech_progress. */
+  trainingMode: "kindergarten_phonics";
+  unitId: string;
+  lessonId: string;
+  practiceItemId: string;
+  activityType: PhonicsActivityType;
+  prompt: string;
+  score: number;
+  status: PhonicsAttemptStatus;
+  feedback: string;
+  starsEarned: number;
+  sessionId?: string;
+  durationMs: number;
+  isMock: boolean;
+  createdAt: string;
+}
+
+export type PhonicsSessionStatus = "active" | "completed" | "abandoned";
+
+export interface PhonicsSession {
+  id: string;
+  childId: string;
+  unitId: string;
+  lessonId: string;
+  startedAt: string;
+  endedAt?: string;
+  durationMs?: number;
+  completedItems: number;
+  totalItems: number;
+  averageScore: number;
+  starsEarned: number;
+  attemptIds: string[];
+  status: PhonicsSessionStatus;
+}
+
+/** All phonics progress for one child. Stored separately from SpeechProgress. */
+export interface PhonicsProgress {
+  childId: string;
+  attempts: PhonicsAttempt[];
+  sessions: PhonicsSession[];
+  updatedAt: string;
+}
+
+export interface PhonicsProgressSummary {
+  totalAttempts: number;
+  totalSessions: number;
+  completedLessonIds: string[];
+  completedUnitIds: string[];
+  lessonPassRate: Record<string, number>; // lessonId → 0-100
+}

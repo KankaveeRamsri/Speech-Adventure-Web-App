@@ -150,7 +150,9 @@ export class OpenAISpeechEvaluationProvider implements SpeechEvaluationProviderC
     }
 
     try {
-      return await this.evaluateWithGpt(transcript, input);
+      return input.trainingMode === "kindergarten_phonics"
+        ? await this.evaluateKindergartenWithGpt(transcript, input)
+        : await this.evaluateWithGpt(transcript, input);
     } catch (err) {
       console.warn("[OpenAI] GPT eval failed:", err instanceof Error ? err.message : err);
       const score = transcript ? 55 : 45;
@@ -350,6 +352,97 @@ export class OpenAISpeechEvaluationProvider implements SpeechEvaluationProviderC
       clarityScore,
       transcriptReliable,
       transcriptReliabilityReason,
+      isMock: false,
+      provider: "openai",
+      createdAt: new Date().toISOString(),
+    };
+  }
+
+  // ── Kindergarten Phonics light evaluation ─────────────────────────────────
+
+  private async evaluateKindergartenWithGpt(
+    transcript: string | undefined,
+    input: SpeechEvaluationInput,
+  ): Promise<SpeechEvaluationResult> {
+    const kgSystemPrompt = `คุณเป็นผู้ช่วยประเมินการออกเสียงภาษาไทยสำหรับเด็กอนุบาล
+
+งาน: ประเมินว่าเด็กออกเสียงตามที่คาดหวังได้ดีแค่ไหน โดยพิจารณาจาก transcript
+
+นี่คือการฝึกภาษาไทยขั้นพื้นฐาน ไม่ใช่การบำบัดการพูด อย่าใช้ภาษาทางการแพทย์
+
+ตอบเป็น JSON object เท่านั้น ไม่มี markdown:
+{
+  "transcriptMatchScore": <จำนวนเต็ม 0-100>,
+  "clarityScore": <จำนวนเต็ม 0-100>,
+  "confidence": <ทศนิยม 0.0-1.0>,
+  "feedback": <string ภาษาไทย สั้นมาก ให้กำลังใจ ไม่เกิน 50 ตัวอักษร>
+}
+
+กฎสำคัญ:
+- ให้คะแนนใจกว้าง เด็กที่พยายามออกเสียงตามควรได้คะแนนอย่างน้อย 50
+- ห้ามใช้คำว่า "ผิด" หรือภาษาที่ทำให้เด็กรู้สึกแย่
+- ถ้า transcript ว่างหรือไม่น่าเชื่อถือ ให้ confidence ≤ 0.4 และ score ≤ 45
+- feedback ต้องกระตุ้น ให้กำลังใจ เหมาะกับเด็กเล็ก`;
+
+    const userPrompt = [
+      `คำ/เสียงที่คาดหวัง: "${input.promptText}"`,
+      `ประเภทกิจกรรม: ${input.itemType}`,
+      `Transcript: ${transcript ? `"${transcript}"` : "(ไม่มีเสียง)"}`,
+      `ประเมินความตรงและความชัดเจน แล้วตอบ JSON`,
+    ].join("\n");
+
+    const response = await fetch(OPENAI_CHAT_URL, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${this.apiKey}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        model: "gpt-4o-mini",
+        response_format: { type: "json_object" },
+        temperature: 0.2,
+        messages: [
+          { role: "system", content: kgSystemPrompt },
+          { role: "user", content: userPrompt },
+        ],
+      }),
+    });
+
+    if (!response.ok) {
+      const errText = await response.text().catch(() => "");
+      throw new Error(`GPT-kg ${response.status}: ${errText.slice(0, 80)}`);
+    }
+
+    const data = (await response.json()) as {
+      choices: Array<{ message: { content: string } }>;
+    };
+    const raw = JSON.parse(data.choices[0].message.content) as {
+      transcriptMatchScore?: number;
+      clarityScore?: number;
+      confidence?: number;
+      feedback?: string;
+    };
+
+    const tms = clamp(Math.round(raw.transcriptMatchScore ?? 50), 0, 100);
+    const cs = clamp(Math.round(raw.clarityScore ?? 50), 0, 100);
+    const conf = clamp(raw.confidence ?? 0.6, 0, 1);
+
+    // Kindergarten weights: clarity 40%, transcriptMatch 40%, participation 20%
+    const score = clamp(Math.round(cs * 0.4 + tms * 0.4 + 20), 0, 100);
+
+    // Kindergarten threshold: pass at 50
+    const kgStatus = score >= 50 ? "passed" : score >= 35 ? "almost" : "retry";
+
+    return {
+      score,
+      confidence: conf,
+      status: kgStatus,
+      feedback: raw.feedback ?? "ลองฟังก่อนแล้วพูดตามนะ",
+      practiceTip: "ฟังเสียงตัวอย่างก่อนแล้วพูดตาม",
+      transcript,
+      transcriptMatchScore: tms,
+      clarityScore: cs,
+      transcriptReliable: conf > 0.4,
       isMock: false,
       provider: "openai",
       createdAt: new Date().toISOString(),

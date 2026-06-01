@@ -204,7 +204,30 @@ These are in `school`/`teacher` routes — not in the parent training flow. Docu
 
 ---
 
-## Next Phase: K5 — AI Light Evaluation + Phonics Progress Storage
+## Phase K5 — Phonics Progress Storage + Light Evaluation (Done 2026-06-01)
+
+1. ✅ **`src/types/phonics.ts`** — Added `PhonicsAttempt`, `PhonicsSession`, `PhonicsProgress`, `PhonicsProgressSummary`, `PhonicsAttemptStatus`, `PhonicsActivityResult`, `PhonicsSessionStatus`
+2. ✅ **`storageKeys.ts`** — Added `PHONICS_PROGRESS` key + included in `DATA_KEYS`
+3. ✅ **`src/lib/storage/phonicsProgressStorage.ts`** — Standalone localStorage module (user+child scoped, stable snapshots, stale session cleanup, helper `getCompletedLessonIds`)
+4. ✅ **`src/hooks/usePhonicsProgress.ts`** — Hook with auto scope-sync; exposes `startSession`, `addAttempt`, `completeSession`, `completedLessonIds`, `completedUnitIds`, `summary`
+5. ✅ **`SpeechEvaluationInput`** — Added optional `trainingMode?` (non-breaking)
+6. ✅ **API route + client.ts** — Parse + forward `trainingMode` to providers
+7. ✅ **Mock provider** — Deterministic kindergarten mock pool (generous scores, cycles)
+8. ✅ **OpenAI provider** — `evaluateKindergartenWithGpt()` method: lighter prompt, no therapy wording, passScore=50, weights: clarity 40% + transcriptMatch 40% + participation 20%
+9. ✅ **Activity components** — All 4 use `PhonicsActivityResult` callback; production activities add "✨ ตรวจสอบเสียง" button; listen_and_choose returns score 100 client-side
+10. ✅ **Lesson page** — Full session flow (start → attempt per item → complete); summary shows avgScore + stars + pass rate
+11. ✅ **PhonicsJourneyMap** — `completedLessonIds` prop; K1→K2 unlock logic; "✓ ผ่านแล้ว" badge on completed units
+12. ✅ **Training page** — Passes `completedLessonIds` from `usePhonicsProgress` to `PhonicsJourneyMap`
+
+### K5 Remaining TODOs (for K6+)
+- Phonics progress dashboard page `/phonics/progress`
+- Supabase implementation (`IPhonicsProgressRepository`)
+- Per-lesson detail view (attempt history)
+- Unlock K3+ based on cascading progress
+
+---
+
+## Next Phase: K6 — Phonics Progress Dashboard
 
 ---
 
