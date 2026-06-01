@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { getPhonicsUnits } from "@/data/kindergartenCurriculum";
 import type { PhonicsUnit, PhonicsLesson, PhonicsActivityType } from "@/types/phonics";
 
@@ -110,15 +111,14 @@ function LessonPanel({ unit }: { unit: PhonicsUnit }) {
                 {lesson.items.length} กิจกรรม
               </p>
             </div>
-            {/* CTA — placeholder until K4 activity pages are built */}
+            {/* CTA — routes to phonics lesson page */}
             <div className="flex-shrink-0 self-center">
-              <span
-                className="inline-flex items-center px-3 py-1.5 rounded-lg text-xs font-semibold bg-amber-100 dark:bg-amber-900/40 text-amber-600 dark:text-amber-400 opacity-60 cursor-not-allowed select-none"
-                title="กิจกรรมกำลังเตรียมพร้อม"
-                aria-disabled="true"
+              <Link
+                href={`/training/phonics/${unit.id}/${lesson.id}`}
+                className="inline-flex items-center px-3 py-1.5 rounded-lg text-xs font-semibold bg-amber-500 text-white hover:bg-amber-600 transition-all active:scale-[0.97] shadow-sm shadow-amber-300/30"
               >
-                เร็ว ๆ นี้
-              </span>
+                เริ่ม →
+              </Link>
             </div>
           </div>
         ))}
@@ -126,7 +126,7 @@ function LessonPanel({ unit }: { unit: PhonicsUnit }) {
 
       <div className="px-4 py-2.5 border-t border-amber-200 dark:border-amber-700/40 bg-amber-50/80 dark:bg-amber-950/30">
         <p className="text-xs text-amber-600/70 dark:text-amber-500/70 text-center">
-          กิจกรรมการฝึกกำลังเตรียมพร้อม — อัปเดตเร็ว ๆ นี้ 🌟
+          กดปุ่ม เริ่ม → เพื่อเข้าสู่กิจกรรม
         </p>
       </div>
     </div>

@@ -186,7 +186,25 @@ These are in `school`/`teacher` routes — not in the parent training flow. Docu
 
 ---
 
-## Next Phase: K4 — Activity Renderers
+## Phase K4 — Kindergarten Phonics Activity Renderers MVP (Done 2026-06-01)
+
+1. ✅ **`/training/phonics/[unitId]/[lessonId]`** — Lesson page with progress dots, activity card, summary screen
+2. ✅ **`PhonicsActivityRenderer`** — Dispatches to correct renderer by `item.type`
+3. ✅ **`ListenAndChooseActivity`** — Tap choice → correct/wrong feedback; "ถัดไป" unlocked after correct tap; no API call
+4. ✅ **`SayAfterMeActivity`** — Listen (required) + record (optional) → "ถัดไป" enabled after `onPlayed` or recording; no AI eval yet
+5. ✅ **`BlendSoundsActivity`** — Visual equation "ก + อา = กา" from `parseBlendEquation(instruction)`; same flow as SayAfterMe
+6. ✅ **`WordPracticeActivity`** — Handles simple_word / final_consonant / short_sentence; sentence uses smaller font
+7. ✅ **`PhonicsJourneyMap` updated** — Lesson CTA links to `/training/phonics/K1/K1-L1`; footer updated
+
+### K4 Remaining TODOs (for K5+)
+- Add light AI evaluation to SayAfterMe/Blend/Word activities (uses phonicsRubric LIGHT_RUBRIC)
+- Build phonics progress storage `IPhonicsProgressRepository` (local + Supabase)
+- Unlock K2+ based on K1 completion status
+- Add Supabase `training_mode` column + migration
+
+---
+
+## Next Phase: K5 — AI Light Evaluation + Phonics Progress Storage
 
 ---
 
