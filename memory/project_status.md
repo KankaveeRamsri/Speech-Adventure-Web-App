@@ -155,7 +155,22 @@ These are in `school`/`teacher` routes — not in the parent training flow. Docu
 
 ---
 
-## Next Phase: K2 — (TBD)
+## Phase K2 — Kindergarten Phonics Curriculum Config (Done 2026-06-01)
+
+1. ✅ **`src/types/phonics.ts`** — `PhonicsUnit`, `PhonicsLesson`, `PhonicsPracticeItem`, `PhonicsActivityType`, `PhonicsEvaluationRubric`, `PhonicsEvaluationMode`
+2. ✅ **`src/data/kindergartenCurriculum.ts`** — 7 units K1–K7 with sample lessons/items; helper functions: `getPhonicsUnits`, `getPhonicsUnit`, `getPhonicsLesson`, `getFirstPhonicsLesson`, `getNextPhonicsLesson`, `getPhonicsItem`
+3. ✅ **`src/lib/speech-evaluation/phonicsRubric.ts`** — `PHONICS_LIGHT_RUBRIC` (passingScore 50, encouraging Thai feedback), `PHONICS_NONE_RUBRIC` (tap activities), `getPhonicsRubric(mode)`
+4. ✅ **Training page updated** — kindergarten placeholder now lists K1–K7 unit names/descriptions
+
+### K2 Remaining TODOs (for K3+)
+- Build Phonics Journey Map UI (K3)
+- Build phonics progress storage: `IPhonicsProgressRepository` + local/Supabase impls (K3+)
+- Build activity renderer for each PhonicsActivityType (K4+)
+- Add Supabase `training_mode` column + migration (K3)
+
+---
+
+## Next Phase: K3 — Phonics Journey Map UI
 
 ---
 
