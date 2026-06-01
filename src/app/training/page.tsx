@@ -19,7 +19,7 @@ import {
 } from "@/data/speechAdventureMockData";
 import type { TrainingStage } from "@/types/speechAdventure";
 import type { TrainingMode } from "@/lib/child-profile/childProfileStorage";
-import { getPhonicsUnits } from "@/data/kindergartenCurriculum";
+import PhonicsJourneyMap from "@/components/phonics/PhonicsJourneyMap";
 import { calculateRewards } from "@/lib/rewards/calculateRewards";
 
 export default function TrainingMapPage() {
@@ -181,48 +181,7 @@ export default function TrainingMapPage() {
             )}
 
             {activeMode === "kindergarten_phonics" && (
-              <div className="space-y-4">
-                {/* Coming-soon banner */}
-                <div className="rounded-2xl border border-amber-200 dark:border-amber-700/50 bg-amber-50 dark:bg-amber-950/20 px-6 py-6 text-center space-y-2">
-                  <div className="text-4xl" aria-hidden="true">🌟</div>
-                  <h3 className="text-base font-bold text-amber-700 dark:text-amber-400">
-                    โหมดเรียนเสียงไทยกำลังเตรียมพร้อม
-                  </h3>
-                  <p className="text-sm text-amber-600/80 dark:text-amber-500/80 leading-relaxed">
-                    เร็ว ๆ นี้: เรียนพยัญชนะ สระ และการประสมเสียง
-                  </p>
-                </div>
-
-                {/* K1–K7 unit list preview */}
-                <section>
-                  <h2 className="text-sm font-semibold text-text-muted uppercase tracking-wider mb-3 px-1">
-                    หน่วยการเรียน
-                  </h2>
-                  <div className="space-y-2">
-                    {getPhonicsUnits().map((unit) => (
-                      <div
-                        key={unit.id}
-                        className="flex items-center gap-3 px-4 py-3 rounded-xl bg-surface border border-border opacity-60"
-                        aria-label={`${unit.id}: ${unit.title} — กำลังเตรียมพร้อม`}
-                      >
-                        <span className="text-xl flex-shrink-0" aria-hidden="true">
-                          {unit.icon}
-                        </span>
-                        <div className="min-w-0 flex-1">
-                          <p className="text-sm font-semibold text-text leading-snug">
-                            <span className="text-amber-600 dark:text-amber-400 mr-1.5">{unit.id}</span>
-                            {unit.title}
-                          </p>
-                          <p className="text-xs text-text-muted truncate mt-0.5">{unit.description}</p>
-                        </div>
-                        <span className="text-xs text-text-muted/60 flex-shrink-0 bg-border/40 px-2 py-0.5 rounded-full">
-                          เร็ว ๆ นี้
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-                </section>
-              </div>
+              <PhonicsJourneyMap canStart={canStartPractice} />
             )}
           </div>
 

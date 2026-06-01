@@ -170,7 +170,23 @@ These are in `school`/`teacher` routes — not in the parent training flow. Docu
 
 ---
 
-## Next Phase: K3 — Phonics Journey Map UI
+## Phase K3 — Kindergarten Phonics Journey Map UI (Done 2026-06-01)
+
+1. ✅ **`src/components/phonics/PhonicsJourneyMap.tsx`** — Self-contained component; reads from `kindergartenCurriculum`; no hooks/repos
+2. ✅ **Unit cards K1–K7** — K1 available (expandable), K2–K7 locked ("ทำด่านก่อนหน้าให้เสร็จก่อน")
+3. ✅ **Lesson panel** — expands inside K1 card; shows lesson title, activity type summary, item count; "เร็ว ๆ นี้" CTA (placeholder until K4 routes built)
+4. ✅ **Training page** — `PhonicsJourneyMap canStart={canStartPractice}` replaces K2 placeholder; speech_clarity flow unchanged
+5. ✅ **"สวนเสียง" header** — progress pill "เปิดใช้งาน 1/7"; footer note about unlock sequence
+
+### K3 Remaining TODOs (for K4+)
+- Build activity renderer pages `/phonics/[unit]/[lesson]` (K4)
+- Build phonics progress storage: `IPhonicsProgressRepository` (K4)
+- Unlock K2+ based on progress data (K4)
+- Add Supabase `training_mode` column + migration
+
+---
+
+## Next Phase: K4 — Activity Renderers
 
 ---
 
