@@ -14,6 +14,7 @@ import { mockTrainingStages } from "@/data/speechAdventureMockData";
 type NavItem = { href: string; label: string; icon: NavIconName; exact?: boolean };
 
 const PARENT_NAV_ITEMS: NavItem[] = [
+  { href: "/dashboard", label: "หน้าหลัก", icon: "home", exact: true },
   { href: "/training", label: "ฝึกออกเสียง", icon: "training" },
   { href: "/library", label: "เนื้อหา", icon: "library" },
   { href: "/progress", label: "ความก้าวหน้า", icon: "progress" },

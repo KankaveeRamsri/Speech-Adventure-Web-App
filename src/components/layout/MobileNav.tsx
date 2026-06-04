@@ -8,6 +8,7 @@ import { useAuth, isTeacher, isSchoolAdmin } from "@/hooks/useAuth";
 type NavItem = { href: string; label: string; icon: NavIconName; exact?: boolean };
 
 const PARENT_MOBILE: NavItem[] = [
+  { href: "/dashboard", label: "หน้าหลัก", icon: "home", exact: true },
   { href: "/training", label: "ฝึก", icon: "training" },
   { href: "/library", label: "เนื้อหา", icon: "library" },
   { href: "/progress", label: "ก้าวหน้า", icon: "progress" },

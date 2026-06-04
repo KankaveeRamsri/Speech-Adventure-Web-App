@@ -281,6 +281,32 @@ Build: ✅ | tsc: ✅ | lint: 11 errors (school/teacher React compiler — uncha
 
 ---
 
+## Phase P6 — Parent Home and Daily Practice Plan (Done 2026-06-04)
+
+1. ✅ **`src/lib/homeRecommendations.ts`** — Lightweight pure utility; `getSpeechClarityHomeRecommendation(summary)` + `getPhonicsHomeRecommendation(completedLessonIds)`; no React, no heavy imports
+2. ✅ **`src/app/dashboard/page.tsx`** — New parent home route; AppShell; mode-aware (speech_clarity / kindergarten_phonics); sections: child card, multi-child switcher, today's plan, latest result, progress snapshot, quick actions (ฝึกต่อ / ดูก้าวหน้า / ดูเนื้อหา)
+3. ✅ **AppSidebar** — Added "หน้าหลัก" (home, exact) as first parent nav item pointing to `/dashboard`
+4. ✅ **MobileNav** — Added "หน้าหลัก" (home, exact) as first parent mobile nav item
+
+### P6 Key design notes
+- Speech Clarity CTA routes to `/training/{stageSlug}`; Phonics CTA routes to `/training/phonics/{unitId}/{lessonId}`
+- Empty states: no profile → redirect to `/onboarding`; no attempts → friendly CTA to first lesson/pretest
+- Multi-child switcher shown only when `profiles.length > 1`
+- Auth guards: not authenticated → redirect to `/auth/signin`; authenticated + no profile → redirect to `/onboarding`
+
+### P6 Performance precautions taken
+- No ProgressDashboard, PhonicsProgressDashboard, TrainingMap, or PhonicsJourneyMap imported into dashboard page
+- `homeRecommendations.ts` imports only pure data files (kindergartenCurriculum, speechAdventureMockData) — same files already loaded by training page; no new module bloat
+- Hooks used (useSpeechProgress, usePhonicsProgress, useChildProfile) already bundled with training page
+- No OpenAI or server-only modules anywhere near the dashboard
+
+### P6 Remaining TODOs
+- Consider updating post-auth redirect from `/training` → `/dashboard` for better first-impression UX
+- Per-lesson attempt history detail
+- Supabase IPhonicsProgressRepository
+
+---
+
 ## Next Phase: K9 — (TBD)
 
 ---
