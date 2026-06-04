@@ -386,7 +386,69 @@ Build: ✅ | tsc: ✅ | lint: 11 errors (school/teacher React compiler — uncha
 
 ---
 
-## Next Phase: K9 — (TBD)
+## Phase P9-A — Mode-aware Rewards/Report + Supabase trainingMode Fix (Done 2026-06-04)
+
+### Critical Fix: Supabase trainingMode Persistence
+
+1. ✅ **Migration** `supabase/migrations/20260604000100_add_training_mode.sql`
+   - `ALTER TABLE child_profiles ADD COLUMN IF NOT EXISTS training_mode text NOT NULL DEFAULT 'speech_clarity'`
+   - Check constraint: `training_mode in ('speech_clarity', 'kindergarten_phonics')`
+   - Existing rows auto-default to `speech_clarity` (migration-safe)
+
+2. ✅ **`src/types/database.ts`** — Added `training_mode: string` to `DbChildProfile`
+
+3. ✅ **`src/lib/storage/supabase/mappers.ts`**
+   - `dbToDomainProfile`: reads `db.training_mode`, validated against known modes, falls back to `speech_clarity`
+   - `domainToDbProfile`: writes `training_mode: profile.trainingMode`
+   - Added `TrainingMode` import
+
+4. ✅ **`src/lib/storage/supabase/SupabaseSchoolRepository.ts`**
+   - School-imported students: hardcodes `training_mode: "speech_clarity"` (correct default)
+   - Required to fix tsc error after DbChildProfile gained the non-nullable field
+
+### Rewards Page Mode-Awareness
+
+5. ✅ **`src/app/rewards/page.tsx`** — Added phonics mode support
+   - Added `useChildProfile`, `usePhonicsProgress`, `getPhonicsUnits` imports
+   - `buildPhonicsMilestones()` function: 9 milestone definitions computed from `completedLessonIds` + `completedUnitIds`
+   - `PhonicsRewardsView` component: hero stats (stars/lessons/units), progress bar, earned/locked milestones, latest attempt, amber-themed CTAs
+   - Early return for `trainingMode === "kindergarten_phonics"` with `PhonicsRewardsView`
+   - Speech clarity rewards flow: **unchanged**
+
+### Report Page Mode-Awareness
+
+6. ✅ **`src/app/report/page.tsx`** — Added phonics mode support
+   - Added `usePhonicsProgress`, `getPhonicsUnits` imports
+   - Early return for `trainingMode === "kindergarten_phonics"` showing phonics report:
+     - Summary stats (attempts, lessons, units, stars)
+     - Avg score + next recommendation card
+     - Unit progress table (K1–K7 with per-unit lesson progress bars)
+     - Recent attempts list (last 8) with prompt, activity type, unit, score, stars
+     - Development notice ("กำลังอยู่ในช่วงพัฒนา")
+     - Amber-themed CTAs ("เรียนต่อ", "ดูความก้าวหน้า")
+   - Speech clarity report flow: **unchanged**
+   - `canExportReport` guard applies to both modes
+
+### Navigation Polish
+
+7. ✅ **`src/components/layout/AppSidebar.tsx`**
+   - `"ฝึกออกเสียง"` → `"ฝึกและเรียน"` (neutral label works for both speech + phonics)
+
+### Performance Notes
+- `usePhonicsProgress` and `getPhonicsUnits` are already bundled with training/dashboard pages — no new global module adds
+- No OpenAI/server imports in rewards or report client components
+- tsc: ✅ no errors
+
+### Remaining TODOs
+- `supabase db push` must be run to apply the migration
+- Attempt detail drawer for phonics attempts (still only `PracticeAttempt` type)
+- Per-lesson detail history in phonics progress
+- Phonics full attempt history tab (PhonicsProgressDashboard shows only last 6)
+- Supabase `IPhonicsProgressRepository` (phonics progress is still localStorage only)
+
+---
+
+## Next Phase: P9 — Production Readiness
 
 ---
 

@@ -400,6 +400,7 @@ export class SupabaseSchoolRepository implements ISchoolRepository {
             age:                  row.age ?? 6,
             target_sound:         row.targetSounds[0] ?? "ก",
             training_goal:        "",
+            training_mode:        "speech_clarity",
             selected_sound_id:    row.targetSounds[0] ?? "ก",
             avatar_emoji:         "🧒",
             organization_id:      organizationId,

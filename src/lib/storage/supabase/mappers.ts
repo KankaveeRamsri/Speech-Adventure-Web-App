@@ -25,7 +25,7 @@ import type {
   EvaluationStatus,
   SessionStatus,
 } from "@/types/speechAdventure";
-import type { ChildProfileData } from "@/lib/child-profile/childProfileStorage";
+import type { ChildProfileData, TrainingMode } from "@/lib/child-profile/childProfileStorage";
 import type {
   ObservationNote,
   ObservationTargetType,
@@ -94,14 +94,18 @@ export function dbToDomainSession(db: DbPracticeSession): PracticeSession {
 }
 
 export function dbToDomainProfile(db: DbChildProfile): ChildProfileData {
+  const knownModes: TrainingMode[] = ["speech_clarity", "kindergarten_phonics"];
+  const trainingMode: TrainingMode = knownModes.includes(db.training_mode as TrainingMode)
+    ? (db.training_mode as TrainingMode)
+    : "speech_clarity";
+
   return {
     id: db.id,
     name: db.name,
     age: db.age,
     targetSound: db.target_sound,
     trainingGoal: db.training_goal,
-    // training_mode column not yet in DB (K1 foundation); all Supabase profiles default to speech_clarity.
-    trainingMode: "speech_clarity",
+    trainingMode,
     createdAt: db.created_at,
     updatedAt: db.updated_at,
   };
@@ -185,6 +189,7 @@ export function domainToDbProfile(
     age: profile.age,
     target_sound: profile.targetSound,
     training_goal: profile.trainingGoal,
+    training_mode: profile.trainingMode,
     selected_sound_id: selectedSoundId,
     // TODO: add avatarEmoji to ChildProfileData domain type (Phase 27+)
     avatar_emoji: "🧒",

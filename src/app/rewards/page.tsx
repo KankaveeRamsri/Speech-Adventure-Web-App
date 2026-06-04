@@ -3,8 +3,11 @@
 import Link from "next/link";
 import AppShell from "@/components/layout/AppShell";
 import { useSpeechProgress } from "@/hooks/useSpeechProgress";
+import { usePhonicsProgress } from "@/hooks/usePhonicsProgress";
+import { useChildProfile } from "@/hooks/useChildProfile";
 import { calculateRewards } from "@/lib/rewards/calculateRewards";
 import { mockTrainingStages } from "@/data/speechAdventureMockData";
+import { getPhonicsUnits } from "@/data/kindergartenCurriculum";
 import type { EarnedReward, RewardProgress } from "@/types/rewards";
 
 // ── Icons ──────────────────────────────────────────────────────────────────────
@@ -321,9 +324,299 @@ function NextActionCard({
   );
 }
 
+// ── Phonics milestone definition ───────────────────────────────────────────────
+
+interface PhonicsMilestone {
+  id: string;
+  icon: string;
+  name: string;
+  description: string;
+  color: string;
+  earned: boolean;
+  earnedLabel?: string;
+}
+
+function buildPhonicsMilestones(
+  completedLessonIds: Set<string>,
+  completedUnitIds: Set<string>,
+  totalAttempts: number,
+): PhonicsMilestone[] {
+  const units = getPhonicsUnits();
+  const milestones: PhonicsMilestone[] = [
+    {
+      id: "first_phonics",
+      icon: "🌱",
+      name: "เริ่มเรียนเสียงไทยแล้ว",
+      description: "ฝึกบทเรียนแรกของสวนเสียง",
+      color: "#4CAF82",
+      earned: totalAttempts >= 1,
+      earnedLabel: "บทเรียนแรก",
+    },
+    {
+      id: "first_lesson",
+      icon: "⭐",
+      name: "นักเรียนตัวน้อย",
+      description: "ผ่านบทเรียนแรกสำเร็จ",
+      color: "#F59E0B",
+      earned: completedLessonIds.size >= 1,
+    },
+    {
+      id: "listener",
+      icon: "👂",
+      name: "นักฟังเสียงตัวน้อย",
+      description: "ผ่าน 3 บทเรียนขึ้นไป",
+      color: "#6C63FF",
+      earned: completedLessonIds.size >= 3,
+    },
+    {
+      id: "k1_complete",
+      icon: "🎯",
+      name: "เรียนครบ K1",
+      description: "ฟังและจดจำเสียงพยัญชนะครบแล้ว",
+      color: "#F59E0B",
+      earned: completedUnitIds.has("K1"),
+    },
+    {
+      id: "k2_complete",
+      icon: "🔤",
+      name: "นักพยัญชนะ",
+      description: "ผ่านระดับพยัญชนะต้น K2",
+      color: "#F59E0B",
+      earned: completedUnitIds.has("K2"),
+    },
+    {
+      id: "blender",
+      icon: "🔀",
+      name: "นักผสมเสียง",
+      description: "ผ่านระดับผสมเสียง K4",
+      color: "#EC4899",
+      earned: completedUnitIds.has("K4"),
+    },
+    {
+      id: "word_master",
+      icon: "📖",
+      name: "เก่งคำศัพท์",
+      description: "ผ่านระดับคำง่าย K5",
+      color: "#8B5CF6",
+      earned: completedUnitIds.has("K5"),
+    },
+    {
+      id: "half_way",
+      icon: "🏅",
+      name: "ครึ่งทางแล้ว!",
+      description: "ผ่านครึ่งหนึ่งของสวนเสียง (4 ระดับ)",
+      color: "#F59E0B",
+      earned: completedUnitIds.size >= 4,
+    },
+    {
+      id: "all_units",
+      icon: "🌟",
+      name: "ผ่านสวนเสียงครบแล้ว!",
+      description: `ผ่านทั้ง ${units.length} ระดับในสวนเสียง`,
+      color: "#F59E0B",
+      earned: completedUnitIds.size >= units.length,
+    },
+  ];
+  return milestones;
+}
+
+// ── Phonics Rewards View ───────────────────────────────────────────────────────
+
+function PhonicsRewardsView() {
+  const { summary, completedLessonIds, completedUnitIds, progress, isHydrated } = usePhonicsProgress();
+  const units = getPhonicsUnits();
+
+  if (!isHydrated) {
+    return (
+      <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+        {Array.from({ length: 6 }).map((_, i) => (
+          <div key={i} className="h-36 rounded-2xl bg-border/40 animate-pulse" />
+        ))}
+      </div>
+    );
+  }
+
+  const totalAttempts = summary.totalAttempts;
+  const completedLessons = summary.completedLessonIds.length;
+  const completedUnitsCount = summary.completedUnitIds.length;
+  const starsEarned = progress?.attempts.reduce((s, a) => s + a.starsEarned, 0) ?? 0;
+
+  const milestones = buildPhonicsMilestones(completedLessonIds, completedUnitIds, totalAttempts);
+  const earned = milestones.filter((m) => m.earned);
+  const locked = milestones.filter((m) => !m.earned);
+
+  const latestAttempt = progress?.attempts.length
+    ? [...progress.attempts].sort(
+        (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
+      )[0]
+    : null;
+
+  return (
+    <div className="space-y-6">
+      {/* ── Hero stats ── */}
+      <div
+        className="rounded-2xl border border-amber-200 dark:border-amber-800/40 p-5"
+        style={{ background: "linear-gradient(135deg, rgba(245,158,11,0.08) 0%, rgba(251,191,36,0.04) 100%)" }}
+      >
+        <div className="flex items-center justify-between gap-4">
+          <div>
+            <p className="text-xs font-semibold text-amber-700 dark:text-amber-400 uppercase tracking-wider mb-1">
+              ดาวสะสม
+            </p>
+            <div className="flex items-baseline gap-1.5">
+              <span className="text-4xl font-bold text-amber-500 leading-none">{starsEarned}</span>
+              <span className="text-base text-amber-600 dark:text-amber-400 font-semibold">ดาว</span>
+            </div>
+          </div>
+          <div className="text-center">
+            <p className="text-xs font-semibold text-amber-700 dark:text-amber-400 uppercase tracking-wider mb-1">
+              บทเรียนผ่าน
+            </p>
+            <div className="flex items-baseline gap-1 justify-center">
+              <span className="text-4xl font-bold text-amber-500 leading-none">{completedLessons}</span>
+              <span className="text-base text-text-muted font-medium">บทเรียน</span>
+            </div>
+          </div>
+          <div className="text-right">
+            <p className="text-xs font-semibold text-amber-700 dark:text-amber-400 uppercase tracking-wider mb-1">
+              ระดับผ่าน
+            </p>
+            <div className="flex items-baseline gap-1 justify-end">
+              <span className="text-4xl font-bold text-amber-500 leading-none">{completedUnitsCount}</span>
+              <span className="text-base text-text-muted font-medium">/ {units.length}</span>
+            </div>
+          </div>
+        </div>
+
+        {/* Unit progress bar */}
+        <div className="mt-4">
+          <div className="flex items-center justify-between mb-1.5">
+            <p className="text-xs text-amber-700/70 dark:text-amber-400/70">ความคืบหน้าสวนเสียง</p>
+            <p className="text-xs font-semibold text-amber-600 dark:text-amber-400">
+              {Math.round((completedUnitsCount / units.length) * 100)}%
+            </p>
+          </div>
+          <div className="h-2 bg-amber-100 dark:bg-amber-900/30 rounded-full overflow-hidden">
+            <div
+              className="h-full bg-amber-400 rounded-full transition-all duration-700"
+              style={{ width: `${Math.round((completedUnitsCount / units.length) * 100)}%` }}
+            />
+          </div>
+        </div>
+      </div>
+
+      {/* ── CTA ── */}
+      <div className="flex gap-3">
+        <Link
+          href="/training"
+          className="flex-1 flex items-center justify-center gap-2 bg-amber-500 text-white font-semibold py-3 rounded-xl hover:bg-amber-600 transition-all hover:scale-[1.02] active:scale-[0.98] shadow-sm shadow-amber-300/30 text-sm"
+        >
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            <path d="M5 3l14 9-14 9V3z" />
+          </svg>
+          เรียนต่อ
+        </Link>
+        <Link
+          href="/progress"
+          className="flex-1 flex items-center justify-center gap-2 border border-amber-400 text-amber-600 dark:text-amber-400 font-semibold py-3 rounded-xl hover:bg-amber-50 dark:hover:bg-amber-900/20 transition-all text-sm"
+        >
+          ดูความก้าวหน้า
+        </Link>
+      </div>
+
+      {/* ── Empty state ── */}
+      {totalAttempts === 0 && (
+        <div className="bg-surface border border-border rounded-2xl p-8 text-center">
+          <div className="text-5xl mb-3" aria-hidden="true">🌱</div>
+          <h2 className="text-base font-bold text-text mb-1">ยังไม่มีความสำเร็จ</h2>
+          <p className="text-sm text-text-muted mb-5">เริ่มเรียนบทเรียนแรกเพื่อสะสมดาวและความสำเร็จ</p>
+          <Link
+            href="/training"
+            className="inline-flex items-center gap-2 bg-amber-500 text-white font-semibold px-6 py-2.5 rounded-xl text-sm hover:bg-amber-600 transition-all active:scale-[0.98]"
+          >
+            เริ่มเรียนเสียงไทย →
+          </Link>
+        </div>
+      )}
+
+      {/* ── Latest attempt ── */}
+      {latestAttempt && (
+        <div className="bg-surface border border-border rounded-xl px-4 py-3 flex items-center gap-3">
+          <div className="text-2xl flex-shrink-0" aria-hidden="true">🎙️</div>
+          <div className="flex-1 min-w-0">
+            <p className="text-xs text-text-muted">ฝึกล่าสุด</p>
+            <p className="text-sm font-semibold text-text truncate">
+              {latestAttempt.prompt}
+            </p>
+            <p className="text-xs text-text-muted mt-0.5">
+              {latestAttempt.unitId} · {new Date(latestAttempt.createdAt).toLocaleDateString("th-TH", { day: "numeric", month: "short" })}
+            </p>
+          </div>
+          <div className="flex-shrink-0 text-right">
+            <p className="text-sm font-bold text-amber-600 dark:text-amber-400">{latestAttempt.score}%</p>
+            <p className="text-xs text-amber-500">{"⭐".repeat(latestAttempt.starsEarned) || "–"}</p>
+          </div>
+        </div>
+      )}
+
+      {/* ── Earned milestones ── */}
+      {earned.length > 0 && (
+        <section aria-label="ความสำเร็จที่ได้รับ">
+          <p className="text-xs font-semibold text-text-muted uppercase tracking-wider mb-3">
+            ความสำเร็จที่ได้รับ ({earned.length})
+          </p>
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+            {earned.map((m) => (
+              <div
+                key={m.id}
+                className="flex flex-col items-center text-center p-4 bg-surface border rounded-2xl shadow-sm"
+                style={{ borderColor: `${m.color}30` }}
+              >
+                <div
+                  className="w-14 h-14 rounded-2xl flex items-center justify-center mb-2 text-3xl"
+                  style={{ backgroundColor: `${m.color}14` }}
+                  aria-hidden="true"
+                >
+                  {m.icon}
+                </div>
+                <h3 className="text-xs font-bold text-text leading-tight mb-0.5">{m.name}</h3>
+                <p className="text-xs text-text-muted leading-snug">{m.description}</p>
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
+
+      {/* ── Locked milestones ── */}
+      {locked.length > 0 && (
+        <section aria-label="ความสำเร็จที่รอปลดล็อก">
+          <p className="text-xs font-semibold text-text-muted uppercase tracking-wider mb-3">
+            รอการปลดล็อก ({locked.length})
+          </p>
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+            {locked.map((m) => (
+              <div
+                key={m.id}
+                className="flex flex-col items-center text-center p-4 bg-bg dark:bg-white/2 border border-dashed border-border/60 rounded-2xl opacity-50"
+              >
+                <div className="w-14 h-14 rounded-2xl flex items-center justify-center mb-2 text-3xl bg-gray-100 dark:bg-white/6" aria-hidden="true">
+                  {m.icon}
+                </div>
+                <h3 className="text-xs font-bold text-text-muted leading-tight mb-0.5">{m.name}</h3>
+                <p className="text-xs text-text-muted/60 leading-snug">{m.description}</p>
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
+    </div>
+  );
+}
+
 // ── Page ───────────────────────────────────────────────────────────────────────
 
 export default function RewardsPage() {
+  const { profile, isHydrated: profileHydrated } = useChildProfile();
   const { progress, summary, isHydrated } = useSpeechProgress();
 
   const result = isHydrated ? calculateRewards(progress) : null;
@@ -347,6 +640,29 @@ export default function RewardsPage() {
   const currentStage = isHydrated
     ? mockTrainingStages.find((s) => s.id === summary.currentStageId)
     : null;
+
+  const isPhonicsMode = profileHydrated && profile?.trainingMode === "kindergarten_phonics";
+
+  // ── Phonics mode: replace entire page content ────────────────────────────────
+  if (isPhonicsMode) {
+    return (
+      <AppShell>
+        <div className="max-w-3xl mx-auto px-4 sm:px-6 py-6 space-y-6">
+          <header>
+            <nav className="text-xs text-text-muted mb-2" aria-label="Breadcrumb">
+              <Link href="/dashboard" className="hover:text-primary transition-colors">หน้าหลัก</Link>
+              <span className="mx-1.5 text-disabled">/</span>
+              <span className="text-text font-medium">ความสำเร็จ</span>
+            </nav>
+            <h1 className="text-xl font-bold text-text">ความสำเร็จ</h1>
+            <p className="text-sm text-text-muted mt-0.5">ติดตามพัฒนาการสวนเสียงของน้อง 🌟</p>
+          </header>
+          <PhonicsRewardsView />
+          <div className="pb-4" />
+        </div>
+      </AppShell>
+    );
+  }
 
   return (
     <AppShell>

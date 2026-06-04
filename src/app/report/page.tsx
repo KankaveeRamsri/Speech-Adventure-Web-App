@@ -10,9 +10,11 @@ import ReportSummaryCard from "@/components/report/ReportSummaryCard";
 import PrintActions from "@/components/report/PrintActions";
 import PermissionBanner from "@/components/ui/PermissionBanner";
 import { useSpeechProgress } from "@/hooks/useSpeechProgress";
+import { usePhonicsProgress } from "@/hooks/usePhonicsProgress";
 import { useChildProfile } from "@/hooks/useChildProfile";
 import { useObservationNotes } from "@/hooks/useObservationNotes";
 import { useCurrentChildAccess } from "@/hooks/useCurrentChildAccess";
+import { getPhonicsUnits } from "@/data/kindergartenCurriculum";
 import { CATEGORY_META } from "@/types/observations";
 import {
   mockChildProfile,
@@ -119,6 +121,13 @@ export default function ReportPage() {
   const { profile } = useChildProfile();
   const { recentNotes } = useObservationNotes();
   const { canExportReport } = useCurrentChildAccess();
+  const {
+    summary: phonicsSummary,
+    completedLessonIds,
+    completedUnitIds,
+    progress: phonicsProgress,
+    isHydrated: phonicsHydrated,
+  } = usePhonicsProgress();
 
   const handlePrint = useCallback(() => {
     window.print();
@@ -152,6 +161,225 @@ export default function ReportPage() {
           >
             กลับไปหน้าความก้าวหน้า ←
           </Link>
+        </div>
+      </AppShell>
+    );
+  }
+
+  // ── Kindergarten phonics report ─────────────────────────────────────────────
+  if (phonicsHydrated && profile?.trainingMode === "kindergarten_phonics") {
+    const units = getPhonicsUnits();
+    const completedUnitsCount = phonicsSummary.completedUnitIds.length;
+    const completedLessonsCount = phonicsSummary.completedLessonIds.length;
+    const totalAttempts = phonicsSummary.totalAttempts;
+    const starsEarned = phonicsProgress?.attempts.reduce((s, a) => s + a.starsEarned, 0) ?? 0;
+    const avgScore = (() => {
+      const atts = phonicsProgress?.attempts ?? [];
+      if (!atts.length) return 0;
+      return Math.round(atts.reduce((s, a) => s + a.score, 0) / atts.length);
+    })();
+    const recentAttempts = phonicsProgress
+      ? [...phonicsProgress.attempts]
+          .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+          .slice(0, 8)
+      : [];
+    const latestAttempt = recentAttempts[0] ?? null;
+
+    const ACTIVITY_LABELS: Record<string, string> = {
+      listen_and_choose: "ฟังและเลือก",
+      say_after_me: "พูดตาม",
+      blend_sounds: "ผสมเสียง",
+      simple_word: "คำง่าย",
+      final_consonant: "ตัวสะกด",
+      short_sentence: "ประโยค",
+    };
+
+    const nextRec = (() => {
+      for (const u of units) {
+        for (const l of u.lessons) {
+          if (!completedLessonIds.has(l.id)) return { unit: u, lesson: l };
+        }
+      }
+      return null;
+    })();
+
+    return (
+      <AppShell>
+        <div className="max-w-3xl mx-auto px-4 sm:px-6 py-6 space-y-6 print:px-0">
+          {/* ── Header ── */}
+          <header className="flex items-start justify-between gap-4 print:hidden">
+            <div>
+              <nav className="text-xs text-text-muted mb-2" aria-label="Breadcrumb">
+                <Link href="/dashboard" className="hover:text-primary transition-colors">หน้าหลัก</Link>
+                <span className="mx-1.5 text-disabled">/</span>
+                <Link href="/progress" className="hover:text-primary transition-colors">ความก้าวหน้า</Link>
+                <span className="mx-1.5 text-disabled">/</span>
+                <span className="text-text font-medium">รายงาน</span>
+              </nav>
+              <h1 className="text-xl font-bold text-text">รายงานเรียนเสียงไทย</h1>
+              <p className="text-sm text-text-muted mt-0.5">
+                {profile?.name ?? "น้อง"} · สวนเสียง · ข้อมูล ณ{" "}
+                {new Date().toLocaleDateString("th-TH", { day: "numeric", month: "long", year: "numeric" })}
+              </p>
+            </div>
+          </header>
+
+          {/* ── Development notice ── */}
+          <div className="flex items-start gap-3 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700/40 rounded-xl px-4 py-3 print:hidden">
+            <span className="text-amber-500 flex-shrink-0 mt-0.5" aria-hidden="true">📋</span>
+            <p className="text-sm text-amber-700 dark:text-amber-300 leading-relaxed">
+              รายงานเรียนเสียงไทยกำลังอยู่ในช่วงพัฒนา — สรุปพื้นฐานพร้อมใช้งานแล้ว
+            </p>
+          </div>
+
+          {/* ── Summary stats ── */}
+          <section className="grid grid-cols-2 sm:grid-cols-4 gap-3" aria-label="สรุปภาพรวม">
+            {[
+              { label: "ครั้งที่ฝึก", value: totalAttempts, color: "text-amber-500" },
+              { label: "บทเรียนผ่าน", value: completedLessonsCount, color: "text-amber-500" },
+              { label: "ระดับผ่าน", value: `${completedUnitsCount}/${units.length}`, color: "text-amber-500" },
+              { label: "ดาวสะสม", value: starsEarned, color: "text-amber-500" },
+            ].map((s) => (
+              <div key={s.label} className="bg-surface border border-border rounded-xl p-4 text-center">
+                <p className={`text-2xl font-bold ${s.color} tabular-nums`}>{s.value}</p>
+                <p className="text-xs text-text-muted mt-1">{s.label}</p>
+              </div>
+            ))}
+          </section>
+
+          {/* ── Avg score + next recommendation ── */}
+          <div className="grid sm:grid-cols-2 gap-4">
+            <div className="bg-surface border border-border rounded-xl px-5 py-4">
+              <p className="text-xs font-semibold text-text-muted uppercase tracking-wider mb-1">คะแนนเฉลี่ย</p>
+              <p className="text-3xl font-bold text-amber-500 tabular-nums">{totalAttempts > 0 ? `${avgScore}%` : "—"}</p>
+              <p className="text-xs text-text-muted mt-1">จากทุกกิจกรรมที่ฝึก</p>
+            </div>
+            <div className="bg-amber-50 dark:bg-amber-900/15 border border-amber-200 dark:border-amber-800/40 rounded-xl px-5 py-4">
+              <p className="text-xs font-semibold text-amber-700 dark:text-amber-400 uppercase tracking-wider mb-1">แนะนำต่อไป</p>
+              {nextRec ? (
+                <>
+                  <p className="text-sm font-bold text-text leading-tight">{nextRec.lesson.title}</p>
+                  <p className="text-xs text-text-muted mt-0.5">{nextRec.unit.title}</p>
+                  <Link
+                    href={`/training/phonics/${nextRec.unit.id}/${nextRec.lesson.id}`}
+                    className="mt-2 inline-flex text-xs font-semibold text-amber-600 dark:text-amber-400 hover:underline"
+                  >
+                    เรียนต่อ →
+                  </Link>
+                </>
+              ) : (
+                <p className="text-sm text-text-muted">ผ่านครบทุกบทเรียนแล้ว 🌟</p>
+              )}
+            </div>
+          </div>
+
+          {/* ── Unit progress table ── */}
+          <section aria-label="ความคืบหน้าแต่ละระดับ">
+            <p className="text-xs font-semibold text-text-muted uppercase tracking-wider mb-3">ความคืบหน้าแต่ละระดับ</p>
+            <div className="bg-surface border border-border rounded-xl overflow-hidden">
+              {units.map((unit, i) => {
+                const doneLessons = unit.lessons.filter((l) => completedLessonIds.has(l.id)).length;
+                const total = unit.lessons.length;
+                const pct = total > 0 ? Math.round((doneLessons / total) * 100) : 0;
+                const isDone = completedUnitIds.has(unit.id);
+                return (
+                  <div
+                    key={unit.id}
+                    className={`flex items-center gap-4 px-4 py-3 ${i < units.length - 1 ? "border-b border-border/60" : ""}`}
+                  >
+                    <span className="w-8 h-8 rounded-lg bg-amber-100 dark:bg-amber-900/30 flex items-center justify-center text-sm font-bold text-amber-700 dark:text-amber-400 flex-shrink-0">
+                      {unit.id}
+                    </span>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium text-text truncate">{unit.title}</p>
+                      <div className="h-1 bg-border rounded-full mt-1.5 overflow-hidden">
+                        <div
+                          className="h-full bg-amber-400 rounded-full"
+                          style={{ width: `${pct}%` }}
+                        />
+                      </div>
+                    </div>
+                    <span className="text-xs text-text-muted flex-shrink-0 tabular-nums">{doneLessons}/{total}</span>
+                    {isDone && (
+                      <span className="text-xs font-semibold text-green-600 dark:text-green-400 flex-shrink-0">✓</span>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </section>
+
+          {/* ── Recent attempts ── */}
+          {recentAttempts.length > 0 && (
+            <section aria-label="กิจกรรมล่าสุด">
+              <p className="text-xs font-semibold text-text-muted uppercase tracking-wider mb-3">
+                กิจกรรมล่าสุด ({recentAttempts.length} รายการ)
+              </p>
+              <div className="bg-surface border border-border rounded-xl overflow-hidden">
+                {recentAttempts.map((attempt, i) => (
+                  <div
+                    key={attempt.id}
+                    className={`flex items-center gap-3 px-4 py-3 ${i < recentAttempts.length - 1 ? "border-b border-border/60" : ""}`}
+                  >
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="text-sm font-semibold text-text">{attempt.prompt}</span>
+                        <span className="text-xs text-text-muted px-1.5 py-0.5 bg-amber-50 dark:bg-amber-900/20 rounded">
+                          {ACTIVITY_LABELS[attempt.activityType] ?? attempt.activityType}
+                        </span>
+                      </div>
+                      <p className="text-xs text-text-muted mt-0.5">
+                        {attempt.unitId} ·{" "}
+                        {new Date(attempt.createdAt).toLocaleDateString("th-TH", {
+                          day: "numeric",
+                          month: "short",
+                        })}
+                      </p>
+                    </div>
+                    <div className="text-right flex-shrink-0">
+                      <p className="text-sm font-bold text-amber-600 dark:text-amber-400 tabular-nums">
+                        {attempt.score}%
+                      </p>
+                      <p className="text-xs text-amber-500">
+                        {"⭐".repeat(attempt.starsEarned) || "–"}
+                      </p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </section>
+          )}
+
+          {/* ── No data empty state ── */}
+          {totalAttempts === 0 && (
+            <div className="bg-surface border border-border rounded-xl p-8 text-center">
+              <div className="text-5xl mb-3" aria-hidden="true">🌱</div>
+              <h2 className="text-base font-bold text-text mb-1">ยังไม่มีข้อมูลการเรียน</h2>
+              <p className="text-sm text-text-muted mb-5">เริ่มเรียนบทเรียนแรกเพื่อสร้างรายงาน</p>
+              <Link
+                href="/training"
+                className="inline-flex items-center gap-2 bg-amber-500 text-white font-semibold px-6 py-2.5 rounded-xl text-sm hover:bg-amber-600 transition-all active:scale-[0.98]"
+              >
+                เริ่มเรียนเสียงไทย →
+              </Link>
+            </div>
+          )}
+
+          {/* ── Bottom CTAs ── */}
+          <div className="flex flex-col sm:flex-row gap-3 print:hidden pb-4">
+            <Link
+              href="/training"
+              className="flex-1 flex items-center justify-center gap-2 bg-amber-500 text-white font-semibold py-3 rounded-xl hover:bg-amber-600 transition-all active:scale-[0.98] text-sm"
+            >
+              เรียนต่อ
+            </Link>
+            <Link
+              href="/progress"
+              className="flex-1 flex items-center justify-center gap-2 border border-amber-400 text-amber-600 dark:text-amber-400 font-semibold py-3 rounded-xl hover:bg-amber-50 dark:hover:bg-amber-900/20 transition-all text-sm"
+            >
+              ดูความก้าวหน้า
+            </Link>
+          </div>
         </div>
       </AppShell>
     );

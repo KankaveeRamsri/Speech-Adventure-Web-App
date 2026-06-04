@@ -24,6 +24,8 @@ export type DbChildProfile = {
   training_goal: string;
   selected_sound_id: string;
   avatar_emoji: string;
+  /** Added in migration 20260604000100. Defaults to 'speech_clarity' for existing rows. */
+  training_mode: string;
   created_at: string;
   updated_at: string;
   // School import fields (nullable — only set for school-imported students)
