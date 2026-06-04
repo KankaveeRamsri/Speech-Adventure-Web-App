@@ -338,7 +338,7 @@ export default function PracticeCard({
             )}
             {evalResult.isMock && usesRecorder(item.type) && (
               <p className="text-xs text-text-muted pt-1 border-t border-border/50">
-                ผลประเมินนี้เป็นตัวอย่าง (Mock)
+                ระบบทดลอง · ผลนี้เป็นตัวอย่าง ยังไม่ใช่ AI จริง
               </p>
             )}
           </div>

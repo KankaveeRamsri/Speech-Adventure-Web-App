@@ -345,6 +345,47 @@ Build: ✅ | tsc: ✅ | lint: 11 errors (school/teacher React compiler — uncha
 
 ---
 
+## Phase P8 — Parent Final UX Polish (Done 2026-06-04)
+
+### Changes Made
+
+1. ✅ **`src/components/phonics/PhonicsRecordPanel.tsx`** (new) — Shared recording/eval/next UI
+   - Extracted from identical code in SayAfterMeActivity, BlendSoundsActivity, WordPracticeActivity
+   - Removes ~80 lines of duplication per activity component
+   - Added "อัดเสียงใหม่อีกครั้ง" re-record button when eval status is "retry" (new feature)
+   - Added microphone permission error message for permission_denied/unsupported/error states
+
+2. ✅ **SayAfterMeActivity, BlendSoundsActivity, WordPracticeActivity** — Refactored to use PhonicsRecordPanel
+   - All 3 now share consistent recording/eval/next UI
+   - Each parent component provides `onRetryRecording` callback (clears evalResult + recorder)
+
+3. ✅ **BlendSoundsActivity** — Mobile responsive blend equation
+   - `text-4xl sm:text-5xl` / `text-5xl sm:text-6xl` instead of fixed large sizes
+   - `overflow-x-auto px-2` on equation row for very small screens (320px)
+   - `gap-2 sm:gap-3` for tighter fit
+
+4. ✅ **PhonicsProgressDashboard** — Fixed status labels
+   - `"เกือบผ่าน"` → `"เสียงใกล้แล้ว"` (consistent with AttemptDetailDrawer)
+   - `"ลองใหม่"` → `"ลองอีกครั้ง"` (consistent across the app)
+
+5. ✅ **PracticeCard** — Mock indicator text improved
+   - `"ผลประเมินนี้เป็นตัวอย่าง (Mock)"` → `"ระบบทดลอง · ผลนี้เป็นตัวอย่าง ยังไม่ใช่ AI จริง"` (friendlier, more informative)
+
+6. ✅ **Dashboard page** — Improved child card + greeting
+   - Avatar: replaced hardcoded "👦" with initial letter of child's name, mode-colored
+   - Heading: `"สวัสดี, คุณพ่อคุณแม่ 👋"` → `"วันนี้จะฝึกอะไรกับ{name}? 👋"` (personalized)
+   - Subtitle: mode-aware (`"สวนเสียง · เรียนเสียงไทยทีละขั้น"` or `"ฝึกเสียงให้ชัด · เลือกระดับที่เหมาะสม"`)
+   - Practice plan section header: `"แผนการฝึกวันนี้"` → `"วันนี้ควรฝึกอะไรต่อดี"` (matches spec)
+
+### QA: No harsh/clinical wording found
+- OpenAI provider prompt already blocks "ผิด", diagnostic language ✅
+- All status labels use child-safe Thai ✅
+- Progress page uses encouraging language ✅
+
+Build: ✅ | tsc: ✅ | lint: 11 errors (school/teacher React compiler — unchanged)
+
+---
+
 ## Next Phase: K9 — (TBD)
 
 ---

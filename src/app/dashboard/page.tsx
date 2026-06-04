@@ -250,9 +250,13 @@ export default function ParentDashboardPage() {
             <span className="text-text font-medium">หน้าหลัก</span>
           </nav>
           <h1 className="text-xl font-bold text-text">
-            สวัสดี, คุณพ่อคุณแม่ 👋
+            วันนี้จะฝึกอะไรกับ{childFirstName}? 👋
           </h1>
-          <p className="text-sm text-text-muted mt-0.5">วันนี้จะฝึกอะไรกับ{childFirstName}?</p>
+          <p className="text-sm text-text-muted mt-0.5">
+            {trainingMode === "kindergarten_phonics"
+              ? "สวนเสียง · เรียนเสียงไทยทีละขั้น"
+              : "ฝึกเสียงให้ชัด · เลือกระดับที่เหมาะสม"}
+          </p>
         </header>
 
         {/* ── Child card ── */}
@@ -260,9 +264,16 @@ export default function ParentDashboardPage() {
           className="bg-surface border border-border rounded-2xl px-5 py-4 flex items-center gap-4"
           aria-label="ข้อมูลเด็ก"
         >
-          {/* Avatar placeholder */}
-          <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center flex-shrink-0 text-2xl" aria-hidden="true">
-            👦
+          {/* Child avatar — first letter of name */}
+          <div
+            className={`w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0 text-xl font-bold select-none ${
+              trainingMode === "kindergarten_phonics"
+                ? "bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400"
+                : "bg-primary/10 text-primary"
+            }`}
+            aria-hidden="true"
+          >
+            {profile.name.charAt(0).toUpperCase()}
           </div>
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2 flex-wrap">
@@ -318,7 +329,7 @@ export default function ParentDashboardPage() {
         {/* ── Today's practice plan ── */}
         <section aria-labelledby="plan-heading">
           <h2 id="plan-heading" className="text-sm font-semibold text-text-muted uppercase tracking-wider mb-3 px-0.5">
-            แผนการฝึกวันนี้
+            วันนี้ควรฝึกอะไรต่อดี
           </h2>
 
           {/* Speech Clarity recommendation */}

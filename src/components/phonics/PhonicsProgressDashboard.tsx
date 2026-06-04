@@ -36,8 +36,8 @@ const ACTIVITY_LABELS: Record<string, string> = {
 
 const STATUS_LABELS = {
   passed: { label: "ผ่าน", color: "text-green-600 dark:text-green-400 bg-green-50 dark:bg-green-950/30" },
-  almost: { label: "เกือบผ่าน", color: "text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/20" },
-  retry: { label: "ลองใหม่", color: "text-text-muted bg-border/30" },
+  almost: { label: "เสียงใกล้แล้ว", color: "text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/20" },
+  retry: { label: "ลองอีกครั้ง", color: "text-text-muted bg-border/30" },
 };
 
 // ── Next recommendation ───────────────────────────────────────────────────────
