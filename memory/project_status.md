@@ -248,7 +248,26 @@ Features:
 
 ---
 
-## Next Phase: K7 — (TBD)
+## Phase K7 — Kindergarten Phonics Polish and Stability Pass (Done 2026-06-04)
+
+1. ✅ **PhonicsJourneyMap — status badges** — unit cards now show "ยังไม่เริ่ม" / "กำลังเรียน" / "ล็อก" sub-badges; "✓ ผ่านแล้ว" retained for completed
+2. ✅ **PhonicsJourneyMap — CTA labels** — LessonPanel now shows "เริ่มเรียน →" / "เรียนต่อ →" / "ดูบทเรียน →" per-lesson based on `completedLessonIds`; CTA hidden when `canStart=false`
+3. ✅ **PhonicsJourneyMap — recommended highlight** — first available non-completed unit gets amber ring highlight and auto-expands on mount
+4. ✅ **Lesson page — session retry bug** — `resetLesson` now increments `sessionKey` state which triggers the session-start `useEffect` to re-run; stale sessions on retry are properly started
+5. ✅ **Lesson page — no-profile guard** — if `isHydrated && !hasProfile`, shows friendly "กรุณาตั้งค่าโปรไฟล์เด็ก" screen with onboarding CTA before lesson UI renders
+6. ✅ **Training page — mode-aware header** — h1 shows "เรียนเสียงไทย" and subtitle shows "สวนเสียง · ฟังก่อน แล้วลองพูดตามนะ" when `trainingMode === "kindergarten_phonics"`
+
+Build: ✅ | tsc: ✅ | lint: 11 errors (React compiler, school/teacher only — unchanged)
+
+### K7 Remaining TODOs (for K8+)
+- Per-lesson detail drawer (attempt history per lesson)
+- Supabase `IPhonicsProgressRepository` implementation
+- K3–K7 cascading unlock based on progress
+- Phonics rewards/badge system
+
+---
+
+## Next Phase: K8 — (TBD)
 
 ---
 

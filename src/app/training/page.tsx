@@ -117,9 +117,13 @@ export default function TrainingMapPage() {
           </nav>
           <div className="flex items-end justify-between gap-4">
             <div>
-              <h1 className="text-xl font-bold text-text">ฝึกออกเสียง</h1>
+              <h1 className="text-xl font-bold text-text">
+                {activeMode === "kindergarten_phonics" ? "เรียนเสียงไทย" : "ฝึกออกเสียง"}
+              </h1>
               <p className="text-sm text-text-muted mt-0.5">
-                เลือกเสียงเป้าหมายและระดับที่ต้องการฝึก
+                {activeMode === "kindergarten_phonics"
+                  ? "สวนเสียง · ฟังก่อน แล้วลองพูดตามนะ"
+                  : "เลือกเสียงเป้าหมายและระดับที่ต้องการฝึก"}
               </p>
             </div>
             {isHydrated && activeMode === "speech_clarity" && (

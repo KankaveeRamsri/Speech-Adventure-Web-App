@@ -129,22 +129,25 @@ export default function PhonicsLessonPage() {
   const unit = getPhonicsUnit(unitId);
   const lesson = unit ? getPhonicsLesson(unitId, lessonId) : undefined;
 
-  const { profile } = useChildProfile();
-  const { startSession, addAttempt, completeSession } = usePhonicsProgress();
+  const { profile, hasProfile } = useChildProfile();
+  const { startSession, addAttempt, completeSession, isHydrated } = usePhonicsProgress();
 
   const [phase, setPhase] = useState<Phase>("activity");
   const [currentIndex, setCurrentIndex] = useState(0);
   const [results, setResults] = useState<StoredResult[]>([]);
   const [activeSession, setActiveSession] = useState<PhonicsSession | null>(null);
   const sessionStarted = useRef(false);
+  // sessionKey increments on retry to force the session-start effect to re-run
+  const [sessionKey, setSessionKey] = useState(0);
 
   // Start session when lesson + profile are ready
   useEffect(() => {
     if (!lesson || !profile?.id || sessionStarted.current) return;
     sessionStarted.current = true;
     const s = startSession(unitId, lessonId, lesson.items.length);
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     if (s) setActiveSession(s);
-  }, [lesson, profile?.id, unitId, lessonId, startSession]);
+  }, [lesson, profile?.id, unitId, lessonId, startSession, sessionKey]);
 
   const resetLesson = () => {
     setPhase("activity");
@@ -152,7 +155,25 @@ export default function PhonicsLessonPage() {
     setResults([]);
     setActiveSession(null);
     sessionStarted.current = false;
+    setSessionKey((k) => k + 1);
   };
+
+  // ── No profile guard (wait for hydration before showing) ──
+  if (isHydrated && !hasProfile) {
+    return (
+      <main className="min-h-screen bg-bg flex flex-col items-center justify-center px-6 py-10 gap-4 text-center">
+        <div className="text-5xl" aria-hidden="true">🌱</div>
+        <p className="text-text font-semibold">กรุณาตั้งค่าโปรไฟล์เด็กก่อนนะคะ</p>
+        <p className="text-sm text-text-muted">เพื่อบันทึกความก้าวหน้าในการเรียน</p>
+        <Link href="/onboarding" className="px-6 py-3 rounded-xl bg-amber-500 text-white font-semibold text-sm hover:bg-amber-600 transition-all shadow-sm shadow-amber-300/30">
+          ตั้งค่าโปรไฟล์ →
+        </Link>
+        <Link href="/training" className="text-sm text-amber-600 dark:text-amber-400 hover:underline">
+          กลับไปสวนเสียง
+        </Link>
+      </main>
+    );
+  }
 
   // ── Not found ──
   if (!unit || !lesson) {

@@ -96,7 +96,17 @@ interface Props {
 
 // ── Lesson panel (shown when an available unit is expanded) ───────────────────
 
-function LessonPanel({ unit }: { unit: PhonicsUnit }) {
+function LessonPanel({
+  unit,
+  completedLessonIds,
+  canStart,
+}: {
+  unit: PhonicsUnit;
+  completedLessonIds: Set<string>;
+  canStart: boolean;
+}) {
+  const hasAnyCompleted = unit.lessons.some((l) => completedLessonIds.has(l.id));
+
   return (
     <div className="mt-3 rounded-xl border border-amber-200 dark:border-amber-700/50 bg-amber-50/60 dark:bg-amber-950/20 overflow-hidden">
       <div className="px-4 py-2.5 border-b border-amber-200 dark:border-amber-700/40">
@@ -106,40 +116,53 @@ function LessonPanel({ unit }: { unit: PhonicsUnit }) {
       </div>
 
       <div className="divide-y divide-amber-100 dark:divide-amber-800/30">
-        {unit.lessons.map((lesson) => (
-          <div key={lesson.id} className="px-4 py-3 flex items-start gap-3">
-            <div className="w-7 h-7 rounded-lg bg-amber-100 dark:bg-amber-900/40 flex items-center justify-center flex-shrink-0 mt-0.5">
-              <span className="text-xs font-bold text-amber-700 dark:text-amber-400">
-                {lesson.order}
-              </span>
-            </div>
-            <div className="flex-1 min-w-0">
-              <p className="text-sm font-semibold text-text leading-snug">{lesson.title}</p>
-              {lesson.subtitle && (
-                <p className="text-xs text-text-muted mt-0.5">{lesson.subtitle}</p>
+        {unit.lessons.map((lesson) => {
+          const isDone = completedLessonIds.has(lesson.id);
+          const ctaLabel = isDone
+            ? "ดูบทเรียน →"
+            : hasAnyCompleted
+            ? "เรียนต่อ →"
+            : "เริ่มเรียน →";
+          const ctaClass = isDone
+            ? "bg-green-50 dark:bg-green-950/20 text-green-700 dark:text-green-400 border border-green-200 dark:border-green-800/50 hover:bg-green-100 dark:hover:bg-green-900/30"
+            : "bg-amber-500 text-white hover:bg-amber-600 shadow-sm shadow-amber-300/30";
+
+          return (
+            <div key={lesson.id} className="px-4 py-3 flex items-start gap-3">
+              <div className="w-7 h-7 rounded-lg bg-amber-100 dark:bg-amber-900/40 flex items-center justify-center flex-shrink-0 mt-0.5">
+                <span className="text-xs font-bold text-amber-700 dark:text-amber-400">
+                  {lesson.order}
+                </span>
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-semibold text-text leading-snug">{lesson.title}</p>
+                {lesson.subtitle && (
+                  <p className="text-xs text-text-muted mt-0.5">{lesson.subtitle}</p>
+                )}
+                <p className="text-xs text-text-muted/70 mt-1">
+                  {lessonActivitySummary(lesson)}
+                  <span className="mx-1.5 text-border">·</span>
+                  {lesson.items.length} กิจกรรม
+                </p>
+              </div>
+              {canStart && (
+                <div className="flex-shrink-0 self-center">
+                  <Link
+                    href={`/training/phonics/${unit.id}/${lesson.id}`}
+                    className={`inline-flex items-center px-3 py-1.5 rounded-lg text-xs font-semibold transition-all active:scale-[0.97] ${ctaClass}`}
+                  >
+                    {ctaLabel}
+                  </Link>
+                </div>
               )}
-              <p className="text-xs text-text-muted/70 mt-1">
-                {lessonActivitySummary(lesson)}
-                <span className="mx-1.5 text-border">·</span>
-                {lesson.items.length} กิจกรรม
-              </p>
             </div>
-            {/* CTA — routes to phonics lesson page */}
-            <div className="flex-shrink-0 self-center">
-              <Link
-                href={`/training/phonics/${unit.id}/${lesson.id}`}
-                className="inline-flex items-center px-3 py-1.5 rounded-lg text-xs font-semibold bg-amber-500 text-white hover:bg-amber-600 transition-all active:scale-[0.97] shadow-sm shadow-amber-300/30"
-              >
-                เริ่ม →
-              </Link>
-            </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
 
       <div className="px-4 py-2.5 border-t border-amber-200 dark:border-amber-700/40 bg-amber-50/80 dark:bg-amber-950/30">
         <p className="text-xs text-amber-600/70 dark:text-amber-500/70 text-center">
-          กดปุ่ม เริ่ม → เพื่อเข้าสู่กิจกรรม
+          {hasAnyCompleted ? "ฟังก่อน แล้วลองพูดตามนะ 🎧" : "กดปุ่มเพื่อเข้าสู่กิจกรรม"}
         </p>
       </div>
     </div>
@@ -154,15 +177,21 @@ function UnitCard({
   onToggle,
   canStart,
   status,
+  completedLessonIds,
+  isRecommended,
 }: {
   unit: PhonicsUnit;
   expanded: boolean;
   onToggle: () => void;
   canStart: boolean;
   status: "available" | "completed" | "locked";
+  completedLessonIds: Set<string>;
+  isRecommended: boolean;
 }) {
   const isAvailable = status === "available" || status === "completed";
   const items = totalItems(unit);
+  const completedCount = unit.lessons.filter((l) => completedLessonIds.has(l.id)).length;
+  const isInProgress = status === "available" && completedCount > 0;
 
   return (
     <div
@@ -170,6 +199,8 @@ function UnitCard({
         isAvailable
           ? expanded
             ? "border-amber-400 dark:border-amber-500 bg-surface shadow-sm shadow-amber-200/40 dark:shadow-amber-900/20"
+            : isRecommended && status !== "completed"
+            ? "border-amber-400 dark:border-amber-500 bg-surface ring-1 ring-amber-300/50 dark:ring-amber-600/30 shadow-sm shadow-amber-100/50"
             : "border-amber-200 dark:border-amber-700/60 bg-surface hover:border-amber-400 dark:hover:border-amber-500 hover:shadow-sm"
           : "border-border bg-surface opacity-55"
       }`}
@@ -217,9 +248,25 @@ function UnitCard({
           <p className="text-xs text-text-muted leading-snug line-clamp-1">
             {unit.description}
           </p>
-          <p className="text-xs text-text-muted/60 mt-0.5">
-            {unit.lessons.length} บทเรียน · {items} กิจกรรม
-          </p>
+          <div className="flex items-center gap-2 mt-1 flex-wrap">
+            <span className="text-xs text-text-muted/60">
+              {unit.lessons.length} บทเรียน · {items} กิจกรรม
+            </span>
+            {status === "available" && (
+              <span className={`text-xs font-medium px-1.5 py-0.5 rounded-full ${
+                isInProgress
+                  ? "bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-400"
+                  : "bg-border/40 text-text-muted/60"
+              }`}>
+                {isInProgress ? "กำลังเรียน" : "ยังไม่เริ่ม"}
+              </span>
+            )}
+            {status === "locked" && (
+              <span className="text-xs font-medium px-1.5 py-0.5 rounded-full bg-border/40 text-text-muted/60">
+                ล็อก
+              </span>
+            )}
+          </div>
         </div>
 
         {/* Right side: CTA or lock */}
@@ -262,7 +309,7 @@ function UnitCard({
       {/* Expandable lesson panel */}
       {isAvailable && expanded && (
         <div className="px-4 pb-4">
-          <LessonPanel unit={unit} />
+          <LessonPanel unit={unit} completedLessonIds={completedLessonIds} canStart={canStart} />
         </div>
       )}
     </div>
@@ -273,7 +320,18 @@ function UnitCard({
 
 export default function PhonicsJourneyMap({ canStart, completedLessonIds = new Set() }: Props) {
   const units = getPhonicsUnits();
-  const [expandedUnitId, setExpandedUnitId] = useState<string | null>(null);
+
+  // First available non-completed unit — used for highlight and auto-expand on first mount
+  const recommendedUnitId: string | null = (() => {
+    for (let i = 0; i < units.length; i++) {
+      const u = units[i]!;
+      const prev = i > 0 ? units[i - 1] : undefined;
+      if (getUnitStatus(u, completedLessonIds, prev) === "available") return u.id;
+    }
+    return null;
+  })();
+
+  const [expandedUnitId, setExpandedUnitId] = useState<string | null>(recommendedUnitId);
 
   if (units.length === 0) {
     return (
@@ -326,6 +384,8 @@ export default function PhonicsJourneyMap({ canStart, completedLessonIds = new S
               onToggle={() => toggleUnit(unit.id)}
               canStart={canStart}
               status={status}
+              completedLessonIds={completedLessonIds}
+              isRecommended={unit.id === recommendedUnitId}
             />
           );
         })}
