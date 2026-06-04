@@ -267,7 +267,21 @@ Build: ✅ | tsc: ✅ | lint: 11 errors (React compiler, school/teacher only —
 
 ---
 
-## Next Phase: K8 — (TBD)
+## Phase K8 — Mode-aware Content Page (Done 2026-06-04)
+
+1. ✅ **`/library` mode tabs** — segmented control "🎯 ฝึกเสียงให้ชัด" / "🌟 เรียนเสียงไทย"; local `ContentMode` state; speech_clarity default
+2. ✅ **Speech Clarity tab** — all existing content preserved exactly (sound filter, stats, SoundSection, stage legend, activity type legend)
+3. ✅ **`PhonicsUnitCard`** — shows unit icon, K label, title, description, lesson count, item count, activity type chips (amber), sample prompts, CTA "เริ่มเรียน →" → `/training/phonics/${unitId}/${lessonId}`
+4. ✅ **`PhonicsContent`** — summary stats (7 ระดับ, total lessons, total items, activity types), K1–K7 unit cards grid, unit sequence legend, activity type legend
+5. ✅ **Data source** — `getPhonicsUnits()` from `kindergartenCurriculum.ts`; no hardcoded duplicate data
+6. ✅ **Header subtitle** — mode-aware: "เรียนเสียงไทย · 7 ระดับ · เรียงจากง่ายไปยาก" in phonics mode
+7. ✅ **`soundId` warning** — fixed pre-existing unused prop in StageContentCard
+
+Build: ✅ | tsc: ✅ | lint: 11 errors (school/teacher React compiler — unchanged)
+
+---
+
+## Next Phase: K9 — (TBD)
 
 ---
 
