@@ -448,6 +448,33 @@ Build: ✅ | tsc: ✅ | lint: 11 errors (school/teacher React compiler — uncha
 
 ---
 
+## Phase P9-A Add-on — Mode-aware Showcase Page (Done 2026-06-04)
+
+1. ✅ **`src/app/demo/page.tsx`** — Fully rewritten as mode-aware showcase
+   - Added `useChildProfile` + `usePhonicsProgress` hooks
+   - `isPhonicsMode = isHydrated && profile?.trainingMode === "kindergarten_phonics"`
+   - **Speech clarity mode**: existing showcase behavior preserved; wording fixed:
+     - "ออกแบบโดยทีมนักบำบัดการพูด" → "ออกแบบสำหรับเด็กและผู้ปกครองไทย"
+     - "นักบำบัดการพูด" → "ครูและผู้เชี่ยวชาญด้านการพูด"
+   - **Kindergarten phonics mode**: full `PhonicsShowcase` component:
+     - Hero: "สวนเสียง — เรียนเสียงไทย" amber-themed
+     - Live stats (if progress exists): attempts/lessons/units from `usePhonicsProgress`
+     - K1–K7 curriculum units with live ✓ completion badges
+     - Activity types (4 types with descriptions)
+     - Phonics milestones (6 achievements, live earned/locked state)
+     - AI-ready section (shared)
+     - CTAs: "เรียนต่อ" → `/training`, "ดูความก้าวหน้า" → `/progress`
+   - Shared components: `PracticeFlowSection`, `AISection`, `Btn`, `Card`, `Section`
+   - No demo data loader shown for phonics (phonics has no demo data)
+
+Build: ✅ | tsc: ✅
+
+### Remaining TODOs for Showcase
+- Phonics demo data loader (if demo phonics data is ever created)
+- Remove "Showcase" from sidebar nav or rename if devs want to hide it from production parents
+
+---
+
 ## Next Phase: P9 — Production Readiness
 
 ---
