@@ -111,7 +111,7 @@ export default function TrainingMapPage() {
         {/* ── Page Header ── */}
         <header>
           <nav className="text-xs text-text-muted mb-2" aria-label="Breadcrumb">
-            <Link href="/" className="hover:text-primary transition-colors">หน้าหลัก</Link>
+            <Link href={isAuthenticated ? "/dashboard" : "/"} className="hover:text-primary transition-colors">หน้าหลัก</Link>
             <span className="mx-1.5 text-disabled">/</span>
             <span className="text-text font-medium">ฝึกออกเสียง</span>
           </nav>

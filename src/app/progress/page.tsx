@@ -268,8 +268,26 @@ export default function ProgressDashboardPage() {
     setFilterStageId(null);
   };
 
+  // ── Pre-hydration: show skeleton to prevent flash for phonics users ────────────
+  if (!isHydrated) {
+    return (
+      <AppShell>
+        <div className="max-w-4xl mx-auto px-4 sm:px-6 py-6 space-y-4" aria-busy="true" aria-label="กำลังโหลด">
+          <div className="animate-pulse rounded-2xl bg-border/40 h-10 w-48" />
+          <div className="animate-pulse rounded-2xl bg-border/40 h-32 w-full" />
+          <div className="grid grid-cols-3 gap-4">
+            {[0, 1, 2].map((i) => (
+              <div key={i} className="animate-pulse rounded-2xl bg-border/40 h-20" />
+            ))}
+          </div>
+          <div className="animate-pulse rounded-2xl bg-border/40 h-48 w-full" />
+        </div>
+      </AppShell>
+    );
+  }
+
   // ── Mode switch: kindergarten phonics dashboard ───────────────────────────────
-  if (isHydrated && profile?.trainingMode === "kindergarten_phonics") {
+  if (profile?.trainingMode === "kindergarten_phonics") {
     return (
       <AppShell>
         <PhonicsProgressDashboard />

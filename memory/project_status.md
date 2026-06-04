@@ -307,6 +307,44 @@ Build: ✅ | tsc: ✅ | lint: 11 errors (school/teacher React compiler — uncha
 
 ---
 
+## Phase P7 — Parent System QA and Performance Pass (Done 2026-06-04)
+
+### Issues Found and Fixed
+
+1. ✅ **AppSidebar context section not mode-aware** — phonics users saw speech-clarity "เสียง X" badge and "ฝึกต่อ →" button linking to a speech stage
+   - Added `useChildProfile` to sidebar
+   - Added `isSpeechMode` flag (`!isHydrated || profile?.trainingMode !== "kindergarten_phonics"`)
+   - Sound badge and stars link now only show when `isSpeechMode`
+   - Speech "ฝึกต่อ" CTA gated by `isSpeechMode`
+   - Phonics "เรียนต่อ" amber CTA links to `/training` when `!isSpeechMode`
+   - Fix applied to both desktop sidebar and mobile drawer
+
+2. ✅ **Progress page flash for phonics users** — before hydration, page rendered speech clarity skeleton before switching to PhonicsProgressDashboard
+   - Added `!isHydrated` early return with a generic loading skeleton (4 skeleton blocks)
+   - After hydration: `profile?.trainingMode === "kindergarten_phonics"` early return fires immediately (no flash)
+
+3. ✅ **Breadcrumb "หน้าหลัก" consistency** — training, library pages pointed to `/` instead of `/dashboard`
+   - `training/page.tsx`: `href={isAuthenticated ? "/dashboard" : "/"}` (uses existing `isAuthenticated` from useAuth)
+   - `library/page.tsx`: changed to `href="/dashboard"` (authenticated-only route)
+
+### Performance Audit Results (92s cold start)
+- **OpenAI isolation confirmed** — openai imports only in `src/lib/speech-evaluation/service.ts` + `src/lib/sample-audio/service.ts`; both only imported by `src/app/api/` routes; NOT in any client component
+- **Home page import graph clean** — `src/components/home/` components only import `useChildProfile` (lightweight); no phonics, training, or progress modules pulled into landing page
+- **RepositoryProvider confirmed** — creates local singletons at module load; imports Supabase client (by design for provider switching); no expensive work at load time
+- **Conclusion**: 92s is Turbopack cold compilation cost of npm deps (`@supabase/supabase-js`, React, etc.); not a code structure issue; no changes needed
+
+### QA Checks Passed
+- No child → `/onboarding` redirect guard in training, dashboard
+- speech_clarity → speech stages correctly gated by `canStartPractice` 
+- kindergarten_phonics → phonics journey/lesson routes
+- Mode labels: "ฝึกเสียงให้ชัด" / "เรียนเสียงไทย" consistent across all routes
+- No raw UUIDs in display code
+- No child-001 in runtime paths
+- OpenAI not imported by any client component
+- tsc: ✅ no errors
+
+---
+
 ## Next Phase: K9 — (TBD)
 
 ---

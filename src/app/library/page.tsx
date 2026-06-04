@@ -424,7 +424,7 @@ export default function LibraryPage() {
         {/* Page header */}
         <header>
           <nav className="text-xs text-text-muted mb-2" aria-label="Breadcrumb">
-            <Link href="/" className="hover:text-primary transition-colors">
+            <Link href="/dashboard" className="hover:text-primary transition-colors">
               หน้าหลัก
             </Link>
             <span className="mx-1.5 text-disabled">/</span>

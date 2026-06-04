@@ -8,6 +8,7 @@ import { useSidebar } from "./SidebarContext";
 import ChildSelector from "./ChildSelector";
 import ThemeToggle from "@/components/ui/ThemeToggle";
 import { useSpeechProgress } from "@/hooks/useSpeechProgress";
+import { useChildProfile } from "@/hooks/useChildProfile";
 import { useAuth, isTeacher, isSchoolAdmin } from "@/hooks/useAuth";
 import { mockTrainingStages } from "@/data/speechAdventureMockData";
 
@@ -76,7 +77,10 @@ export default function AppSidebar() {
   const pathname = usePathname();
   const { collapsed, toggle, mounted, mobileOpen, setMobileOpen } = useSidebar();
   const { summary, isHydrated, selectedSoundId } = useSpeechProgress();
+  const { profile } = useChildProfile();
   const { user } = useAuth();
+
+  const isSpeechMode = !isHydrated || profile?.trainingMode !== "kindergarten_phonics";
 
   const NAV_ITEMS: NavItem[] = isSchoolAdmin(user)
     ? SCHOOL_ADMIN_NAV_ITEMS
@@ -134,14 +138,14 @@ export default function AppSidebar() {
         <>
           <ChildSelector />
 
-          {/* Target sound + Stars row */}
+          {/* Target sound + Stars row — speech_clarity only */}
           <div className="flex items-center gap-2 flex-wrap">
-            {isHydrated && selectedSoundId && (
+            {isHydrated && isSpeechMode && selectedSoundId && (
               <span className="inline-flex items-center px-2 py-0.5 rounded-full bg-primary/10 text-primary text-xs font-bold">
                 เสียง {selectedSoundId}
               </span>
             )}
-            {isHydrated && stars > 0 && (
+            {isHydrated && isSpeechMode && stars > 0 && (
               <Link href="/rewards" className="flex items-center gap-1 text-xs font-bold text-secondary hover:text-secondary/80 transition-colors" aria-label={`ดาวสะสม ${stars} ดาว`}>
                 <StarFilledIcon size={12} />
                 <span>{stars}</span>
@@ -149,8 +153,8 @@ export default function AppSidebar() {
             )}
           </div>
 
-          {/* Continue Training CTA */}
-          {isHydrated && currentStage && (
+          {/* Continue Training CTA — mode-aware */}
+          {isHydrated && isSpeechMode && currentStage && (
             <Link
               href={`/training/${currentStage.slug}`}
               className="flex items-center justify-center gap-1.5 w-full px-3 py-2 rounded-xl bg-primary text-white text-xs font-semibold hover:bg-primary/90 transition-all active:scale-[0.97]"
@@ -159,6 +163,17 @@ export default function AppSidebar() {
                 <path d="M5 3l14 9-14 9V3z" />
               </svg>
               ฝึกต่อ
+            </Link>
+          )}
+          {isHydrated && !isSpeechMode && (
+            <Link
+              href="/training"
+              className="flex items-center justify-center gap-1.5 w-full px-3 py-2 rounded-xl bg-amber-500 text-white text-xs font-semibold hover:bg-amber-600 transition-all active:scale-[0.97]"
+            >
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <path d="M5 3l14 9-14 9V3z" />
+              </svg>
+              เรียนต่อ
             </Link>
           )}
 
@@ -307,25 +322,34 @@ export default function AppSidebar() {
             <>
               <ChildSelector />
               <div className="flex items-center gap-2 flex-wrap">
-                {isHydrated && selectedSoundId && (
+                {isHydrated && isSpeechMode && selectedSoundId && (
                   <span className="inline-flex items-center px-2 py-0.5 rounded-full bg-primary/10 text-primary text-xs font-bold">
                     เสียง {selectedSoundId}
                   </span>
                 )}
-                {isHydrated && stars > 0 && (
+                {isHydrated && isSpeechMode && stars > 0 && (
                   <Link href="/rewards" className="flex items-center gap-1 text-xs font-bold text-secondary hover:text-secondary/80 transition-colors" aria-label={`ดาวสะสม ${stars} ดาว`}>
                     <StarFilledIcon size={12} />
                     <span>{stars}</span>
                   </Link>
                 )}
               </div>
-              {isHydrated && currentStage && (
+              {isHydrated && isSpeechMode && currentStage && (
                 <Link
                   href={`/training/${currentStage.slug}`}
                   onClick={() => setMobileOpen(false)}
                   className="flex items-center justify-center gap-1.5 w-full px-3 py-2 rounded-xl bg-primary text-white text-xs font-semibold hover:bg-primary/90 transition-all active:scale-[0.97]"
                 >
                   ฝึกต่อ
+                </Link>
+              )}
+              {isHydrated && !isSpeechMode && (
+                <Link
+                  href="/training"
+                  onClick={() => setMobileOpen(false)}
+                  className="flex items-center justify-center gap-1.5 w-full px-3 py-2 rounded-xl bg-amber-500 text-white text-xs font-semibold hover:bg-amber-600 transition-all active:scale-[0.97]"
+                >
+                  เรียนต่อ
                 </Link>
               )}
             </>
