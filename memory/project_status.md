@@ -475,7 +475,105 @@ Build: ✅ | tsc: ✅
 
 ---
 
-## Next Phase: P9 — Production Readiness
+## Phase P9 — Parent System Production Readiness (Done 2026-06-04)
+
+### Issues Found and Fixed
+
+1. ✅ **`src/lib/storage/childAccessStorage.ts`** — `ChildSnapshotSchema` now includes `trainingMode`
+   - Old snapshots default to `"speech_clarity"` (migration-safe via `.default()`)
+   - Previously: shared/invited children always appeared as speech_clarity mode regardless of real mode
+   - Fix: `trainingMode: z.enum(["speech_clarity","kindergarten_phonics"]).default("speech_clarity")`
+
+2. ✅ **`src/lib/storage/invitationStorage.ts`** — `childSnapshot.trainingMode` added same way
+   - Invitation-accepted shared children will now carry the correct mode
+
+3. ✅ **`.env.example`** — Added all missing AI/eval env vars:
+   - `SPEECH_EVALUATION_PROVIDER` (mock | openai, default mock)
+   - `SAMPLE_AUDIO_PROVIDER` (mock | openai, default mock)
+   - `OPENAI_API_KEY` (server-side only — comment warns against NEXT_PUBLIC_)
+   - `OPENAI_TTS_MODEL` / `OPENAI_TTS_VOICE` (optional overrides, commented out)
+   - All AI vars correctly documented as server-side only
+
+4. ✅ **`src/lib/storage/supabase/createSupabaseRepositories.ts`** — Fixed legacy comment
+   - "NEXT_PUBLIC_STORAGE_BACKEND" → "NEXT_PUBLIC_STORAGE_PROVIDER" in activation guide
+
+### Production Safety Audit Results (No Code Changes Needed)
+
+| Area | Status | Notes |
+|---|---|---|
+| NEXT_PUBLIC_OPENAI_API_KEY | ✅ Safe | No such var; OpenAI uses server-side `OPENAI_API_KEY` only |
+| OpenAI in client | ✅ Safe | Only in `src/lib/speech-evaluation/service.ts` + `sample-audio/service.ts`; both API-route only |
+| localStorage in server | ✅ Safe | Only in `dangerouslySetInnerHTML` script tag in layout (correct pattern) |
+| window.location / window.print | ✅ Safe | Only in "use client" onClick handlers |
+| API route error handling | ✅ Safe | All errors return Thai-friendly messages; no raw stack traces |
+| Audio quality guard | ✅ Safe | `validateRecordedAudio()` in PracticeCard before API call |
+| Mock fallback | ✅ Safe | Both eval + audio providers fall back to mock when unconfigured |
+| Auth redirect chain | ✅ Correct | signin → `/training`; training → `/onboarding` if no profile |
+| Onboarding targetSound | ✅ Correct | Skipped for kindergarten_phonics; required for speech_clarity |
+| Zod profile schema | ✅ Correct | `trainingMode` has `.default("speech_clarity")` for old profiles |
+| childId="" guard | ✅ Safe | `addAttempt` returns early; `startPracticeSession` throws |
+| child-001 in runtime | ✅ Safe | Only in demo/mock display paths |
+| data isolation | ✅ Safe | phonicsProgressStorage is separate from speechProgressStorage |
+| Supabase trainingMode | ✅ Fixed (P9-A) | Migration added, mappers updated |
+| NEXT_PUBLIC_STORAGE_BACKEND (legacy) | ✅ Note only | Code still handles it as fallback; .env.example now uses correct var name |
+
+### Remaining Risks (Not Blocking Production)
+
+1. **Attempt detail drawer phonics** — `AttemptDetailDrawer` accepts only `PracticeAttempt`, not `PhonicsAttempt`. Phonics attempt detail is not viewable per-item. (PhonicsProgressDashboard shows recent 6 only.)
+2. **Supabase `IPhonicsProgressRepository`** — phonics progress is localStorage only; Supabase users' phonics data won't sync across devices.
+3. **K3–K7 phonics unlock** — only K1→K2 unlock tested; cascading K3–K7 logic exists in PhonicsJourneyMap but not stress-tested with real data.
+4. **Post-auth redirect** — still goes to `/training` not `/dashboard` (P6 TODO — low impact).
+5. **Supabase stale session cleanup** — only localStorage stale sessions are cleaned up (P1 note).
+6. **lint: 11 errors** — school/teacher React compiler errors (not in parent flow; not blocking).
+
+Build: ✅ | tsc: ✅ | lint: 11 errors (school/teacher only — unchanged)
+
+---
+
+## Final Manual QA Checklist
+
+### Auth & Routing
+- [ ] Logged-out user visits `/` → sees landing page (no crash)
+- [ ] Logged-out user visits `/training` → sees training page with "ตั้งค่าโปรไฟล์เด็ก" CTA
+- [ ] Logged-out user visits `/progress` → sees progress page with empty state
+- [ ] Logged-in parent with no profile → `/training` redirects to `/onboarding`
+- [ ] Logged-in parent completes onboarding → `/training` with correct mode
+- [ ] `/dashboard` requires auth, redirects to `/auth/signin` if not logged in
+
+### Speech Clarity Mode
+- [ ] Training page shows 7 stages + target sound selector
+- [ ] Lesson page evaluates audio, saves attempt with correct childId + targetSound
+- [ ] Progress page shows speech clarity dashboard
+- [ ] Rewards page shows speech badges
+- [ ] Report page shows speech report with stage table
+- [ ] Showcase shows speech clarity content
+
+### Kindergarten Phonics Mode
+- [ ] Onboarding skips targetSound step for phonics mode
+- [ ] Training page shows Phonics Journey Map
+- [ ] K1 lesson loads and evaluates correctly
+- [ ] K1 completion unlocks K2
+- [ ] Progress page shows PhonicsProgressDashboard
+- [ ] Rewards page shows phonics milestones (not speech badges)
+- [ ] Report page shows phonics report (not speech report)
+- [ ] Showcase shows phonics content
+- [ ] Dashboard shows correct phonics recommendation
+
+### Data Isolation
+- [ ] Switch from child A (speech) to child B (phonics) → sidebar CTA changes
+- [ ] Child B progress has no Child A attempts
+- [ ] Speech progress (localStorage key) does not contain phonics attempts
+- [ ] Supabase: after logout+login, trainingMode is preserved correctly (requires supabase db push)
+
+### AI & Audio
+- [ ] Sample audio plays (browser TTS with SAMPLE_AUDIO_PROVIDER=mock)
+- [ ] Speech evaluation works (mock scores with SPEECH_EVALUATION_PROVIDER=mock)
+- [ ] Error state: if evaluation fails, friendly Thai message shown (not raw error)
+- [ ] Recording too short → friendly error before API call
+
+---
+
+## Next Phase: Post-P9 (Optional)
 
 ---
 

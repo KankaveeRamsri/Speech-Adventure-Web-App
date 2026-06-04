@@ -31,6 +31,8 @@ const ChildSnapshotSchema = z.object({
   age: z.number(),
   targetSound: z.string().default(""),
   trainingGoal: z.string().default(""),
+  // trainingMode added in P9-A. Old snapshots default to speech_clarity (migration-safe).
+  trainingMode: z.enum(["speech_clarity", "kindergarten_phonics"]).default("speech_clarity"),
   createdAt: z.string().default(""),
   updatedAt: z.string().default(""),
 });

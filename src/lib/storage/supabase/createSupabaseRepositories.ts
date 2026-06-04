@@ -9,7 +9,7 @@
  * 1. Make sure NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY are
  *    set in .env.local to real values (not placeholders).
  *
- * 2. Set NEXT_PUBLIC_STORAGE_BACKEND=supabase in .env.local.
+ * 2. Set NEXT_PUBLIC_STORAGE_PROVIDER=supabase in .env.local.
  *
  * 3. In src/app/layout.tsx, add:
  *
