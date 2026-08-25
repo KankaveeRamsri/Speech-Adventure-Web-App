@@ -185,6 +185,10 @@ export interface Database {
         Args: { p_child_id: string };
         Returns: void;
       };
+      ensure_teacher_organization: {
+        Args: { p_name: string };
+        Returns: string;
+      };
     };
     Enums: {
       session_status: DbSessionStatus;

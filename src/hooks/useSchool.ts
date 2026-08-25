@@ -128,6 +128,11 @@ export function useSchool() {
     return school.revokeParentLink(childId);
   }
 
+  async function ensureTeacherOrganization(userId: string): Promise<{ organizationId: string }> {
+    if (!school) throw new Error("School repository not available");
+    return school.ensureTeacherOrganization(userId);
+  }
+
   return {
     organizations,
     listClassrooms,
@@ -147,5 +152,6 @@ export function useSchool() {
     listStudentParentLinks,
     ensureParentInvitationForChild,
     revokeParentLink,
+    ensureTeacherOrganization,
   };
 }

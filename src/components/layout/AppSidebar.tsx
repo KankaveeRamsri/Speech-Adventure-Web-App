@@ -6,11 +6,13 @@ import { usePathname } from "next/navigation";
 import NavIcon, { type NavIconName } from "./NavIcon";
 import { useSidebar } from "./SidebarContext";
 import ChildSelector from "./ChildSelector";
+import UserMenu from "./UserMenu";
 import ThemeToggle from "@/components/ui/ThemeToggle";
 import { useSpeechProgress } from "@/hooks/useSpeechProgress";
 import { useChildProfile } from "@/hooks/useChildProfile";
 import { useAuth, isTeacher, isSchoolAdmin } from "@/hooks/useAuth";
 import { mockTrainingStages } from "@/data/speechAdventureMockData";
+import { FEATURES } from "@/lib/config/featureFlags";
 
 type NavItem = { href: string; label: string; icon: NavIconName; exact?: boolean };
 
@@ -26,10 +28,14 @@ const PARENT_NAV_ITEMS: NavItem[] = [
   { href: "/settings", label: "ตั้งค่า", icon: "settings" },
 ];
 
+// Teacher V2 primary nav — Profile/Settings intentionally omitted; they live
+// in the UserMenu (avatar) instead, per the Teacher V2 navigation spec.
 const TEACHER_NAV_ITEMS: NavItem[] = [
-  { href: "/teacher", label: "แดชบอร์ดครู", icon: "teacher" },
-  { href: "/report", label: "รายงาน", icon: "report" },
-  { href: "/settings", label: "ตั้งค่า", icon: "settings" },
+  { href: "/teacher", label: "ภาพรวม", icon: "teacher", exact: true },
+  { href: "/teacher/classrooms", label: "ห้องเรียน", icon: "classrooms" },
+  { href: "/teacher/students", label: "นักเรียน", icon: "students" },
+  { href: "/teacher/assignments", label: "แบบฝึก", icon: "assignments" },
+  { href: "/teacher/reports", label: "รายงาน", icon: "report" },
 ];
 
 const SCHOOL_ADMIN_NAV_ITEMS: NavItem[] = [
@@ -82,7 +88,12 @@ export default function AppSidebar() {
 
   const isSpeechMode = !isHydrated || profile?.trainingMode !== "kindergarten_phonics";
 
-  const NAV_ITEMS: NavItem[] = isSchoolAdmin(user)
+  // School Admin nav only renders while the feature flag is on — an existing
+  // school_admin account falls back to the parent nav when it's off, since
+  // /school itself now redirects them away.
+  const isSchoolAdminActive = FEATURES.schoolAdmin && isSchoolAdmin(user);
+
+  const NAV_ITEMS: NavItem[] = isSchoolAdminActive
     ? SCHOOL_ADMIN_NAV_ITEMS
     : isTeacher(user)
     ? TEACHER_NAV_ITEMS
@@ -116,18 +127,16 @@ export default function AppSidebar() {
     : "w-auto opacity-100";
 
   // ── Context section (role-aware) ──
-  const isProfRole = isSchoolAdmin(user) || isTeacher(user);
+  const isProfRole = isSchoolAdminActive || isTeacher(user);
   const contextSection = isProfRole ? (
-    // Teacher / school_admin: minimal context (no child selector)
-    <div className={`px-3 py-3 border-b border-border flex-shrink-0 ${isCollapsed ? "" : ""}`}>
+    // Teacher / school_admin: avatar/profile menu instead of child context
+    <div className="px-3 py-3 border-b border-border flex-shrink-0 space-y-2">
       {!isCollapsed && (
-        <div className="flex items-center justify-between">
-          <span className="text-xs font-medium text-text-muted">
-            {isSchoolAdmin(user) ? "ผู้ดูแลโรงเรียน" : "ครูผู้สอน"}
-          </span>
+        <div className="flex items-center justify-end">
           <ThemeToggle />
         </div>
       )}
+      <UserMenu collapsed={isCollapsed} />
     </div>
   ) : (
     // Parent / default: full child context
@@ -312,12 +321,12 @@ export default function AppSidebar() {
         {/* Mobile context */}
         <div className="px-4 py-3 border-b border-border flex-shrink-0 space-y-2.5">
           {isProfRole ? (
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-medium text-text-muted">
-                {isSchoolAdmin(user) ? "ผู้ดูแลโรงเรียน" : "ครูผู้สอน"}
-              </span>
-              <ThemeToggle />
-            </div>
+            <>
+              <div className="flex items-center justify-end">
+                <ThemeToggle />
+              </div>
+              <UserMenu />
+            </>
           ) : (
             <>
               <ChildSelector />

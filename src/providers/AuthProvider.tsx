@@ -11,6 +11,7 @@ import type { ReactNode } from "react";
 import type { AuthContextValue, AuthSession, UserRole } from "@/types/auth";
 import * as supabaseAuth from "@/lib/auth/supabaseAuth";
 import { isSupabaseConfigured } from "@/lib/supabase/client";
+import { isSignupRoleAllowed } from "@/lib/auth/roleHelpers";
 
 // ── Context ───────────────────────────────────────────────────────────────────
 
@@ -68,10 +69,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     [],
   );
 
-  const signUp = useCallback(
-    (email: string, password: string, role?: UserRole) => supabaseAuth.signUp(email, password, role),
-    [],
-  );
+  const signUp = useCallback((email: string, password: string, role?: UserRole) => {
+    // Application-layer enforcement of the feature-flagged role list — not
+    // just the signup form's disabled buttons. A role hidden by a flag
+    // (school_admin, therapist) is silently downgraded to the default
+    // "parent" role rather than allowed through.
+    if (role && !isSignupRoleAllowed(role)) {
+      if (process.env.NODE_ENV !== "production") {
+        console.warn(
+          `[Auth] signup role "${role}" is disabled by feature flag — falling back to "parent"`,
+        );
+      }
+      return supabaseAuth.signUp(email, password, "parent");
+    }
+    return supabaseAuth.signUp(email, password, role);
+  }, []);
 
   const handleSignOut = useCallback(async () => {
     await supabaseAuth.signOut();

@@ -12,6 +12,7 @@ import {
   ChildAccessSection,
 } from "@/components/layout/InviteSection";
 import { useAuth, isParent, isTeacher, isSchoolAdmin } from "@/hooks/useAuth";
+import { FEATURES } from "@/lib/config/featureFlags";
 import { useRepositories } from "@/lib/providers/RepositoryProvider";
 import {
   exportData,
@@ -546,7 +547,9 @@ export default function SettingsPage() {
   // Anonymous (local mode) defaults to parent flow
   const isParentUser = !user || isParent(user);
   const isTeacherUser = !!user && isTeacher(user);
-  const isAdminUser   = !!user && isSchoolAdmin(user);
+  // Gated by the feature flag too — School Admin is hidden from navigation
+  // while disabled, even for an existing school_admin account.
+  const isAdminUser   = !!user && isSchoolAdmin(user) && FEATURES.schoolAdmin;
 
   return (
     <AppShell>

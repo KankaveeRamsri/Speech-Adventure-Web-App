@@ -1,6 +1,14 @@
 // School / classroom domain types for Speech Adventure.
 // Phase 13 foundation — full school admin and CSV import are later phases.
 
+/**
+ * Internal name used when an organization is auto-provisioned for a teacher
+ * (Teacher V2 Phase 1 — see ISchoolRepository.ensureTeacherOrganization).
+ * Never shown as a "create your organization" concept in Teacher UI — the
+ * teacher experiences this as using Speech Adventure independently.
+ */
+export const DEFAULT_TEACHER_ORGANIZATION_NAME = "Teacher Workspace";
+
 export type OrganizationType = "family" | "school" | "clinic";
 export type OrgMemberRole = "owner" | "admin" | "teacher" | "therapist" | "parent" | "viewer";
 export type OrgMemberStatus = "active" | "invited" | "removed";

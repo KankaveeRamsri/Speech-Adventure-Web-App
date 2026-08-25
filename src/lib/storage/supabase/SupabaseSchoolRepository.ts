@@ -13,6 +13,7 @@ import type {
 } from "@/types/school";
 import type { ValidatedImportRow, ImportResult, ImportRowResult } from "@/types/schoolImport";
 import { INVITATION_EXPIRY_DAYS } from "@/types/invitations";
+import { DEFAULT_TEACHER_ORGANIZATION_NAME } from "@/types/school";
 import type { SupabaseClient } from "@/lib/supabase/client";
 import type { Database } from "@/types/supabase";
 import { QueryError, warnRepo } from "./errors";
@@ -633,6 +634,30 @@ export class SupabaseSchoolRepository implements ISchoolRepository {
       p_child_id: childId,
     });
     if (error) throw new Error(error.message);
+  }
+
+  // ── Teacher self-serve provisioning (Teacher V2 Phase 1) ──────────────────────
+
+  async ensureTeacherOrganization(_userId: string): Promise<{ organizationId: string }> {
+    // Delegates the check-then-create to a SECURITY DEFINER RPC so it's
+    // atomic (advisory-locked per user) even under concurrent calls — see
+    // supabase/migrations/*_ensure_teacher_organization.sql. auth.uid() is
+    // used server-side, so the userId param isn't sent explicitly.
+    const { data: orgId, error } = await this.client.rpc("ensure_teacher_organization", {
+      p_name: DEFAULT_TEACHER_ORGANIZATION_NAME,
+    });
+
+    if (error || !orgId) {
+      warnRepo("SupabaseSchoolRepository.ensureTeacherOrganization",
+        new QueryError("organizations", "rpc:ensure_teacher_organization", error ?? new Error("no org id returned")));
+      throw new Error(error?.message ?? "Failed to provision teacher organization");
+    }
+
+    // Refresh the cache so listMyOrganizations()/listClassroomsForTeacher()
+    // reflect the (possibly newly created) organization immediately.
+    this.rehydrate();
+
+    return { organizationId: orgId };
   }
 
   public setScope(_userId: string | null): void {

@@ -107,6 +107,20 @@ export interface ISchoolRepository {
    */
   revokeParentLink(childId: string): Promise<void>;
 
+  // ── Teacher self-serve provisioning (Teacher V2 Phase 1) ──────────────────────
+
+  /**
+   * Idempotently ensures the given user has an organization they administer
+   * (owner/admin membership), creating one internally if they don't have one
+   * yet. Required because classrooms.organization_id is NOT NULL and only an
+   * org admin can create a classroom — this lets a teacher use classrooms in
+   * Phase 2+ without any School Admin ever provisioning an organization for
+   * them. Safe to call on every Teacher V2 page load: reuses an existing
+   * org/membership rather than creating a duplicate. Never call this for a
+   * parent account.
+   */
+  ensureTeacherOrganization(userId: string): Promise<{ organizationId: string }>;
+
   // ── Scope ─────────────────────────────────────────────────────────────────────
   setScope(userId: string | null): void;
 }

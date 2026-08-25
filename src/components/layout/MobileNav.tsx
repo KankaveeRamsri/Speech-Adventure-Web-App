@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import NavIcon, { type NavIconName } from "./NavIcon";
 import { useAuth, isTeacher, isSchoolAdmin } from "@/hooks/useAuth";
+import { FEATURES } from "@/lib/config/featureFlags";
 
 type NavItem = { href: string; label: string; icon: NavIconName; exact?: boolean };
 
@@ -16,10 +17,14 @@ const PARENT_MOBILE: NavItem[] = [
   { href: "/settings", label: "ตั้งค่า", icon: "settings" },
 ];
 
+// Teacher V2 mobile nav — Settings lives in the UserMenu (mobile drawer),
+// not in the bottom bar, matching the desktop nav.
 const TEACHER_MOBILE: NavItem[] = [
-  { href: "/teacher", label: "ครู", icon: "teacher" },
-  { href: "/report", label: "รายงาน", icon: "report" },
-  { href: "/settings", label: "ตั้งค่า", icon: "settings" },
+  { href: "/teacher", label: "ภาพรวม", icon: "teacher", exact: true },
+  { href: "/teacher/classrooms", label: "ห้องเรียน", icon: "classrooms" },
+  { href: "/teacher/students", label: "นักเรียน", icon: "students" },
+  { href: "/teacher/assignments", label: "แบบฝึก", icon: "assignments" },
+  { href: "/teacher/reports", label: "รายงาน", icon: "report" },
 ];
 
 const SCHOOL_MOBILE: NavItem[] = [
@@ -32,7 +37,7 @@ export default function MobileNav() {
   const pathname = usePathname();
   const { user } = useAuth();
 
-  const items = isSchoolAdmin(user)
+  const items = FEATURES.schoolAdmin && isSchoolAdmin(user)
     ? SCHOOL_MOBILE
     : isTeacher(user)
     ? TEACHER_MOBILE

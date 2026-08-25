@@ -2,7 +2,8 @@
 
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { useAuth, isTeacher, isSchoolAdmin } from "@/hooks/useAuth";
+import { useAuth, isTeacher } from "@/hooks/useAuth";
+import { getPostAuthDestination } from "@/lib/auth/postAuthDestination";
 
 export default function TeacherLayout({ children }: { children: React.ReactNode }) {
   const { user, isLoading } = useAuth();
@@ -14,8 +15,10 @@ export default function TeacherLayout({ children }: { children: React.ReactNode 
       router.replace("/auth/signin?redirect=/teacher");
       return;
     }
+    // Strictly role-gated: a parent or a school_admin (even with School Admin
+    // disabled) must not reach Teacher V2 just because it renders next.
     if (!isTeacher(user)) {
-      router.replace(isSchoolAdmin(user) ? "/school" : "/training");
+      router.replace(getPostAuthDestination(user));
     }
   }, [isLoading, user, router]);
 

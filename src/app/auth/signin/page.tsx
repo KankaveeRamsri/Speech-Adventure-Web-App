@@ -6,6 +6,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { useAuth } from "@/hooks/useAuth";
 import { isSupabaseConfigured } from "@/lib/supabase/client";
 import ThemeToggle from "@/components/ui/ThemeToggle";
+import { getPostAuthDestination } from "@/lib/auth/postAuthDestination";
 
 function MicIcon() {
   return (
@@ -49,17 +50,9 @@ function SignInContent() {
 
   useEffect(() => {
     if (mounted && !isLoading && isAuthenticated) {
-      if (explicitRedirect) {
-        router.replace(explicitRedirect);
-      } else if (user?.role === "school_admin") {
-        router.replace("/school");
-      } else if (user?.role === "teacher") {
-        router.replace("/teacher");
-      } else {
-        router.replace("/training");
-      }
+      router.replace(explicitRedirect ?? getPostAuthDestination(user));
     }
-  }, [mounted, isLoading, isAuthenticated, router, explicitRedirect, user?.role]);
+  }, [mounted, isLoading, isAuthenticated, router, explicitRedirect, user]);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();

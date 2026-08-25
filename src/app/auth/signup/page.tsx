@@ -7,6 +7,8 @@ import { useAuth } from "@/hooks/useAuth";
 import { isSupabaseConfigured } from "@/lib/supabase/client";
 import ThemeToggle from "@/components/ui/ThemeToggle";
 import type { UserRole } from "@/types/auth";
+import { FEATURES } from "@/lib/config/featureFlags";
+import { getPostAuthDestination } from "@/lib/auth/postAuthDestination";
 
 function MicIcon() {
   return (
@@ -49,8 +51,8 @@ const PASSWORD_RULES = [
 const ROLE_OPTIONS: { value: UserRole; label: string; desc: string; available: boolean }[] = [
   { value: "parent", label: "ผู้ปกครอง", desc: "ติดตามพัฒนาการบุตรหลาน", available: true },
   { value: "teacher", label: "ครู", desc: "ติดตามเด็กที่ได้รับมอบหมาย", available: true },
-  { value: "therapist", label: "นักบำบัด", desc: "ดูแลผู้ใช้หลายคน", available: false },
-  { value: "school_admin", label: "ผู้ดูแลโรงเรียน", desc: "บริหารจัดการทั้งโรงเรียน", available: true },
+  { value: "therapist", label: "นักบำบัด", desc: "ดูแลผู้ใช้หลายคน", available: FEATURES.therapist },
+  { value: "school_admin", label: "ผู้ดูแลโรงเรียน", desc: "บริหารจัดการทั้งโรงเรียน", available: FEATURES.schoolAdmin },
 ];
 
 export default function SignUpPage() {
@@ -70,11 +72,9 @@ export default function SignUpPage() {
 
   useEffect(() => {
     if (mounted && !isLoading && isAuthenticated) {
-      if (user?.role === "school_admin") router.replace("/school");
-      else if (user?.role === "teacher") router.replace("/teacher");
-      else router.replace("/training");
+      router.replace(getPostAuthDestination(user));
     }
-  }, [mounted, isLoading, isAuthenticated, router, user?.role]);
+  }, [mounted, isLoading, isAuthenticated, router, user]);
 
   const passwordValid = PASSWORD_RULES.every((r) => r.test(password));
 

@@ -9,7 +9,10 @@ export type NavIconName =
   | "profile"
   | "settings"
   | "teacher"
-  | "school";
+  | "school"
+  | "classrooms"
+  | "students"
+  | "assignments";
 
 interface Props {
   name: NavIconName;
@@ -114,6 +117,35 @@ export default function NavIcon({ name, active = false, size = 17 }: Props) {
         <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
         <rect x="9" y="13" width="6" height="9" />
         <path d="M9 9h.01M15 9h.01" />
+      </svg>
+    );
+  }
+  if (name === "classrooms") {
+    return (
+      <svg {...shared}>
+        <rect x="3" y="3" width="7" height="7" rx="1.5" />
+        <rect x="14" y="3" width="7" height="7" rx="1.5" />
+        <rect x="3" y="14" width="7" height="7" rx="1.5" />
+        <rect x="14" y="14" width="7" height="7" rx="1.5" />
+      </svg>
+    );
+  }
+  if (name === "students") {
+    return (
+      <svg {...shared}>
+        <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
+        <circle cx="9" cy="7" r="4" />
+        <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
+        <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+      </svg>
+    );
+  }
+  if (name === "assignments") {
+    return (
+      <svg {...shared}>
+        <rect x="4" y="3" width="16" height="18" rx="2" />
+        <path d="M9 3h6a1 1 0 0 1 1 1v1a1 1 0 0 1-1 1H9a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1Z" />
+        <path d="m9 14 2 2 4-4" />
       </svg>
     );
   }

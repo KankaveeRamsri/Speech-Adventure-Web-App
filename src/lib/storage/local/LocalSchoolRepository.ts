@@ -13,6 +13,7 @@ import type {
   StudentParentLinkInfo,
 } from "@/types/school";
 import type { ValidatedImportRow, ImportResult, ImportRowResult } from "@/types/schoolImport";
+import { DEFAULT_TEACHER_ORGANIZATION_NAME } from "@/types/school";
 
 // ── Stored shape ───────────────────────────────────────────────────────────────
 
@@ -40,6 +41,13 @@ let _store: SchoolStore = EMPTY_STORE;
 let _userId: string | null = null;
 let _initialized = false;
 const _listeners = new Set<() => void>();
+
+// In-flight guard for ensureTeacherOrganization — prevents a duplicate org
+// being created if the hook that calls it fires twice in the same tick
+// (e.g. React StrictMode double-invoking an effect) before the first
+// createSchoolOrganization() write has landed.
+let _ensureOrgPromise: Promise<{ organizationId: string }> | null = null;
+let _ensureOrgUserId: string | null = null;
 
 function _isBrowser(): boolean {
   return typeof window !== "undefined";
@@ -338,6 +346,33 @@ export class LocalSchoolRepository implements ISchoolRepository {
 
   async revokeParentLink(_childId: string): Promise<void> {
     // Not implemented in local/demo mode — no-op
+  }
+
+  // ── Teacher self-serve provisioning (Teacher V2 Phase 1) ──────────────────────
+
+  async ensureTeacherOrganization(userId: string): Promise<{ organizationId: string }> {
+    _init();
+
+    const existing = _store.members.find(
+      (m) => m.userId === userId && (m.role === "owner" || m.role === "admin") && m.status === "active",
+    );
+    if (existing) return { organizationId: existing.organizationId };
+
+    if (_ensureOrgPromise && _ensureOrgUserId === userId) return _ensureOrgPromise;
+
+    _ensureOrgUserId = userId;
+    _ensureOrgPromise = this.createSchoolOrganization({
+      name: DEFAULT_TEACHER_ORGANIZATION_NAME,
+      type: "school",
+      createdBy: userId,
+    })
+      .then((org) => ({ organizationId: org.id }))
+      .finally(() => {
+        _ensureOrgPromise = null;
+        _ensureOrgUserId = null;
+      });
+
+    return _ensureOrgPromise;
   }
 
   // ── Scope ─────────────────────────────────────────────────────────────────────
