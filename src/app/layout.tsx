@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { ThemeProvider } from "@/components/ui/ThemeProvider";
 import { RepositoryProvider } from "@/lib/providers/RepositoryProvider";
 import { AuthProvider } from "@/providers/AuthProvider";
+import { TrustedRoleProvider } from "@/providers/TrustedRoleProvider";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -22,11 +23,13 @@ export default function RootLayout({
       </head>
       <body className="min-h-full flex flex-col bg-bg text-text">
         <AuthProvider>
-          <RepositoryProvider>
-            <ThemeProvider>
-              {children}
-            </ThemeProvider>
-          </RepositoryProvider>
+          <TrustedRoleProvider>
+            <RepositoryProvider>
+              <ThemeProvider>
+                {children}
+              </ThemeProvider>
+            </RepositoryProvider>
+          </TrustedRoleProvider>
         </AuthProvider>
       </body>
     </html>

@@ -35,6 +35,7 @@ import type {
   DbOrgMemberRole,
   DbOrgMemberStatus,
   DbUserDisplayProfile,
+  DbUserAppRole,
 } from "@/types/database";
 
 // ── Insert types (server-generated fields become optional) ────────────────────
@@ -148,6 +149,15 @@ export interface Database {
         Row: DbUserDisplayProfile;
         Insert: Omit<DbUserDisplayProfile, "created_at">;
         Update: Partial<Omit<DbUserDisplayProfile, "user_id" | "created_at">>;
+        Relationships: [];
+      };
+      user_app_roles: {
+        Row: DbUserAppRole;
+        // No Insert/Update — table has no client-facing write policy at all;
+        // it is populated exclusively by a database trigger. Typed as never
+        // so a client write attempt fails at compile time, not just at RLS.
+        Insert: never;
+        Update: never;
         Relationships: [];
       };
     };

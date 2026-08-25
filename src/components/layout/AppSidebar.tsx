@@ -10,7 +10,8 @@ import UserMenu from "./UserMenu";
 import ThemeToggle from "@/components/ui/ThemeToggle";
 import { useSpeechProgress } from "@/hooks/useSpeechProgress";
 import { useChildProfile } from "@/hooks/useChildProfile";
-import { useAuth, isTeacher, isSchoolAdmin } from "@/hooks/useAuth";
+import { useAuth, isSchoolAdmin } from "@/hooks/useAuth";
+import { useTrustedAppRole } from "@/hooks/useTrustedAppRole";
 import { mockTrainingStages } from "@/data/speechAdventureMockData";
 import { FEATURES } from "@/lib/config/featureFlags";
 
@@ -79,23 +80,132 @@ function CloseIcon() {
   );
 }
 
+// Neutral chrome shown only while an authenticated, non-school-admin user's
+// trusted role is still resolving — never Teacher or Parent content, per
+// Phase 1.1. Same shape (avatar circle + two lines) regardless of which
+// role turns out to be correct, so there's no layout jump when it resolves.
+function ContextSkeleton({ collapsed }: { collapsed: boolean }) {
+  return (
+    <div className={`px-3 py-3 border-b border-border flex-shrink-0 ${collapsed ? "flex items-center justify-center" : ""}`} aria-hidden="true">
+      <div className="flex items-center gap-2.5">
+        <div className="w-8 h-8 rounded-full bg-border/50 animate-pulse flex-shrink-0" />
+        {!collapsed && (
+          <div className="flex-1 min-w-0 space-y-1.5">
+            <div className="h-3 w-24 rounded bg-border/50 animate-pulse" />
+            <div className="h-2.5 w-16 rounded bg-border/40 animate-pulse" />
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function NavSkeleton({ collapsed }: { collapsed: boolean }) {
+  return (
+    <nav className="flex-1 px-3 py-3 space-y-0.5" aria-hidden="true">
+      {[1, 2, 3, 4, 5].map((i) => (
+        <div key={i} className="flex items-center gap-3 px-3 py-2.5">
+          <div className="w-5 h-5 rounded bg-border/50 animate-pulse flex-shrink-0" />
+          {!collapsed && (
+            <div className="h-3.5 rounded bg-border/50 animate-pulse" style={{ width: `${50 + i * 6}%` }} />
+          )}
+        </div>
+      ))}
+    </nav>
+  );
+}
+
+function WarningIcon({ size = 15 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0Z" />
+      <line x1="12" y1="9" x2="12" y2="13" />
+      <line x1="12" y1="17" x2="12.01" y2="17" />
+    </svg>
+  );
+}
+
+// Shown when the trusted-role query genuinely fails (not while loading) —
+// never falls back to Teacher or Parent chrome. retry() is the same
+// function from useTrustedAppRole(), so this doesn't start a second query;
+// it just re-invokes the one shared resolution the whole app reads from.
+function ContextError({ collapsed, onRetry }: { collapsed: boolean; onRetry: () => void }) {
+  if (collapsed) {
+    return (
+      <div className="px-3 py-3 border-b border-border flex-shrink-0 flex items-center justify-center">
+        <button
+          type="button"
+          onClick={onRetry}
+          aria-label="ไม่สามารถตรวจสอบสิทธิ์ผู้ใช้ได้ — ลองใหม่"
+          title="ลองใหม่"
+          className="w-8 h-8 rounded-full bg-error/10 text-error flex items-center justify-center hover:bg-error/15 transition-colors"
+        >
+          <WarningIcon size={15} />
+        </button>
+      </div>
+    );
+  }
+  return (
+    <div className="px-3 py-3 border-b border-border flex-shrink-0">
+      <div className="flex items-start gap-2.5">
+        <div className="w-8 h-8 rounded-full bg-error/10 text-error flex items-center justify-center flex-shrink-0">
+          <WarningIcon size={15} />
+        </div>
+        <div className="flex-1 min-w-0">
+          <p className="text-xs font-medium text-text leading-snug">ไม่สามารถตรวจสอบสิทธิ์ผู้ใช้ได้</p>
+          <button type="button" onClick={onRetry} className="text-xs font-semibold text-primary hover:underline mt-0.5">
+            ลองใหม่
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function NavError() {
+  return (
+    <div className="flex-1 px-3 py-3" aria-hidden="true">
+      <p className="text-xs text-text-muted px-3 leading-snug">ไม่สามารถโหลดเมนูได้</p>
+    </div>
+  );
+}
+
 export default function AppSidebar() {
   const pathname = usePathname();
   const { collapsed, toggle, mounted, mobileOpen, setMobileOpen } = useSidebar();
   const { summary, isHydrated, selectedSoundId } = useSpeechProgress();
   const { profile } = useChildProfile();
   const { user } = useAuth();
+  const { status: roleStatus, role: trustedRole, retry: retryRole } = useTrustedAppRole();
 
   const isSpeechMode = !isHydrated || profile?.trainingMode !== "kindergarten_phonics";
 
   // School Admin nav only renders while the feature flag is on — an existing
   // school_admin account falls back to the parent nav when it's off, since
-  // /school itself now redirects them away.
+  // /school itself now redirects them away. School Admin isn't part of the
+  // trusted-role scheme (public.user_app_roles only ever resolves to
+  // "teacher" | "parent" — see src/lib/auth/trustedRole.ts), so this one
+  // branch still reads user_metadata via isSchoolAdmin(), same as before.
   const isSchoolAdminActive = FEATURES.schoolAdmin && isSchoolAdmin(user);
+
+  // Teacher nav requires the CONFIRMED trusted role, not user_metadata
+  // (isTeacher(user)) — a spoofed/stale metadata role must never render
+  // Teacher navigation for a non-teacher, and, just as importantly, a real
+  // Teacher whose metadata is stale/missing must still see it.
+  const isTrustedTeacher = roleStatus === "ready" && trustedRole === "teacher";
+
+  // Anonymous (local mode) has no trusted-role concept at all — Parent
+  // chrome is correct immediately. For an authenticated, non-school-admin
+  // user, three distinct states apply: loading (neutral skeleton), ready
+  // (real Teacher/Parent chrome), and error (neutral error/retry — never
+  // Teacher or Parent chrome, never treated the same as "settled parent").
+  const isAnonymous = !user;
+  const roleLoading = !isAnonymous && !isSchoolAdminActive && (roleStatus === "idle" || roleStatus === "loading");
+  const roleError = !isAnonymous && !isSchoolAdminActive && roleStatus === "error";
 
   const NAV_ITEMS: NavItem[] = isSchoolAdminActive
     ? SCHOOL_ADMIN_NAV_ITEMS
-    : isTeacher(user)
+    : isTrustedTeacher
     ? TEACHER_NAV_ITEMS
     : PARENT_NAV_ITEMS;
 
@@ -127,8 +237,12 @@ export default function AppSidebar() {
     : "w-auto opacity-100";
 
   // ── Context section (role-aware) ──
-  const isProfRole = isSchoolAdminActive || isTeacher(user);
-  const contextSection = isProfRole ? (
+  const isProfRole = isSchoolAdminActive || isTrustedTeacher;
+  const contextSection = roleLoading ? (
+    <ContextSkeleton collapsed={isCollapsed} />
+  ) : roleError ? (
+    <ContextError collapsed={isCollapsed} onRetry={retryRole} />
+  ) : isProfRole ? (
     // Teacher / school_admin: avatar/profile menu instead of child context
     <div className="px-3 py-3 border-b border-border flex-shrink-0 space-y-2">
       {!isCollapsed && (
@@ -214,31 +328,37 @@ export default function AppSidebar() {
       {contextSection}
 
       {/* Navigation */}
-      <nav className="flex-1 px-3 py-3 space-y-0.5 overflow-y-auto overflow-x-hidden">
-        {NAV_ITEMS.map((item) => {
-          const active = isActive(item);
-          return (
-            <Link
-              key={item.href}
-              href={item.href}
-              aria-current={active ? "page" : undefined}
-              title={isCollapsed ? item.label : undefined}
-              className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all ${
-                active
-                  ? "bg-primary/10 text-primary"
-                  : "text-text-muted hover:text-text hover:bg-gray-50 dark:hover:bg-white/5"
-              }`}
-            >
-              <span className="flex-shrink-0 flex items-center justify-center w-5">
-                <NavIcon name={item.icon} active={active} size={17} />
-              </span>
-              <span className={`truncate whitespace-nowrap transition-all duration-200 ${labelCls}`}>
-                {item.label}
-              </span>
-            </Link>
-          );
-        })}
-      </nav>
+      {roleLoading ? (
+        <NavSkeleton collapsed={isCollapsed} />
+      ) : roleError ? (
+        <NavError />
+      ) : (
+        <nav className="flex-1 px-3 py-3 space-y-0.5 overflow-y-auto overflow-x-hidden">
+          {NAV_ITEMS.map((item) => {
+            const active = isActive(item);
+            return (
+              <Link
+                key={item.href}
+                href={item.href}
+                aria-current={active ? "page" : undefined}
+                title={isCollapsed ? item.label : undefined}
+                className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all ${
+                  active
+                    ? "bg-primary/10 text-primary"
+                    : "text-text-muted hover:text-text hover:bg-gray-50 dark:hover:bg-white/5"
+                }`}
+              >
+                <span className="flex-shrink-0 flex items-center justify-center w-5">
+                  <NavIcon name={item.icon} active={active} size={17} />
+                </span>
+                <span className={`truncate whitespace-nowrap transition-all duration-200 ${labelCls}`}>
+                  {item.label}
+                </span>
+              </Link>
+            );
+          })}
+        </nav>
+      )}
 
       {/* Footer: Prototype badge */}
       <div className="px-3 py-3 border-t border-border flex-shrink-0">
@@ -320,7 +440,11 @@ export default function AppSidebar() {
 
         {/* Mobile context */}
         <div className="px-4 py-3 border-b border-border flex-shrink-0 space-y-2.5">
-          {isProfRole ? (
+          {roleLoading ? (
+            <ContextSkeleton collapsed={false} />
+          ) : roleError ? (
+            <ContextError collapsed={false} onRetry={retryRole} />
+          ) : isProfRole ? (
             <>
               <div className="flex items-center justify-end">
                 <ThemeToggle />
@@ -366,28 +490,34 @@ export default function AppSidebar() {
         </div>
 
         {/* Mobile nav items */}
-        <nav className="flex-1 px-3 py-3 space-y-0.5 overflow-y-auto">
-          {NAV_ITEMS.map((item) => {
-            const active = isActive(item);
-            return (
-              <Link
-                key={item.href}
-                href={item.href}
-                aria-current={active ? "page" : undefined}
-                className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all ${
-                  active
-                    ? "bg-primary/10 text-primary"
-                    : "text-text-muted hover:text-text hover:bg-gray-50 dark:hover:bg-white/5"
-                }`}
-              >
-                <span className="flex-shrink-0 flex items-center justify-center w-5">
-                  <NavIcon name={item.icon} active={active} size={17} />
-                </span>
-                <span className="truncate">{item.label}</span>
-              </Link>
-            );
-          })}
-        </nav>
+        {roleLoading ? (
+          <NavSkeleton collapsed={false} />
+        ) : roleError ? (
+          <NavError />
+        ) : (
+          <nav className="flex-1 px-3 py-3 space-y-0.5 overflow-y-auto">
+            {NAV_ITEMS.map((item) => {
+              const active = isActive(item);
+              return (
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  aria-current={active ? "page" : undefined}
+                  className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all ${
+                    active
+                      ? "bg-primary/10 text-primary"
+                      : "text-text-muted hover:text-text hover:bg-gray-50 dark:hover:bg-white/5"
+                  }`}
+                >
+                  <span className="flex-shrink-0 flex items-center justify-center w-5">
+                    <NavIcon name={item.icon} active={active} size={17} />
+                  </span>
+                  <span className="truncate">{item.label}</span>
+                </Link>
+              );
+            })}
+          </nav>
+        )}
 
         {/* Mobile footer */}
         <div className="px-3 py-3 border-t border-border flex-shrink-0 space-y-2">

@@ -7,6 +7,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { isSupabaseConfigured } from "@/lib/supabase/client";
 import ThemeToggle from "@/components/ui/ThemeToggle";
 import { getPostAuthDestination } from "@/lib/auth/postAuthDestination";
+import { useTrustedAppRole } from "@/hooks/useTrustedAppRole";
 
 function MicIcon() {
   return (
@@ -35,6 +36,7 @@ function EyeIcon({ show }: { show: boolean }) {
 
 function SignInContent() {
   const { signIn, isAuthenticated, isLoading, user } = useAuth();
+  const { status: roleStatus, role: trustedRole } = useTrustedAppRole();
   const router = useRouter();
   const searchParams = useSearchParams();
   const explicitRedirect = searchParams.get("redirect");
@@ -49,10 +51,17 @@ function SignInContent() {
   useEffect(() => { setMounted(true); }, []);
 
   useEffect(() => {
-    if (mounted && !isLoading && isAuthenticated) {
-      router.replace(explicitRedirect ?? getPostAuthDestination(user));
+    if (!mounted || isLoading || !isAuthenticated) return;
+    if (explicitRedirect) {
+      router.replace(explicitRedirect);
+      return;
     }
-  }, [mounted, isLoading, isAuthenticated, router, explicitRedirect, user]);
+    // Wait for the trusted role before deciding — see the matching comment
+    // on the signup page for why "loading" blocks and "error" doesn't.
+    if (roleStatus === "loading" || roleStatus === "idle") return;
+    const effectiveRole = roleStatus === "ready" ? trustedRole : null;
+    router.replace(getPostAuthDestination(user, effectiveRole));
+  }, [mounted, isLoading, isAuthenticated, router, explicitRedirect, user, roleStatus, trustedRole]);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -68,7 +77,7 @@ function SignInContent() {
       setSubmitting(false);
     }
     // On success: subscribeToAuthChanges updates the session, then the
-    // useEffect above redirects based on user.role.
+    // useEffect above redirects once the trusted role has resolved.
   }
 
   // Render a minimal skeleton until client hydrates

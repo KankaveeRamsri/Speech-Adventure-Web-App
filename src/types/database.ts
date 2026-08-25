@@ -186,6 +186,17 @@ export type DbUserDisplayProfile = {
   created_at: string;
 };
 
+// ── user_app_roles ─────────────────────────────────────────────────────────────
+// Authoritative application-role source (Teacher V2 Phase 1.1) — populated by
+// an INSERT-only trigger at signup, never client-writable. See
+// supabase/migrations/20260825000100_ensure_teacher_organization.sql.
+
+export type DbUserAppRole = {
+  user_id: string;
+  role: string;
+  created_at: string;
+};
+
 // ── observation_notes ─────────────────────────────────────────────────────────
 
 export type DbObservationTargetType = "session" | "attempt" | "general";

@@ -11,7 +11,9 @@ import {
   SentInvitesSection,
   ChildAccessSection,
 } from "@/components/layout/InviteSection";
-import { useAuth, isParent, isTeacher, isSchoolAdmin } from "@/hooks/useAuth";
+import { useAuth, isSchoolAdmin } from "@/hooks/useAuth";
+import { useTrustedAppRole } from "@/hooks/useTrustedAppRole";
+import { ROLE_LABELS, resolveDisplayRole } from "@/lib/auth/roleLabels";
 import { FEATURES } from "@/lib/config/featureFlags";
 import { useRepositories } from "@/lib/providers/RepositoryProvider";
 import {
@@ -34,13 +36,9 @@ import { INVITATION_ROLE_LABELS } from "@/types/invitations";
 import { isSupabaseConfigured } from "@/lib/supabase/client";
 
 // ── Role display helpers ──────────────────────────────────────────────────────
-
-const ROLE_LABELS: Record<string, string> = {
-  parent:      "ผู้ปกครอง",
-  teacher:     "ครูผู้สอน",
-  school_admin:"ผู้ดูแลโรงเรียน",
-  therapist:   "นักบำบัด",
-};
+// ROLE_LABELS / resolveDisplayRole live in @/lib/auth/roleLabels, shared
+// with UserMenu — see that module for why School Admin still reads
+// user_metadata while Teacher/Parent prefer the trusted role.
 
 function roleBadgeClass(role: string): string {
   switch (role) {
@@ -115,11 +113,20 @@ function SectionHeader({ title, description }: { title: string; description?: st
 
 function AccountCard() {
   const { user, signOut } = useAuth();
+  const { status: roleStatus, role: trustedRole } = useTrustedAppRole();
   const [signingOut, setSigningOut] = useState(false);
 
-  const role = user?.role ?? "parent";
-  const label = ROLE_LABELS[role] ?? role;
-  const badgeClass = roleBadgeClass(role);
+  // null while the trusted role is still resolving — never guess
+  // Parent/Teacher from user_metadata in the meantime (see
+  // src/lib/auth/roleLabels.ts). On a genuine query failure, show a plain
+  // "unknown" badge rather than a fabricated Parent/Teacher label.
+  const displayRole = resolveDisplayRole(user?.role ?? "parent", roleStatus, trustedRole);
+  const label = displayRole ? (ROLE_LABELS[displayRole] ?? displayRole) : roleStatus === "error" ? "ไม่ทราบสิทธิ์" : null;
+  const badgeClass = displayRole
+    ? roleBadgeClass(displayRole)
+    : roleStatus === "error"
+    ? "bg-error/10 text-error"
+    : "bg-border/40 text-text-muted";
   const isCloud = isSupabaseConfigured();
 
   async function handleSignOut() {
@@ -140,9 +147,16 @@ function AccountCard() {
         <div className="flex-1 min-w-0">
           <p className="text-sm font-semibold text-text truncate">{user.email}</p>
           <div className="flex items-center gap-2 mt-1 flex-wrap">
-            <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${badgeClass}`}>
-              {label}
-            </span>
+            {label ? (
+              <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${badgeClass}`}>
+                {label}
+              </span>
+            ) : (
+              <span
+                className="inline-flex items-center h-5 w-16 rounded-full bg-border/40 animate-pulse"
+                aria-hidden="true"
+              />
+            )}
             {isCloud ? (
               <span className="inline-flex items-center gap-1 text-xs text-success">
                 <span className="w-1.5 h-1.5 rounded-full bg-success flex-shrink-0" aria-hidden="true" />
@@ -542,14 +556,28 @@ function DataManagerSection() {
 
 export default function SettingsPage() {
   const { user } = useAuth();
+  const { status: roleStatus, role: trustedRole, retry: retryRole } = useTrustedAppRole();
   const { isOwner, isSharedChild } = useCurrentChildAccess();
 
-  // Anonymous (local mode) defaults to parent flow
-  const isParentUser = !user || isParent(user);
-  const isTeacherUser = !!user && isTeacher(user);
-  // Gated by the feature flag too — School Admin is hidden from navigation
-  // while disabled, even for an existing school_admin account.
-  const isAdminUser   = !!user && isSchoolAdmin(user) && FEATURES.schoolAdmin;
+  // School Admin isn't part of the trusted-role scheme (see
+  // src/lib/auth/roleLabels.ts) — gated by the feature flag too, so it's
+  // hidden while disabled even for an existing school_admin account.
+  const isAdminUser = !!user && isSchoolAdmin(user) && FEATURES.schoolAdmin;
+
+  // Teacher-specific content requires the CONFIRMED trusted role (from
+  // public.user_app_roles), never user_metadata.role — a user who edits
+  // their own metadata to claim "teacher" must not see Teacher sections
+  // here. Three distinct states: loading → neither section (skeleton
+  // instead), error → neither section (error/retry instead — NOT treated
+  // as "settled, therefore Parent"), ready → the real section for whichever
+  // role actually resolved. Anonymous (local mode) has no trusted-role
+  // concept and shows Parent content immediately.
+  const isTrustedTeacher = roleStatus === "ready" && trustedRole === "teacher";
+  const roleResolved = !user || roleStatus === "ready";
+  const roleLoading = !!user && !isAdminUser && (roleStatus === "idle" || roleStatus === "loading");
+  const roleErrored = !!user && !isAdminUser && roleStatus === "error";
+  const isTeacherUser = roleResolved && isTrustedTeacher && !isAdminUser;
+  const isParentUser = roleResolved && !isTrustedTeacher && !isAdminUser;
 
   return (
     <AppShell>
@@ -572,6 +600,37 @@ export default function SettingsPage() {
           <SectionHeader title="การแสดงผล" />
           <AppearanceSection />
         </section>
+
+        {/* ── Role-sensitive sections: loading state ───────────────────── */}
+        {roleLoading && (
+          <section aria-hidden="true">
+            <div className="h-4 w-40 rounded bg-border/50 animate-pulse mb-4" />
+            <div className="bg-surface border border-border rounded-xl p-5 space-y-3">
+              <div className="h-3 w-full rounded bg-border/40 animate-pulse" />
+              <div className="h-3 w-4/5 rounded bg-border/40 animate-pulse" />
+              <div className="h-3 w-3/5 rounded bg-border/40 animate-pulse" />
+            </div>
+          </section>
+        )}
+
+        {/* ── Role-sensitive sections: error state ──────────────────────── */}
+        {/* retryRole() re-invokes the one shared trusted-role resolution the
+            whole app reads from — not a second/independent query. */}
+        {roleErrored && (
+          <section>
+            <div className="bg-surface border border-error/25 rounded-xl p-5 text-center">
+              <p className="text-sm font-medium text-text mb-1">ไม่สามารถตรวจสอบสิทธิ์ผู้ใช้ได้</p>
+              <p className="text-xs text-text-muted mb-4">กรุณาลองใหม่อีกครั้ง</p>
+              <button
+                type="button"
+                onClick={retryRole}
+                className="px-5 py-2 rounded-xl bg-primary text-white font-semibold text-sm hover:bg-primary/90 active:scale-[0.98] transition-all"
+              >
+                ลองใหม่
+              </button>
+            </div>
+          </section>
+        )}
 
         {/* ── School admin sections ─────────────────────────────────────── */}
         {isAdminUser && (

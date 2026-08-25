@@ -9,6 +9,7 @@ import ThemeToggle from "@/components/ui/ThemeToggle";
 import type { UserRole } from "@/types/auth";
 import { FEATURES } from "@/lib/config/featureFlags";
 import { getPostAuthDestination } from "@/lib/auth/postAuthDestination";
+import { useTrustedAppRole } from "@/hooks/useTrustedAppRole";
 
 function MicIcon() {
   return (
@@ -57,6 +58,7 @@ const ROLE_OPTIONS: { value: UserRole; label: string; desc: string; available: b
 
 export default function SignUpPage() {
   const { signUp, isAuthenticated, isLoading, user } = useAuth();
+  const { status: roleStatus, role: trustedRole } = useTrustedAppRole();
   const router = useRouter();
 
   const [email, setEmail] = useState("");
@@ -71,10 +73,17 @@ export default function SignUpPage() {
   useEffect(() => { setMounted(true); }, []);
 
   useEffect(() => {
-    if (mounted && !isLoading && isAuthenticated) {
-      router.replace(getPostAuthDestination(user));
-    }
-  }, [mounted, isLoading, isAuthenticated, router, user]);
+    if (!mounted || isLoading || !isAuthenticated) return;
+    // Wait for the trusted role before deciding — avoids briefly routing a
+    // real Teacher into /training (or vice versa) based on an unresolved
+    // guess. An "error" here is treated as "no confirmed role" (falls
+    // through to the safe default) rather than blocking the redirect — a
+    // genuine Teacher can still reach /teacher afterward, where the route
+    // guard performs its own strict check with a proper retry state.
+    if (roleStatus === "loading" || roleStatus === "idle") return;
+    const effectiveRole = roleStatus === "ready" ? trustedRole : null;
+    router.replace(getPostAuthDestination(user, effectiveRole));
+  }, [mounted, isLoading, isAuthenticated, router, user, roleStatus, trustedRole]);
 
   const passwordValid = PASSWORD_RULES.every((r) => r.test(password));
 

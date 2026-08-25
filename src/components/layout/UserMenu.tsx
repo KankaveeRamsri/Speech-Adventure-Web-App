@@ -4,13 +4,8 @@ import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/hooks/useAuth";
-
-const ROLE_LABELS: Record<string, string> = {
-  parent: "ผู้ปกครอง",
-  teacher: "ครูผู้สอน",
-  school_admin: "ผู้ดูแลโรงเรียน",
-  therapist: "นักบำบัด",
-};
+import { useTrustedAppRole } from "@/hooks/useTrustedAppRole";
+import { ROLE_LABELS, resolveDisplayRole } from "@/lib/auth/roleLabels";
 
 function ChevronDownIcon() {
   return (
@@ -28,6 +23,7 @@ function ChevronDownIcon() {
  */
 export default function UserMenu({ collapsed = false }: { collapsed?: boolean }) {
   const { user, signOut } = useAuth();
+  const { status: roleStatus, role: trustedRole } = useTrustedAppRole();
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [signingOut, setSigningOut] = useState(false);
@@ -46,7 +42,8 @@ export default function UserMenu({ collapsed = false }: { collapsed?: boolean })
   if (!user) return null;
 
   const initial = user.email.charAt(0).toUpperCase() || "?";
-  const roleLabel = ROLE_LABELS[user.role] ?? user.role;
+  const displayRole = resolveDisplayRole(user.role, roleStatus, trustedRole);
+  const roleLabel = displayRole ? (ROLE_LABELS[displayRole] ?? displayRole) : null;
 
   async function handleSignOut() {
     setSigningOut(true);
@@ -72,7 +69,18 @@ export default function UserMenu({ collapsed = false }: { collapsed?: boolean })
           <>
             <div className="flex-1 min-w-0 text-left">
               <p className="text-xs font-semibold text-text truncate">{user.email}</p>
-              <p className="text-[11px] text-text-muted truncate">{roleLabel}</p>
+              {roleLabel ? (
+                <p className="text-[11px] text-text-muted truncate">{roleLabel}</p>
+              ) : roleStatus === "error" ? (
+                // Genuine query failure — never a fabricated Parent/Teacher
+                // label. In practice AppSidebar no longer mounts UserMenu at
+                // all during an error (it shows its own ContextError
+                // instead), so this is a defensive fallback for any other
+                // caller.
+                <p className="text-[11px] text-error truncate">ไม่สามารถตรวจสอบสิทธิ์ได้</p>
+              ) : (
+                <div className="h-2.5 w-14 rounded bg-border/50 animate-pulse mt-0.5" aria-hidden="true" />
+              )}
             </div>
             <span className={`text-text-muted transition-transform flex-shrink-0 ${open ? "rotate-180" : ""}`}>
               <ChevronDownIcon />
