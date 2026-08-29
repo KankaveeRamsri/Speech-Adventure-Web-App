@@ -5,6 +5,10 @@ import type {
   ClassroomTeacher,
   CreateOrganizationInput,
   CreateClassroomInput,
+  UpdateClassroomInput,
+  CreateClassroomStudentInput,
+  ClassroomStudentDetail,
+  TeacherStudentDirectoryEntry,
   UserDisplayInfo,
   StudentParentLinkInfo,
 } from "@/types/school";
@@ -29,15 +33,71 @@ export interface ISchoolRepository {
   createSchoolOrganization(input: CreateOrganizationInput): Promise<Organization>;
 
   // ── Classrooms ────────────────────────────────────────────────────────────────
+  /**
+   * All classrooms in the org the caller's cache holds (active + archived).
+   * Kept for the legacy School Admin console. Teacher V2 should call
+   * listActiveClassrooms / listArchivedClassrooms instead so the archived
+   * filter is applied in the repository, never only in the UI.
+   */
   listClassrooms(organizationId: string): Classroom[];
+  /** Active (archivedAt === null) classrooms in the organization. */
+  listActiveClassrooms(organizationId: string): Classroom[];
+  /** Archived (archivedAt !== null) classrooms in the organization. */
+  listArchivedClassrooms(organizationId: string): Classroom[];
+  /** A single classroom from cache, or null when the caller cannot see it. */
+  getClassroom(classroomId: string): Classroom | null;
   createClassroom(input: CreateClassroomInput): Promise<Classroom>;
+  /**
+   * Creates a classroom AND registers `teacherUserId` in classroom_teachers
+   * as its first teacher, as one unit. If the teacher assignment fails the
+   * just-created classroom is rolled back (deleted) so no partial state
+   * (a classroom with no teacher) is left behind — see implementation.
+   */
+  createClassroomForTeacher(
+    input: CreateClassroomInput,
+    teacherUserId: string,
+  ): Promise<Classroom>;
+  /** Updates classroom metadata (name / grade / academic year). */
+  updateClassroom(classroomId: string, patch: UpdateClassroomInput): Promise<Classroom>;
+  /**
+   * Archives (archived=true) or restores (archived=false) a classroom by
+   * setting/clearing archived_at ONLY. Never deletes classroom_students,
+   * classroom_teachers, child profiles, or practice history.
+   */
+  setClassroomArchived(classroomId: string, archived: boolean): Promise<Classroom>;
 
   // ── Classroom assignments ─────────────────────────────────────────────────────
   assignTeacherToClassroom(classroomId: string, teacherUserId: string): Promise<ClassroomTeacher>;
   removeTeacherFromClassroom(classroomId: string, teacherUserId: string): Promise<void>;
   addChildToClassroom(classroomId: string, childId: string): Promise<ClassroomStudent>;
   removeChildFromClassroom(classroomId: string, childId: string): Promise<void>;
+  /**
+   * Creates a teacher-managed student profile (owned by `teacherUserId`,
+   * organization_id = `organizationId`) and enrolls it in the classroom, as
+   * one unit. Rolls the profile back if enrollment fails. The profile is NOT
+   * parent-linked (constraint B).
+   */
+  createStudentInClassroom(
+    classroomId: string,
+    organizationId: string,
+    teacherUserId: string,
+    input: CreateClassroomStudentInput,
+  ): Promise<ClassroomStudent>;
+  /**
+   * Moves a child from one classroom to another. Both classrooms must belong
+   * to the same organization. Changes classroom membership only — no child
+   * profile or practice data is touched.
+   */
+  moveStudentBetweenClassrooms(
+    childId: string,
+    fromClassroomId: string,
+    toClassroomId: string,
+  ): Promise<void>;
   listChildrenForClassroom(classroomId: string): ClassroomStudent[];
+  /** Roster rows for a classroom joined with each child's display data. */
+  listClassroomStudentDetails(classroomId: string): Promise<ClassroomStudentDetail[]>;
+  /** Every student across the teacher's active classrooms (Phase 2 §12). */
+  listTeacherStudentDirectory(userId: string): Promise<TeacherStudentDirectoryEntry[]>;
   listClassroomsForTeacher(userId: string): Classroom[];
   listTeachersForClassroom(classroomId: string): ClassroomTeacher[];
 

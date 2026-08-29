@@ -7,6 +7,10 @@ import type {
   ClassroomTeacher,
   CreateOrganizationInput,
   CreateClassroomInput,
+  UpdateClassroomInput,
+  CreateClassroomStudentInput,
+  ClassroomStudentDetail,
+  TeacherStudentDirectoryEntry,
   UserDisplayInfo,
   ParentLinkStatus,
   StudentParentLinkInfo,
@@ -57,6 +61,7 @@ function mapClassroom(row: DbRoom): Classroom {
     academicYear:   row.academic_year,
     createdAt:      row.created_at,
     updatedAt:      row.updated_at,
+    archivedAt:     row.archived_at ?? null,
   };
 }
 
@@ -159,6 +164,22 @@ export class SupabaseSchoolRepository implements ISchoolRepository {
     return this._classrooms.filter((c) => c.organizationId === organizationId);
   }
 
+  listActiveClassrooms(organizationId: string): Classroom[] {
+    return this._classrooms.filter(
+      (c) => c.organizationId === organizationId && c.archivedAt === null,
+    );
+  }
+
+  listArchivedClassrooms(organizationId: string): Classroom[] {
+    return this._classrooms.filter(
+      (c) => c.organizationId === organizationId && c.archivedAt !== null,
+    );
+  }
+
+  getClassroom(classroomId: string): Classroom | null {
+    return this._classrooms.find((c) => c.id === classroomId) ?? null;
+  }
+
   async createClassroom(input: CreateClassroomInput): Promise<Classroom> {
     const { data, error } = await this.client
       .from("classrooms")
@@ -179,6 +200,92 @@ export class SupabaseSchoolRepository implements ISchoolRepository {
 
     const classroom = mapClassroom(data);
     this._classrooms = [...this._classrooms, classroom];
+    this._notify();
+    return classroom;
+  }
+
+  async createClassroomForTeacher(
+    input: CreateClassroomInput,
+    teacherUserId: string,
+  ): Promise<Classroom> {
+    // Step 1: create the classroom.
+    const classroom = await this.createClassroom(input);
+
+    // Step 2: register the creating teacher. If this fails we must not leave
+    // a teacherless classroom behind — delete it and surface the error.
+    try {
+      await this.assignTeacherToClassroom(classroom.id, teacherUserId);
+    } catch (assignErr) {
+      try {
+        await this.client.from("classrooms").delete().eq("id", classroom.id);
+      } catch (rollbackErr) {
+        warnRepo(
+          "SupabaseSchoolRepository.createClassroomForTeacher:rollback",
+          rollbackErr instanceof Error ? rollbackErr : new Error(String(rollbackErr)),
+        );
+      }
+      this._classrooms = this._classrooms.filter((c) => c.id !== classroom.id);
+      this._notify();
+      warnRepo(
+        "SupabaseSchoolRepository.createClassroomForTeacher:assign",
+        assignErr instanceof Error ? assignErr : new Error(String(assignErr)),
+      );
+      throw new Error(
+        assignErr instanceof Error
+          ? `สร้างห้องเรียนไม่สำเร็จ: ${assignErr.message}`
+          : "สร้างห้องเรียนไม่สำเร็จ",
+      );
+    }
+
+    return classroom;
+  }
+
+  async updateClassroom(
+    classroomId: string,
+    patch: UpdateClassroomInput,
+  ): Promise<Classroom> {
+    const dbPatch: Database["public"]["Tables"]["classrooms"]["Update"] = {};
+    if (patch.name !== undefined) dbPatch.name = patch.name;
+    if (patch.gradeLevel !== undefined) dbPatch.grade_level = patch.gradeLevel;
+    if (patch.academicYear !== undefined) dbPatch.academic_year = patch.academicYear;
+
+    const { data, error } = await this.client
+      .from("classrooms")
+      .update(dbPatch)
+      .eq("id", classroomId)
+      .select()
+      .single();
+
+    if (error || !data) {
+      warnRepo("SupabaseSchoolRepository.updateClassroom",
+        new QueryError("classrooms", "update", error ?? new Error("no data")));
+      throw new Error(error?.message ?? "Failed to update classroom");
+    }
+
+    const classroom = mapClassroom(data);
+    this._classrooms = this._classrooms.map((c) => (c.id === classroomId ? classroom : c));
+    this._notify();
+    return classroom;
+  }
+
+  async setClassroomArchived(classroomId: string, archived: boolean): Promise<Classroom> {
+    // Sets archived_at ONLY — never touches classroom_students,
+    // classroom_teachers, child_profiles, or practice history.
+    const { data, error } = await this.client
+      .from("classrooms")
+      .update({ archived_at: archived ? new Date().toISOString() : null })
+      .eq("id", classroomId)
+      .select()
+      .single();
+
+    if (error || !data) {
+      warnRepo("SupabaseSchoolRepository.setClassroomArchived",
+        new QueryError("classrooms", "update", error ?? new Error("no data")));
+      throw new Error(error?.message ?? "Failed to change classroom status");
+    }
+
+    const classroom = mapClassroom(data);
+    this._classrooms = this._classrooms.map((c) => (c.id === classroomId ? classroom : c));
     this._notify();
     return classroom;
   }
@@ -634,6 +741,176 @@ export class SupabaseSchoolRepository implements ISchoolRepository {
       p_child_id: childId,
     });
     if (error) throw new Error(error.message);
+  }
+
+  // ── Classroom membership (Teacher V2 Phase 2) ────────────────────────────────
+
+  async createStudentInClassroom(
+    classroomId: string,
+    organizationId: string,
+    teacherUserId: string,
+    input: CreateClassroomStudentInput,
+  ): Promise<ClassroomStudent> {
+    // Step 1: create a teacher-managed profile. Owned by the teacher,
+    // stamped with organization_id so it is an org student — NOT parent
+    // linked (no parent_email_pending, no invitation).
+    const { data: profile, error: profileErr } = await this.client
+      .from("child_profiles")
+      .insert({
+        user_id:           teacherUserId,
+        name:              input.name,
+        age:               input.age ?? 6,
+        target_sound:      "ก",
+        training_goal:     "",
+        training_mode:     "speech_clarity",
+        selected_sound_id: "ก",
+        avatar_emoji:      "🧒",
+        organization_id:   organizationId,
+        nickname:          input.nickname || null,
+        grade_level:       input.gradeLevel || null,
+      })
+      .select()
+      .single();
+
+    if (profileErr || !profile) {
+      warnRepo("SupabaseSchoolRepository.createStudentInClassroom:profile",
+        new QueryError("child_profiles", "insert", profileErr ?? new Error("no data")));
+      throw new Error(profileErr?.message ?? "สร้างโปรไฟล์นักเรียนไม่สำเร็จ");
+    }
+
+    // Step 2: enrol. On failure, roll the profile back so we don't leave an
+    // orphan child_profiles row the teacher never sees in any classroom.
+    try {
+      return await this.addChildToClassroom(classroomId, profile.id);
+    } catch (enrolErr) {
+      try {
+        await this.client.from("child_profiles").delete().eq("id", profile.id);
+      } catch (rollbackErr) {
+        warnRepo("SupabaseSchoolRepository.createStudentInClassroom:rollback",
+          rollbackErr instanceof Error ? rollbackErr : new Error(String(rollbackErr)));
+      }
+      warnRepo("SupabaseSchoolRepository.createStudentInClassroom:enrol",
+        enrolErr instanceof Error ? enrolErr : new Error(String(enrolErr)));
+      throw new Error(
+        enrolErr instanceof Error
+          ? `เพิ่มนักเรียนไม่สำเร็จ: ${enrolErr.message}`
+          : "เพิ่มนักเรียนไม่สำเร็จ",
+      );
+    }
+  }
+
+  async moveStudentBetweenClassrooms(
+    childId: string,
+    fromClassroomId: string,
+    toClassroomId: string,
+  ): Promise<void> {
+    if (fromClassroomId === toClassroomId) return;
+
+    const from = this._classrooms.find((c) => c.id === fromClassroomId);
+    const to = this._classrooms.find((c) => c.id === toClassroomId);
+    if (!from || !to) throw new Error("ไม่พบห้องเรียน");
+    if (from.organizationId !== to.organizationId) {
+      throw new Error("ไม่สามารถย้ายนักเรียนข้ามองค์กรได้");
+    }
+
+    // Add to the destination first; only remove from the source once the
+    // child is safely enrolled in the target, so a failure never drops the
+    // child out of every classroom.
+    await this.addChildToClassroom(toClassroomId, childId);
+    await this.removeChildFromClassroom(fromClassroomId, childId);
+  }
+
+  async listClassroomStudentDetails(classroomId: string): Promise<ClassroomStudentDetail[]> {
+    const rows = this._classroomStudents.filter((s) => s.classroomId === classroomId);
+    if (rows.length === 0) return [];
+
+    const { data: { user } } = await this.client.auth.getUser();
+    const ids = rows.map((r) => r.childId);
+
+    const { data, error } = await this.client
+      .from("child_profiles")
+      .select("id, name, nickname, avatar_emoji, user_id")
+      .in("id", ids);
+
+    if (error) {
+      warnRepo("SupabaseSchoolRepository.listClassroomStudentDetails",
+        new QueryError("child_profiles", "select", error));
+    }
+
+    const profileMap = new Map(
+      (data ?? []).map((p) => [
+        p.id,
+        p as { id: string; name: string; nickname: string | null; avatar_emoji: string | null; user_id: string },
+      ]),
+    );
+
+    return rows
+      .map((r) => {
+        const p = profileMap.get(r.childId);
+        return {
+          childId:        r.childId,
+          classroomId:    r.classroomId,
+          name:           p?.name ?? "นักเรียน",
+          nickname:       p?.nickname ?? null,
+          avatarEmoji:    p?.avatar_emoji ?? null,
+          addedAt:        r.createdAt,
+          teacherManaged: !!(p && user && p.user_id === user.id),
+        };
+      })
+      .sort((a, b) => a.addedAt.localeCompare(b.addedAt));
+  }
+
+  async listTeacherStudentDirectory(userId: string): Promise<TeacherStudentDirectoryEntry[]> {
+    const myClassroomIds = new Set(
+      this._classroomTeachers.filter((t) => t.teacherUserId === userId).map((t) => t.classroomId),
+    );
+    const activeClassrooms = this._classrooms.filter(
+      (c) => myClassroomIds.has(c.id) && c.archivedAt === null,
+    );
+    const activeIds = new Set(activeClassrooms.map((c) => c.id));
+    const classroomNameMap = new Map(activeClassrooms.map((c) => [c.id, c.name]));
+
+    const membership = this._classroomStudents.filter((s) => activeIds.has(s.classroomId));
+    if (membership.length === 0) return [];
+
+    const childIds = [...new Set(membership.map((s) => s.childId))];
+    const { data, error } = await this.client
+      .from("child_profiles")
+      .select("id, name, nickname, avatar_emoji")
+      .in("id", childIds);
+
+    if (error) {
+      warnRepo("SupabaseSchoolRepository.listTeacherStudentDirectory",
+        new QueryError("child_profiles", "select", error));
+    }
+    const profileMap = new Map(
+      (data ?? []).map((p) => [
+        p.id,
+        p as { id: string; name: string; nickname: string | null; avatar_emoji: string | null },
+      ]),
+    );
+
+    const byChild = new Map<string, TeacherStudentDirectoryEntry>();
+    for (const m of membership) {
+      let entry = byChild.get(m.childId);
+      if (!entry) {
+        const p = profileMap.get(m.childId);
+        entry = {
+          childId:     m.childId,
+          name:        p?.name ?? "นักเรียน",
+          nickname:    p?.nickname ?? null,
+          avatarEmoji: p?.avatar_emoji ?? null,
+          classrooms:  [],
+        };
+        byChild.set(m.childId, entry);
+      }
+      const name = classroomNameMap.get(m.classroomId);
+      if (name && !entry.classrooms.some((c) => c.id === m.classroomId)) {
+        entry.classrooms.push({ id: m.classroomId, name });
+      }
+    }
+
+    return [...byChild.values()].sort((a, b) => a.name.localeCompare(b.name, "th"));
   }
 
   // ── Teacher self-serve provisioning (Teacher V2 Phase 1) ──────────────────────

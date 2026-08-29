@@ -40,7 +40,19 @@ export interface Classroom {
   academicYear: string | null;
   createdAt: string;
   updatedAt: string;
+  /** null = active; ISO timestamp = archived (Teacher V2 Phase 2). */
+  archivedAt: string | null;
 }
+
+/** Convenience view of {@link Classroom.archivedAt}. */
+export function classroomStatus(c: Pick<Classroom, "archivedAt">): "active" | "archived" {
+  return c.archivedAt ? "archived" : "active";
+}
+
+export const CLASSROOM_STATUS_LABELS: Record<"active" | "archived", string> = {
+  active: "ใช้งานอยู่",
+  archived: "เก็บไว้",
+};
 
 export interface ClassroomStudent {
   classroomId: string;
@@ -65,6 +77,49 @@ export interface CreateClassroomInput {
   name: string;
   gradeLevel?: string;
   academicYear?: string;
+}
+
+/** Editable classroom metadata (Teacher V2 Phase 2). All fields optional. */
+export interface UpdateClassroomInput {
+  name?: string;
+  gradeLevel?: string | null;
+  academicYear?: string | null;
+}
+
+/**
+ * Fields for a teacher-created ("school-managed") student profile.
+ * The created child_profiles row is owned by the creating teacher and
+ * carries organization_id = the teacher's workspace org. It is NOT
+ * parent-linked (Teacher V2 Phase 2, constraint B).
+ */
+export interface CreateClassroomStudentInput {
+  name: string;
+  age?: number;
+  nickname?: string;
+  gradeLevel?: string;
+}
+
+/** A classroom roster row joined with the child's display data. */
+export interface ClassroomStudentDetail {
+  childId: string;
+  classroomId: string;
+  name: string;
+  nickname: string | null;
+  avatarEmoji: string | null;
+  /** When the child was added to this classroom. */
+  addedAt: string;
+  /** True when the child_profiles row is owned by the current teacher. */
+  teacherManaged: boolean;
+}
+
+/** A student in the teacher's cross-classroom directory (Phase 2 §12). */
+export interface TeacherStudentDirectoryEntry {
+  childId: string;
+  name: string;
+  nickname: string | null;
+  avatarEmoji: string | null;
+  /** Active (non-archived) classrooms this child belongs to. */
+  classrooms: { id: string; name: string }[];
 }
 
 export interface UserDisplayInfo {

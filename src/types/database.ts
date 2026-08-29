@@ -159,6 +159,11 @@ export type DbClassroom = {
   academic_year: string | null;
   created_at: string;
   updated_at: string;
+  /**
+   * Added in migration 20260829000100. NULL = active; a timestamp = archived
+   * (hidden from the default active list, all relationships retained).
+   */
+  archived_at: string | null;
 };
 
 // ── classroom_students ─────────────────────────────────────────────────────────

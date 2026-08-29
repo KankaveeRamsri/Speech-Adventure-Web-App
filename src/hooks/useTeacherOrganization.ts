@@ -7,6 +7,12 @@ import { useSchool } from "@/hooks/useSchool";
 
 type ProvisionStatus = "idle" | "provisioning" | "ready" | "error";
 
+// Session-lifetime dedupe, keyed by user id. Multiple mounted instances of
+// this hook (TeacherPageShell + several Phase 2 hooks on one page) then share
+// a single ensure_teacher_organization RPC call and its result instead of
+// each firing their own. Mirrors the pattern in src/lib/auth/trustedRole.ts.
+const _provisionCache = new Map<string, Promise<{ organizationId: string }>>();
+
 /**
  * Ensures a signed-in teacher has an internal organization to own classrooms
  * in (Teacher V2 Phase 1), without ever exposing "organization" as a concept
@@ -43,12 +49,16 @@ export function useTeacherOrganization() {
     let cancelled = false;
     setStatus("provisioning");
 
-    // ensureTeacherOrganization is idempotent server/store-side, so calling
-    // whichever function identity this render's closure captured is safe —
-    // deliberately depending on user?.id (and the resolved role state)
-    // rather than the function itself, which useSchool() recreates every
-    // render, keeps this from re-firing.
-    ensureTeacherOrganization(user.id)
+    // ensureTeacherOrganization is idempotent server/store-side; the module
+    // cache additionally collapses concurrent instances into one RPC call.
+    let pending = _provisionCache.get(user.id);
+    if (!pending) {
+      pending = ensureTeacherOrganization(user.id);
+      _provisionCache.set(user.id, pending);
+      pending.catch(() => _provisionCache.delete(user.id));
+    }
+
+    pending
       .then(({ organizationId: id }) => {
         if (cancelled) return;
         setOrganizationId(id);
@@ -56,6 +66,7 @@ export function useTeacherOrganization() {
       })
       .catch(() => {
         if (cancelled) return;
+        attemptedForUserId.current = null; // allow a retry on next mount
         setStatus("error");
       });
 

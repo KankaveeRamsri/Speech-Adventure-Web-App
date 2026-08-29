@@ -59,7 +59,9 @@ export type InsertChildAccess = Omit<DbChildAccess, "id" | "created_at" | "revok
 export type UpdateChildAccess = Partial<Omit<DbChildAccess, "id" | "created_at">>;
 export type InsertOrganization = Omit<DbOrganization, "id" | "created_at" | "updated_at"> & { id?: string };
 export type InsertOrganizationMember = Omit<DbOrganizationMember, "id" | "created_at" | "updated_at"> & { id?: string };
-export type InsertClassroom = Omit<DbClassroom, "id" | "created_at" | "updated_at"> & { id?: string };
+export type InsertClassroom =
+  Omit<DbClassroom, "id" | "created_at" | "updated_at" | "archived_at">
+  & { id?: string; archived_at?: string | null };
 export type InsertClassroomStudent = Omit<DbClassroomStudent, "created_at">;
 export type InsertClassroomTeacher = Omit<DbClassroomTeacher, "created_at">;
 
@@ -198,6 +200,10 @@ export interface Database {
       ensure_teacher_organization: {
         Args: { p_name: string };
         Returns: string;
+      };
+      can_enroll_child_in_classroom: {
+        Args: { p_child_id: string; p_classroom_id: string };
+        Returns: boolean;
       };
     };
     Enums: {

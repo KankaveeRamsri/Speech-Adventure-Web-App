@@ -9,6 +9,10 @@ import type {
   ClassroomTeacher,
   CreateOrganizationInput,
   CreateClassroomInput,
+  UpdateClassroomInput,
+  CreateClassroomStudentInput,
+  ClassroomStudentDetail,
+  TeacherStudentDirectoryEntry,
   UserDisplayInfo,
   StudentParentLinkInfo,
 } from "@/types/school";
@@ -61,7 +65,8 @@ function _read(): SchoolStore {
     return {
       organizations: parsed.organizations ?? [],
       members: parsed.members ?? [],
-      classrooms: parsed.classrooms ?? [],
+      // Normalize archivedAt for rows written before Phase 2.
+      classrooms: (parsed.classrooms ?? []).map((c) => ({ ...c, archivedAt: c.archivedAt ?? null })),
       classroomStudents: parsed.classroomStudents ?? [],
       classroomTeachers: parsed.classroomTeachers ?? [],
     };
@@ -159,6 +164,25 @@ export class LocalSchoolRepository implements ISchoolRepository {
     return _store.classrooms.filter((c) => c.organizationId === organizationId);
   }
 
+  listActiveClassrooms(organizationId: string): Classroom[] {
+    _init();
+    return _store.classrooms.filter(
+      (c) => c.organizationId === organizationId && c.archivedAt === null,
+    );
+  }
+
+  listArchivedClassrooms(organizationId: string): Classroom[] {
+    _init();
+    return _store.classrooms.filter(
+      (c) => c.organizationId === organizationId && c.archivedAt !== null,
+    );
+  }
+
+  getClassroom(classroomId: string): Classroom | null {
+    _init();
+    return _store.classrooms.find((c) => c.id === classroomId) ?? null;
+  }
+
   async createClassroom(input: CreateClassroomInput): Promise<Classroom> {
     _init();
     const now = new Date().toISOString();
@@ -170,11 +194,79 @@ export class LocalSchoolRepository implements ISchoolRepository {
       academicYear: input.academicYear ?? null,
       createdAt: now,
       updatedAt: now,
+      archivedAt: null,
     };
     _store = { ..._store, classrooms: [..._store.classrooms, classroom] };
     _write();
     _notify();
     return classroom;
+  }
+
+  async createClassroomForTeacher(
+    input: CreateClassroomInput,
+    teacherUserId: string,
+  ): Promise<Classroom> {
+    const classroom = await this.createClassroom(input);
+    try {
+      await this.assignTeacherToClassroom(classroom.id, teacherUserId);
+    } catch (err) {
+      _store = {
+        ..._store,
+        classrooms: _store.classrooms.filter((c) => c.id !== classroom.id),
+      };
+      _write();
+      _notify();
+      throw err instanceof Error ? err : new Error("สร้างห้องเรียนไม่สำเร็จ");
+    }
+    return classroom;
+  }
+
+  async updateClassroom(
+    classroomId: string,
+    patch: UpdateClassroomInput,
+  ): Promise<Classroom> {
+    _init();
+    let updated: Classroom | null = null;
+    _store = {
+      ..._store,
+      classrooms: _store.classrooms.map((c) => {
+        if (c.id !== classroomId) return c;
+        updated = {
+          ...c,
+          name: patch.name ?? c.name,
+          gradeLevel: patch.gradeLevel !== undefined ? patch.gradeLevel : c.gradeLevel,
+          academicYear:
+            patch.academicYear !== undefined ? patch.academicYear : c.academicYear,
+          updatedAt: new Date().toISOString(),
+        };
+        return updated;
+      }),
+    };
+    if (!updated) throw new Error("ไม่พบห้องเรียน");
+    _write();
+    _notify();
+    return updated;
+  }
+
+  async setClassroomArchived(classroomId: string, archived: boolean): Promise<Classroom> {
+    _init();
+    let updated: Classroom | null = null;
+    _store = {
+      ..._store,
+      classrooms: _store.classrooms.map((c) => {
+        if (c.id !== classroomId) return c;
+        updated = {
+          ...c,
+          archivedAt: archived ? new Date().toISOString() : null,
+          updatedAt: new Date().toISOString(),
+        };
+        return updated;
+      }),
+    };
+    if (!updated) throw new Error("ไม่พบห้องเรียน");
+    _write();
+    _notify();
+    return updated;
   }
 
   // ── Classroom assignments ─────────────────────────────────────────────────────
@@ -240,6 +332,75 @@ export class LocalSchoolRepository implements ISchoolRepository {
   listChildrenForClassroom(classroomId: string): ClassroomStudent[] {
     _init();
     return _store.classroomStudents.filter((s) => s.classroomId === classroomId);
+  }
+
+  async createStudentInClassroom(
+    classroomId: string,
+    _organizationId: string,
+    _teacherUserId: string,
+    _input: CreateClassroomStudentInput,
+  ): Promise<ClassroomStudent> {
+    // local/demo mode does not persist child_profiles here — just enrol a
+    // synthetic membership row so the UI flow is exercisable offline.
+    return this.addChildToClassroom(classroomId, _id());
+  }
+
+  async moveStudentBetweenClassrooms(
+    childId: string,
+    fromClassroomId: string,
+    toClassroomId: string,
+  ): Promise<void> {
+    if (fromClassroomId === toClassroomId) return;
+    const from = _store.classrooms.find((c) => c.id === fromClassroomId);
+    const to = _store.classrooms.find((c) => c.id === toClassroomId);
+    if (from && to && from.organizationId !== to.organizationId) {
+      throw new Error("ไม่สามารถย้ายนักเรียนข้ามองค์กรได้");
+    }
+    await this.addChildToClassroom(toClassroomId, childId);
+    await this.removeChildFromClassroom(fromClassroomId, childId);
+  }
+
+  async listClassroomStudentDetails(classroomId: string): Promise<ClassroomStudentDetail[]> {
+    _init();
+    return _store.classroomStudents
+      .filter((s) => s.classroomId === classroomId)
+      .map((s) => ({
+        childId:        s.childId,
+        classroomId:    s.classroomId,
+        name:           `นักเรียน ${s.childId.slice(0, 6)}`,
+        nickname:       null,
+        avatarEmoji:    null,
+        addedAt:        s.createdAt,
+        teacherManaged: true,
+      }));
+  }
+
+  async listTeacherStudentDirectory(userId: string): Promise<TeacherStudentDirectoryEntry[]> {
+    _init();
+    const myClassroomIds = new Set(
+      _store.classroomTeachers.filter((t) => t.teacherUserId === userId).map((t) => t.classroomId),
+    );
+    const active = _store.classrooms.filter(
+      (c) => myClassroomIds.has(c.id) && c.archivedAt === null,
+    );
+    const nameMap = new Map(active.map((c) => [c.id, c.name]));
+    const byChild = new Map<string, TeacherStudentDirectoryEntry>();
+    for (const s of _store.classroomStudents) {
+      if (!nameMap.has(s.classroomId)) continue;
+      let entry = byChild.get(s.childId);
+      if (!entry) {
+        entry = {
+          childId: s.childId,
+          name: `นักเรียน ${s.childId.slice(0, 6)}`,
+          nickname: null,
+          avatarEmoji: null,
+          classrooms: [],
+        };
+        byChild.set(s.childId, entry);
+      }
+      entry.classrooms.push({ id: s.classroomId, name: nameMap.get(s.classroomId)! });
+    }
+    return [...byChild.values()];
   }
 
   listClassroomsForTeacher(userId: string): Classroom[] {
