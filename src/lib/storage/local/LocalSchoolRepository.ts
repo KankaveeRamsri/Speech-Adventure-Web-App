@@ -38,6 +38,7 @@ const EMPTY_STORE: SchoolStore = {
 };
 
 const SERVER_ORGS: Organization[] = [];
+const SERVER_CLASSROOMS: Classroom[] = [];
 
 // ── Module-level state (shared key — org data visible to all users on device) ──
 
@@ -162,6 +163,15 @@ export class LocalSchoolRepository implements ISchoolRepository {
   listClassrooms(organizationId: string): Classroom[] {
     _init();
     return _store.classrooms.filter((c) => c.organizationId === organizationId);
+  }
+
+  getClassroomsSnapshot(): Classroom[] {
+    _init();
+    return _store.classrooms;
+  }
+
+  getServerClassroomsSnapshot(): Classroom[] {
+    return SERVER_CLASSROOMS;
   }
 
   listActiveClassrooms(organizationId: string): Classroom[] {

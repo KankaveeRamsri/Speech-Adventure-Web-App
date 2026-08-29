@@ -86,6 +86,7 @@ function mapDisplay(row: DbDisplay): UserDisplayInfo {
 }
 
 const SERVER_ORGS: Organization[] = [];
+const SERVER_CLASSROOMS: Classroom[] = [];
 
 /**
  * Supabase-backed school/classroom repository.
@@ -96,7 +97,7 @@ const SERVER_ORGS: Organization[] = [];
 export class SupabaseSchoolRepository implements ISchoolRepository {
   private _orgs: Organization[] = SERVER_ORGS;
   private _members: OrganizationMember[] = [];
-  private _classrooms: Classroom[] = [];
+  private _classrooms: Classroom[] = SERVER_CLASSROOMS;
   private _classroomStudents: ClassroomStudent[] = [];
   private _classroomTeachers: ClassroomTeacher[] = [];
   private readonly _listeners = new Set<() => void>();
@@ -162,6 +163,14 @@ export class SupabaseSchoolRepository implements ISchoolRepository {
 
   listClassrooms(organizationId: string): Classroom[] {
     return this._classrooms.filter((c) => c.organizationId === organizationId);
+  }
+
+  getClassroomsSnapshot(): Classroom[] {
+    return this._classrooms;
+  }
+
+  getServerClassroomsSnapshot(): Classroom[] {
+    return SERVER_CLASSROOMS;
   }
 
   listActiveClassrooms(organizationId: string): Classroom[] {
@@ -408,7 +417,7 @@ export class SupabaseSchoolRepository implements ISchoolRepository {
     this._hydratePromise = null;
     this._orgs = SERVER_ORGS;
     this._members = [];
-    this._classrooms = [];
+    this._classrooms = SERVER_CLASSROOMS;
     this._classroomStudents = [];
     this._classroomTeachers = [];
     this._notify();

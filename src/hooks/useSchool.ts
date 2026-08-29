@@ -20,9 +20,14 @@ import type {
 // Module-level stable refs required by useSyncExternalStore
 const _noopSub = () => () => {};
 const _serverOrgs: Organization[] = [];
+const _serverClassrooms: Classroom[] = [];
 
 function _serverSnapshot(): Organization[] {
   return _serverOrgs;
+}
+
+function _serverClassroomsSnapshot(): Classroom[] {
+  return _serverClassrooms;
 }
 
 /**
@@ -41,20 +46,35 @@ export function useSchool() {
     school?.getServerOrganizations.bind(school) ?? _serverSnapshot,
   );
 
+  // Separate subscription for classrooms: its snapshot reference changes on
+  // every classroom mutation (create / rename / archive) even when the
+  // organizations snapshot is untouched, so components re-render on a
+  // classroom-only change. `allClassrooms` is every cached classroom
+  // (active + archived) across all orgs the caller can see.
+  const allClassrooms = useSyncExternalStore(
+    school?.subscribe.bind(school) ?? _noopSub,
+    school?.getClassroomsSnapshot.bind(school) ?? _serverClassroomsSnapshot,
+    school?.getServerClassroomsSnapshot.bind(school) ?? _serverClassroomsSnapshot,
+  );
+
   function listClassrooms(organizationId: string): Classroom[] {
-    return school?.listClassrooms(organizationId) ?? [];
+    return allClassrooms.filter((c) => c.organizationId === organizationId);
   }
 
   function listActiveClassrooms(organizationId: string): Classroom[] {
-    return school?.listActiveClassrooms(organizationId) ?? [];
+    return allClassrooms.filter(
+      (c) => c.organizationId === organizationId && c.archivedAt === null,
+    );
   }
 
   function listArchivedClassrooms(organizationId: string): Classroom[] {
-    return school?.listArchivedClassrooms(organizationId) ?? [];
+    return allClassrooms.filter(
+      (c) => c.organizationId === organizationId && c.archivedAt !== null,
+    );
   }
 
   function getClassroom(classroomId: string): Classroom | null {
-    return school?.getClassroom(classroomId) ?? null;
+    return allClassrooms.find((c) => c.id === classroomId) ?? null;
   }
 
   function listChildrenForClassroom(classroomId: string): ClassroomStudent[] {

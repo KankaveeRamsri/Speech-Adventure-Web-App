@@ -40,6 +40,16 @@ export interface ISchoolRepository {
    * filter is applied in the repository, never only in the UI.
    */
   listClassrooms(organizationId: string): Classroom[];
+  /**
+   * Stable-reference snapshot of every cached classroom, for
+   * useSyncExternalStore. The array identity changes on every classroom
+   * mutation (create / update / archive) and on hydrate, and never
+   * otherwise — so a component subscribed to it re-renders exactly when
+   * classroom data changes, including a classroom-only change that leaves
+   * the organizations snapshot untouched.
+   */
+  getClassroomsSnapshot(): Classroom[];
+  getServerClassroomsSnapshot(): Classroom[];
   /** Active (archivedAt === null) classrooms in the organization. */
   listActiveClassrooms(organizationId: string): Classroom[];
   /** Archived (archivedAt !== null) classrooms in the organization. */
