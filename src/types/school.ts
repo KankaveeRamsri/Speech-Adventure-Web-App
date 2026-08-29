@@ -122,6 +122,27 @@ export interface TeacherStudentDirectoryEntry {
   classrooms: { id: string; name: string }[];
 }
 
+/**
+ * Full profile of one student for the Teacher Student Detail header
+ * (Phase 3). Resolved through the RLS-scoped child_profiles read — null
+ * when the caller has no access to the child.
+ */
+export interface TeacherStudentProfile {
+  childId: string;
+  name: string;
+  nickname: string | null;
+  avatarEmoji: string | null;
+  age: number | null;
+  gradeLevel: string | null;
+  /** "speech_clarity" | "kindergarten_phonics" | other string. */
+  trainingMode: string;
+  targetSound: string | null;
+  /** True when the current teacher owns this child_profiles row. */
+  teacherManaged: boolean;
+  /** Active (non-archived) classrooms this child belongs to that the teacher teaches. */
+  classrooms: { id: string; name: string }[];
+}
+
 export interface UserDisplayInfo {
   userId: string;
   email: string;

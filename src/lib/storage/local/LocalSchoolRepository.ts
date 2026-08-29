@@ -13,6 +13,7 @@ import type {
   CreateClassroomStudentInput,
   ClassroomStudentDetail,
   TeacherStudentDirectoryEntry,
+  TeacherStudentProfile,
   UserDisplayInfo,
   StudentParentLinkInfo,
 } from "@/types/school";
@@ -411,6 +412,37 @@ export class LocalSchoolRepository implements ISchoolRepository {
       entry.classrooms.push({ id: s.classroomId, name: nameMap.get(s.classroomId)! });
     }
     return [...byChild.values()];
+  }
+
+  async getStudentProfile(
+    childId: string,
+    teacherUserId: string,
+  ): Promise<TeacherStudentProfile | null> {
+    _init();
+    if (!childId) return null;
+    // local/demo mode does not persist child_profiles here — return a minimal
+    // shell only when the child is in one of the teacher's classrooms.
+    const myClassroomIds = new Set(
+      _store.classroomTeachers.filter((t) => t.teacherUserId === teacherUserId).map((t) => t.classroomId),
+    );
+    const classrooms = _store.classroomStudents
+      .filter((s) => s.childId === childId && myClassroomIds.has(s.classroomId))
+      .map((s) => _store.classrooms.find((c) => c.id === s.classroomId))
+      .filter((c): c is NonNullable<typeof c> => !!c && c.archivedAt === null)
+      .map((c) => ({ id: c.id, name: c.name }));
+    if (classrooms.length === 0) return null;
+    return {
+      childId,
+      name: `นักเรียน ${childId.slice(0, 6)}`,
+      nickname: null,
+      avatarEmoji: null,
+      age: null,
+      gradeLevel: null,
+      trainingMode: "speech_clarity",
+      targetSound: null,
+      teacherManaged: false,
+      classrooms,
+    };
   }
 
   listClassroomsForTeacher(userId: string): Classroom[] {

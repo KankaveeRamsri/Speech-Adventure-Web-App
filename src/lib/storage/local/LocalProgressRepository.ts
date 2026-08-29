@@ -1,5 +1,9 @@
 import * as storage from "@/lib/speechProgressStorage";
-import type { IProgressRepository, StartSessionInput } from "@/lib/repositories/IProgressRepository";
+import type {
+  IProgressRepository,
+  StartSessionInput,
+  ChildPracticeSummary,
+} from "@/lib/repositories/IProgressRepository";
 import type { SpeechProgress, PracticeAttempt, PracticeSession } from "@/types/speechAdventure";
 
 /**
@@ -84,5 +88,44 @@ export class LocalProgressRepository implements IProgressRepository {
 
   setScope(userId: string | null): void {
     storage.setScope(userId);
+  }
+
+  // ── Teacher V2 Phase 3 ────────────────────────────────────────────────────
+  // Local/demo mode holds only the signed-in user's own selected-child
+  // progress, so cross-child teacher reads are best-effort: real data only
+  // when childId matches the loaded progress, otherwise an empty history.
+
+  async getChildProgress(childId: string): Promise<SpeechProgress> {
+    const current = storage.getProgress();
+    if (childId && current.childId === childId) return current;
+    return {
+      childId,
+      targetSound: current.targetSound,
+      attempts: [],
+      sessions: [],
+      updatedAt: new Date().toISOString(),
+    };
+  }
+
+  async getChildrenPracticeSummaries(
+    childIds: string[],
+  ): Promise<Map<string, ChildPracticeSummary>> {
+    const result = new Map<string, ChildPracticeSummary>();
+    const current = storage.getProgress();
+    if (!current.childId || !childIds.includes(current.childId)) return result;
+    const attempts = current.attempts;
+    if (attempts.length === 0) return result;
+    const total = attempts.reduce((s, a) => s + a.score, 0);
+    const last = attempts.reduce(
+      (m, a) => (a.createdAt > m ? a.createdAt : m),
+      attempts[0].createdAt,
+    );
+    result.set(current.childId, {
+      childId: current.childId,
+      attemptCount: attempts.length,
+      averageScore: Math.round(total / attempts.length),
+      lastPracticedAt: last,
+    });
+    return result;
   }
 }

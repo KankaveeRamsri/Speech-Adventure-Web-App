@@ -41,7 +41,10 @@ function RosterRow({
   const label = student.nickname ? `${student.name} (${student.nickname})` : student.name;
   return (
     <li className="flex items-center justify-between gap-3 px-3 py-2.5 rounded-xl border border-border bg-black/[0.02] dark:bg-white/[0.03]">
-      <div className="flex items-center gap-3 min-w-0">
+      <Link
+        href={`/teacher/students/${student.childId}`}
+        className="flex items-center gap-3 min-w-0 flex-1 rounded-lg -mx-1 px-1 py-0.5 hover:bg-black/[0.03] dark:hover:bg-white/[0.04] transition-colors"
+      >
         <div className="w-9 h-9 rounded-xl bg-primary/10 flex items-center justify-center flex-shrink-0 text-primary font-bold">
           {student.avatarEmoji ?? label.charAt(0)}
         </div>
@@ -49,7 +52,7 @@ function RosterRow({
           <p className="text-sm text-text truncate">{label}</p>
           <p className="text-[11px] text-text-muted">เพิ่มเมื่อ {formatThaiDate(student.addedAt)}</p>
         </div>
-      </div>
+      </Link>
       <div className="flex items-center gap-1 flex-shrink-0">
         <button
           type="button"

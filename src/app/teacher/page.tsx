@@ -9,7 +9,9 @@ import { useTeacherChildren } from "@/hooks/useTeacherChildren";
 import { useChildProfile } from "@/hooks/useChildProfile";
 import { useSpeechProgress } from "@/hooks/useSpeechProgress";
 import { useTeacherClassrooms } from "@/hooks/useTeacherClassrooms";
+import { useTeacherStudentDirectory } from "@/hooks/useTeacherStudentDirectory";
 import { useAuth } from "@/hooks/useAuth";
+import { pct, thaiRelative } from "@/lib/teacher/format";
 
 /**
  * Teacher V2 dashboard.
@@ -25,6 +27,17 @@ export default function TeacherDashboardPage() {
   const { selectChild } = useChildProfile();
   const { switchChildProgress } = useSpeechProgress();
   const { status, active, studentCount } = useTeacherClassrooms();
+  const { rows: directoryRows } = useTeacherStudentDirectory();
+
+  // Small Phase 3 integration: up to 5 students who practiced most recently.
+  const recentlyActive = directoryRows
+    .filter((r) => r.practice?.lastPracticedAt)
+    .sort(
+      (a, b) =>
+        new Date(b.practice!.lastPracticedAt!).getTime() -
+        new Date(a.practice!.lastPracticedAt!).getTime(),
+    )
+    .slice(0, 5);
 
   const greetingName = user?.email?.split("@")[0] ?? "คุณครู";
   const hasSharedChildren = sharedHydrated && sharedChildren.length > 0;
@@ -101,6 +114,37 @@ export default function TeacherDashboardPage() {
                 ))}
               </div>
             </section>
+
+            {recentlyActive.length > 0 && (
+              <section>
+                <p className="text-xs font-semibold text-text-muted uppercase tracking-wider mb-3">
+                  นักเรียนที่ฝึกล่าสุด
+                </p>
+                <ul className="space-y-2">
+                  {recentlyActive.map((r) => {
+                    const label = r.nickname ? `${r.name} (${r.nickname})` : r.name;
+                    return (
+                      <li key={r.childId}>
+                        <Link
+                          href={`/teacher/students/${r.childId}`}
+                          className="flex items-center justify-between gap-3 px-3 py-2.5 rounded-xl border border-border bg-surface hover:border-primary/40 transition-colors"
+                        >
+                          <div className="flex items-center gap-3 min-w-0">
+                            <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0 text-primary font-bold text-sm">
+                              {r.avatarEmoji ?? label.charAt(0)}
+                            </div>
+                            <span className="text-sm text-text truncate">{label}</span>
+                          </div>
+                          <span className="text-[11px] text-text-muted flex-shrink-0">
+                            {pct(r.practice!.averageScore)} · {thaiRelative(r.practice!.lastPracticedAt)}
+                          </span>
+                        </Link>
+                      </li>
+                    );
+                  })}
+                </ul>
+              </section>
+            )}
           </>
         )}
 

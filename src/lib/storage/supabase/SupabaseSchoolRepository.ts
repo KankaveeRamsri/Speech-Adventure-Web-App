@@ -11,6 +11,7 @@ import type {
   CreateClassroomStudentInput,
   ClassroomStudentDetail,
   TeacherStudentDirectoryEntry,
+  TeacherStudentProfile,
   UserDisplayInfo,
   ParentLinkStatus,
   StudentParentLinkInfo,
@@ -920,6 +921,55 @@ export class SupabaseSchoolRepository implements ISchoolRepository {
     }
 
     return [...byChild.values()].sort((a, b) => a.name.localeCompare(b.name, "th"));
+  }
+
+  async getStudentProfile(
+    childId: string,
+    teacherUserId: string,
+  ): Promise<TeacherStudentProfile | null> {
+    if (!childId) return null;
+
+    const { data, error } = await this.client
+      .from("child_profiles")
+      .select("id, name, nickname, avatar_emoji, age, grade_level, training_mode, target_sound, user_id")
+      .eq("id", childId)
+      .maybeSingle();
+
+    if (error) {
+      warnRepo("SupabaseSchoolRepository.getStudentProfile",
+        new QueryError("child_profiles", "select", error));
+      return null;
+    }
+    if (!data) return null; // does not exist OR no access — caller must not distinguish
+
+    const row = data as {
+      id: string; name: string; nickname: string | null; avatar_emoji: string | null;
+      age: number | null; grade_level: string | null; training_mode: string;
+      target_sound: string | null; user_id: string;
+    };
+
+    // Which of the teacher's classrooms currently contain this child.
+    const myClassroomIds = new Set(
+      this._classroomTeachers.filter((t) => t.teacherUserId === teacherUserId).map((t) => t.classroomId),
+    );
+    const classrooms = this._classroomStudents
+      .filter((s) => s.childId === childId && myClassroomIds.has(s.classroomId))
+      .map((s) => this._classrooms.find((c) => c.id === s.classroomId))
+      .filter((c): c is NonNullable<typeof c> => !!c && c.archivedAt === null)
+      .map((c) => ({ id: c.id, name: c.name }));
+
+    return {
+      childId:       row.id,
+      name:          row.name,
+      nickname:      row.nickname ?? null,
+      avatarEmoji:   row.avatar_emoji ?? null,
+      age:           row.age ?? null,
+      gradeLevel:    row.grade_level ?? null,
+      trainingMode:  row.training_mode ?? "speech_clarity",
+      targetSound:   row.target_sound ?? null,
+      teacherManaged: row.user_id === teacherUserId,
+      classrooms,
+    };
   }
 
   // ── Teacher self-serve provisioning (Teacher V2 Phase 1) ──────────────────────

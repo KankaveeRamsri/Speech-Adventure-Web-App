@@ -1,6 +1,7 @@
 import type {
   IProgressRepository,
   StartSessionInput,
+  ChildPracticeSummary,
 } from "@/lib/repositories/IProgressRepository";
 import type {
   SpeechProgress,
@@ -343,6 +344,95 @@ export class SupabaseProgressRepository implements IProgressRepository {
       return;
     }
     await this.clearProgress();
+  }
+
+  // ── Teacher V2 Phase 3: read another child's practice data ────────────────
+
+  async getChildProgress(childId: string): Promise<SpeechProgress> {
+    if (!childId) {
+      return { ...SERVER_PROGRESS };
+    }
+
+    const [profileRes, sessionsRes, attemptsRes] = await Promise.all([
+      this.client
+        .from("child_profiles")
+        .select("target_sound")
+        .eq("id", childId)
+        .maybeSingle(),
+      this.client
+        .from("practice_sessions")
+        .select("*")
+        .eq("child_id", childId)
+        .order("created_at", { ascending: false }),
+      this.client
+        .from("practice_attempts")
+        .select("*")
+        .eq("child_id", childId)
+        .order("created_at", { ascending: false }),
+    ]);
+
+    if (sessionsRes.error) {
+      warnRepo(
+        "SupabaseProgressRepository.getChildProgress (sessions)",
+        new QueryError("practice_sessions", "select", sessionsRes.error),
+      );
+    }
+    if (attemptsRes.error) {
+      warnRepo(
+        "SupabaseProgressRepository.getChildProgress (attempts)",
+        new QueryError("practice_attempts", "select", attemptsRes.error),
+      );
+    }
+
+    return {
+      childId,
+      targetSound: profileRes.data?.target_sound ?? DEFAULT_TARGET_SOUND,
+      sessions: (sessionsRes.data ?? []).map(dbToDomainSession),
+      attempts: (attemptsRes.data ?? []).map(dbToDomainAttempt),
+      updatedAt: new Date().toISOString(),
+    };
+  }
+
+  async getChildrenPracticeSummaries(
+    childIds: string[],
+  ): Promise<Map<string, ChildPracticeSummary>> {
+    const result = new Map<string, ChildPracticeSummary>();
+    const unique = [...new Set(childIds.filter(Boolean))];
+    if (unique.length === 0) return result;
+
+    // ONE query for every child. RLS filters rows to the accessible set.
+    const { data, error } = await this.client
+      .from("practice_attempts")
+      .select("child_id, score, created_at")
+      .in("child_id", unique);
+
+    if (error) {
+      warnRepo(
+        "SupabaseProgressRepository.getChildrenPracticeSummaries",
+        new QueryError("practice_attempts", "select", error),
+      );
+      return result;
+    }
+
+    const acc = new Map<string, { total: number; count: number; last: string | null }>();
+    for (const row of data ?? []) {
+      const r = row as { child_id: string; score: number; created_at: string };
+      const e = acc.get(r.child_id) ?? { total: 0, count: 0, last: null };
+      e.total += r.score;
+      e.count += 1;
+      if (!e.last || r.created_at > e.last) e.last = r.created_at;
+      acc.set(r.child_id, e);
+    }
+
+    for (const [childId, e] of acc) {
+      result.set(childId, {
+        childId,
+        attemptCount: e.count,
+        averageScore: e.count > 0 ? Math.round(e.total / e.count) : null,
+        lastPracticedAt: e.last,
+      });
+    }
+    return result;
   }
 
   // ── Session management ────────────────────────────────────────────────────

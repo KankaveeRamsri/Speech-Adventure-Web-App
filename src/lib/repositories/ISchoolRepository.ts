@@ -9,6 +9,7 @@ import type {
   CreateClassroomStudentInput,
   ClassroomStudentDetail,
   TeacherStudentDirectoryEntry,
+  TeacherStudentProfile,
   UserDisplayInfo,
   StudentParentLinkInfo,
 } from "@/types/school";
@@ -108,6 +109,13 @@ export interface ISchoolRepository {
   listClassroomStudentDetails(classroomId: string): Promise<ClassroomStudentDetail[]>;
   /** Every student across the teacher's active classrooms (Phase 2 §12). */
   listTeacherStudentDirectory(userId: string): Promise<TeacherStudentDirectoryEntry[]>;
+  /**
+   * Full profile for one student, for the Teacher Student Detail header
+   * (Phase 3). Returns null when the RLS-scoped child_profiles read finds
+   * nothing — i.e. the child does not exist OR the teacher has no access
+   * (the caller must not distinguish the two).
+   */
+  getStudentProfile(childId: string, teacherUserId: string): Promise<TeacherStudentProfile | null>;
   listClassroomsForTeacher(userId: string): Classroom[];
   listTeachersForClassroom(classroomId: string): ClassroomTeacher[];
 

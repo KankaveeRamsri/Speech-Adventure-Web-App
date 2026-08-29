@@ -1,49 +1,22 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
+import Link from "next/link";
 import TeacherPageShell from "@/components/teacher/TeacherPageShell";
 import NavIcon from "@/components/layout/NavIcon";
-import { useAuth } from "@/hooks/useAuth";
-import { useSchool } from "@/hooks/useSchool";
-import { useTeacherClassrooms } from "@/hooks/useTeacherClassrooms";
-import type { TeacherStudentDirectoryEntry } from "@/types/school";
+import { useTeacherStudentDirectory } from "@/hooks/useTeacherStudentDirectory";
+import { pct, thaiRelative } from "@/lib/teacher/format";
 
 export default function TeacherStudentsPage() {
-  const { user } = useAuth();
-  const { listTeacherStudentDirectory } = useSchool();
-  const { active: classrooms, status } = useTeacherClassrooms();
-
-  const [entries, setEntries] = useState<TeacherStudentDirectoryEntry[]>([]);
-  const [loadedKey, setLoadedKey] = useState<string | null>(null);
+  const { rows, classrooms, status } = useTeacherStudentDirectory();
   const [query, setQuery] = useState("");
   const [classroomFilter, setClassroomFilter] = useState("");
 
-  // Re-fetch whenever the set of classrooms the teacher owns changes.
-  const classroomsKey = classrooms.map((c) => c.id).sort().join(",");
-  const fetchKey = `${user?.id ?? ""}:${classroomsKey}`;
-  const loading = status === "loading" || (status === "ready" && loadedKey !== fetchKey);
-
-  useEffect(() => {
-    if (!user || status !== "ready") return;
-    let cancelled = false;
-    listTeacherStudentDirectory(user.id)
-      .then((rows) => {
-        if (cancelled) return;
-        setEntries(rows);
-        setLoadedKey(fetchKey);
-      })
-      .catch(() => {
-        if (!cancelled) setLoadedKey(fetchKey);
-      });
-    return () => {
-      cancelled = true;
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user?.id, status, fetchKey]);
+  const loading = status === "loading";
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
-    return entries.filter((e) => {
+    return rows.filter((e) => {
       const matchesQuery =
         !q ||
         e.name.toLowerCase().includes(q) ||
@@ -52,7 +25,7 @@ export default function TeacherStudentsPage() {
         !classroomFilter || e.classrooms.some((c) => c.id === classroomFilter);
       return matchesQuery && matchesClassroom;
     });
-  }, [entries, query, classroomFilter]);
+  }, [rows, query, classroomFilter]);
 
   return (
     <TeacherPageShell>
@@ -94,10 +67,10 @@ export default function TeacherStudentsPage() {
         {loading ? (
           <div className="space-y-2">
             {[1, 2, 3, 4].map((i) => (
-              <div key={i} className="h-14 rounded-xl bg-surface border border-border animate-pulse" />
+              <div key={i} className="h-16 rounded-xl bg-surface border border-border animate-pulse" />
             ))}
           </div>
-        ) : entries.length === 0 ? (
+        ) : rows.length === 0 ? (
           <div className="bg-surface border border-dashed border-border rounded-2xl p-10 text-center">
             <p className="text-sm text-text-muted">
               ยังไม่มีนักเรียน เพิ่มนักเรียนได้จากหน้าห้องเรียน
@@ -110,30 +83,42 @@ export default function TeacherStudentsPage() {
             {filtered.map((e) => {
               const label = e.nickname ? `${e.name} (${e.nickname})` : e.name;
               return (
-                <li
-                  key={e.childId}
-                  className="flex items-center justify-between gap-3 px-3 py-2.5 rounded-xl border border-border bg-surface"
-                >
-                  <div className="flex items-center gap-3 min-w-0">
-                    <div className="w-9 h-9 rounded-xl bg-primary/10 flex items-center justify-center flex-shrink-0 text-primary font-bold">
-                      {e.avatarEmoji ?? label.charAt(0)}
+                <li key={e.childId}>
+                  <Link
+                    href={`/teacher/students/${e.childId}`}
+                    className="flex items-center justify-between gap-3 px-3 py-3 rounded-xl border border-border bg-surface hover:border-primary/40 transition-colors"
+                  >
+                    <div className="flex items-center gap-3 min-w-0">
+                      <div className="w-9 h-9 rounded-xl bg-primary/10 flex items-center justify-center flex-shrink-0 text-primary font-bold">
+                        {e.avatarEmoji ?? label.charAt(0)}
+                      </div>
+                      <div className="min-w-0">
+                        <p className="text-sm text-text truncate">{label}</p>
+                        <p className="text-[11px] text-text-muted truncate">
+                          {e.classrooms.map((c) => c.name).join(", ") || "ไม่มีห้องเรียน"}
+                        </p>
+                      </div>
                     </div>
-                    <div className="min-w-0">
-                      <p className="text-sm text-text truncate">{label}</p>
-                      <p className="text-[11px] text-text-muted truncate">
-                        {e.classrooms.map((c) => c.name).join(", ") || "ไม่มีห้องเรียน"}
-                      </p>
+                    <div className="text-right flex-shrink-0">
+                      {e.practice ? (
+                        <>
+                          <p className="text-sm font-semibold text-text">
+                            {pct(e.practice.averageScore)}
+                          </p>
+                          <p className="text-[11px] text-text-muted">
+                            {e.practice.attemptCount} ครั้ง · {thaiRelative(e.practice.lastPracticedAt)}
+                          </p>
+                        </>
+                      ) : (
+                        <p className="text-[11px] text-text-muted italic">ยังไม่เริ่มฝึก</p>
+                      )}
                     </div>
-                  </div>
+                  </Link>
                 </li>
               );
             })}
           </ul>
         )}
-
-        <p className="text-[11px] text-text-muted">
-          รายละเอียดนักเรียนรายบุคคลจะเปิดให้ใช้งานในเฟสถัดไป
-        </p>
       </div>
     </TeacherPageShell>
   );

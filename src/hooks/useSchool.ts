@@ -13,6 +13,7 @@ import type {
   CreateClassroomStudentInput,
   ClassroomStudentDetail,
   TeacherStudentDirectoryEntry,
+  TeacherStudentProfile,
   UserDisplayInfo,
   StudentParentLinkInfo,
 } from "@/types/school";
@@ -156,6 +157,14 @@ export function useSchool() {
     return school.listTeacherStudentDirectory(userId);
   }
 
+  async function getStudentProfile(
+    childId: string,
+    teacherUserId: string,
+  ): Promise<TeacherStudentProfile | null> {
+    if (!school) return null;
+    return school.getStudentProfile(childId, teacherUserId);
+  }
+
   async function assignTeacher(classroomId: string, teacherUserId: string): Promise<ClassroomTeacher> {
     if (!school) throw new Error("School repository not available");
     return school.assignTeacherToClassroom(classroomId, teacherUserId);
@@ -244,6 +253,7 @@ export function useSchool() {
     moveStudentBetweenClassrooms,
     listClassroomStudentDetails,
     listTeacherStudentDirectory,
+    getStudentProfile,
     assignTeacher,
     removeTeacher,
     addChild,
